@@ -89,7 +89,9 @@ See [maps/README.md](maps/README.md) for source and orientation details. The fil
 
 ## Publishing to GHCR
 
-Pushing `main` publishes `ghcr.io/lukehollanddev/palworld-live-map:latest`, `:main`, and a commit tag. Pushing `v1.0.0` also publishes semantic `1.0.0` and `1.0` tags. Images target amd64 and arm64 and include provenance and an SBOM.
+Pushing `main` publishes `ghcr.io/lukehollanddev/palworld-live-map:latest`, `:main`, and a commit tag. Version tags follow semantic versioning: while the project is experimental, releases use `v0.0.X`; for example, `v0.0.1` publishes `:0.0.1` and `:0.0`. Once the interface is stable, `v1.0.0` publishes `:1.0.0` and `:1.0`. The `:latest` tag always tracks the newest build from `main`.
+
+Images target amd64 and arm64 and include provenance and an SBOM.
 
 The workflow uses the built-in `GITHUB_TOKEN`; no Docker Hub credentials are required. Set the resulting GHCR package to public if anonymous pulls should work. See GitHub's [container publishing guidance](https://docs.github.com/en/actions/tutorials/publish-packages/publish-docker-images).
 
