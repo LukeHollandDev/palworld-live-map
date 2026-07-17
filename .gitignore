@@ -1,0 +1,5 @@
+.DS_Store
+.env
+bin/
+coverage.out
+maps/*.webp

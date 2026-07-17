@@ -1,0 +1,36 @@
+name: palworld-live-map
+
+services:
+  map:
+    image: ghcr.io/lukehollanddev/palworld-live-map:latest
+    restart: unless-stopped
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    environment:
+      TZ: Europe/London
+      PALWORLD_REST_URL: http://server:8212
+      PALWORLD_ADMIN_PASSWORD: ${PALWORLD_ADMIN_PASSWORD:?set PALWORLD_ADMIN_PASSWORD}
+      SITE_TITLE: ${SITE_TITLE:-Palworld Live Map}
+      POLL_INTERVAL: ${POLL_INTERVAL:-5s}
+      WORLD_DATA_ENABLED: "true"
+      WORLD_POLL_INTERVAL: ${WORLD_POLL_INTERVAL:-15s}
+      MAP_ASSET_DIR: /maps
+    volumes:
+      - ./maps:/maps:ro
+    expose:
+      - "8080"
+    networks:
+      palworld: {}
+      homelab_proxy:
+        aliases:
+          - palworld-live-map
+
+networks:
+  palworld:
+    external: true
+    name: palworld_default
+  homelab_proxy:
+    external: true

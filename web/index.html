@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="dark">
+    <title>Palworld Live Map</title>
+    <link rel="stylesheet" href="/styles.css">
+    <script src="/app.js" defer></script>
+  </head>
+  <body>
+    <div class="app">
+      <header class="topbar">
+        <h1 id="siteTitle">Palworld Live Map</h1>
+        <div class="server-state">
+          <span id="statusDot" class="status-dot"></span>
+          <span id="statusText">Connecting…</span>
+          <span class="divider">·</span>
+          <span id="updatedText">Waiting for data</span>
+        </div>
+        <button id="toggleFilters" class="header-button" type="button">Layers</button>
+      </header>
+
+      <main class="map-shell">
+        <div id="mapViewport" class="map-viewport">
+          <div id="mapScene" class="map-scene">
+            <img id="mapImage" class="map-image" alt="" draggable="false">
+            <div class="fallback-grid" aria-hidden="true"></div>
+            <div id="markerLayer" class="marker-layer"></div>
+          </div>
+
+          <div id="layerTabs" class="layer-tabs" role="tablist" aria-label="World region"></div>
+
+          <aside id="filterPanel" class="filter-panel" aria-label="Map filters">
+            <div class="panel-title">
+              <strong>Map layers</strong>
+              <button id="closeFilters" type="button" aria-label="Close layers">×</button>
+            </div>
+
+            <label class="search-field">
+              <span>Find</span>
+              <input id="searchInput" type="search" placeholder="Player, Pal, base…" autocomplete="off">
+            </label>
+
+            <label class="level-field">
+              <span>Minimum level</span>
+              <select id="levelFilter">
+                <option value="0">Any level</option>
+                <option value="10">10+</option>
+                <option value="20">20+</option>
+                <option value="30">30+</option>
+                <option value="40">40+</option>
+                <option value="50">50+</option>
+              </select>
+            </label>
+
+            <div id="legend" class="legend">
+              <label data-kind="players">
+                <input type="checkbox" value="players" checked>
+                <span class="legend-symbol players"></span>
+                <span>Players</span>
+                <output>0</output>
+              </label>
+              <label data-kind="bases">
+                <input type="checkbox" value="bases" checked>
+                <span class="legend-symbol bases"></span>
+                <span>Bases</span>
+                <output>0</output>
+              </label>
+              <label data-kind="workers">
+                <input type="checkbox" value="workers">
+                <span class="legend-symbol workers"></span>
+                <span>Base workers</span>
+                <output>0</output>
+              </label>
+              <label data-kind="companions">
+                <input type="checkbox" value="companions">
+                <span class="legend-symbol companions"></span>
+                <span>Companion Pals</span>
+                <output>0</output>
+              </label>
+              <label data-kind="wild-pals">
+                <input type="checkbox" value="wild-pals">
+                <span class="legend-symbol wild-pals"></span>
+                <span>Wild Pals</span>
+                <output>0</output>
+              </label>
+              <label data-kind="npcs">
+                <input type="checkbox" value="npcs">
+                <span class="legend-symbol npcs"></span>
+                <span>NPCs</span>
+                <output>0</output>
+              </label>
+            </div>
+
+            <p id="objectNotice" class="object-notice" hidden></p>
+          </aside>
+
+          <div id="mapNotice" class="map-notice" hidden>Map artwork is not installed.</div>
+
+          <div class="map-controls" aria-label="Map controls">
+            <button id="zoomOut" type="button" aria-label="Zoom out">−</button>
+            <button id="fitMap" type="button">Fit</button>
+            <button id="zoomIn" type="button" aria-label="Zoom in">+</button>
+          </div>
+
+          <div id="cursorCoordinates" class="coordinate-readout">X 0 · Y 0</div>
+        </div>
+      </main>
+    </div>
+  </body>
+</html>

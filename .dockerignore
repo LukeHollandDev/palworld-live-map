@@ -1,0 +1,9 @@
+.git
+.github
+.env
+maps/*.webp
+deploy
+Dockerfile*
+README.md
+LICENSE
+SECURITY.md
