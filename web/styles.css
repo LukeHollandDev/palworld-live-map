@@ -45,7 +45,7 @@ button { color: inherit; }
 }
 
 .map-shell, .map-viewport { position: relative; min-height: 0; width: 100%; height: 100%; }
-.map-viewport { overflow: hidden; background: #111416; cursor: grab; touch-action: none; }
+.map-viewport { overflow: hidden; background: #111416; cursor: grab; touch-action: pinch-zoom; }
 .map-viewport.dragging { cursor: grabbing; }
 
 .map-scene {
@@ -59,6 +59,7 @@ button { color: inherit; }
 }
 
 .map-image, .fallback-grid, .marker-layer { position: absolute; inset: 0; width: 100%; height: 100%; }
+.marker-sublayer { position: absolute; inset: 0; }
 .map-image { display: block; object-fit: fill; user-select: none; }
 .map-image[hidden] { display: none; }
 .fallback-grid {

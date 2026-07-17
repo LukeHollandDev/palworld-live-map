@@ -16,12 +16,12 @@
           <p id="serverDescription" hidden></p>
         </div>
         <div class="server-state">
-          <span id="statusDot" class="status-dot"></span>
-          <span id="statusText">Connecting…</span>
+          <span id="statusDot" class="status-dot" aria-hidden="true"></span>
+          <span id="statusText" role="status">Connecting…</span>
           <span class="divider">·</span>
           <span id="updatedText">Waiting for data</span>
         </div>
-        <button id="toggleFilters" class="header-button" type="button">Layers</button>
+        <button id="toggleFilters" class="header-button" type="button" aria-controls="filterPanel" aria-expanded="true">Layers</button>
       </header>
 
       <main class="map-shell">
@@ -29,10 +29,13 @@
           <div id="mapScene" class="map-scene">
             <img id="mapImage" class="map-image" alt="" draggable="false">
             <div class="fallback-grid" aria-hidden="true"></div>
-            <div id="markerLayer" class="marker-layer"></div>
+            <div id="markerLayer" class="marker-layer">
+              <div id="objectMarkerLayer" class="marker-sublayer"></div>
+              <div id="playerMarkerLayer" class="marker-sublayer"></div>
+            </div>
           </div>
 
-          <div id="layerTabs" class="layer-tabs" role="tablist" aria-label="World region"></div>
+          <div id="layerTabs" class="layer-tabs" role="group" aria-label="World region"></div>
 
           <aside id="filterPanel" class="filter-panel" aria-label="Map filters">
             <div class="panel-title">

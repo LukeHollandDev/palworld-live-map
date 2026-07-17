@@ -12,6 +12,7 @@ import (
 	"sort"
 	"strings"
 	"time"
+	"unicode/utf8"
 )
 
 const maxResponseBytes = 2 << 20
@@ -315,6 +316,9 @@ func cleanText(value string, limit int) string {
 	}, value))
 	if len(value) > limit {
 		value = value[:limit]
+		for !utf8.ValidString(value) {
+			value = value[:len(value)-1]
+		}
 	}
 	return value
 }

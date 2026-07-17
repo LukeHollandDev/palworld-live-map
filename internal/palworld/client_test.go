@@ -100,6 +100,27 @@ func TestNewClientRejectsUnsafeURL(t *testing.T) {
 	}
 }
 
+func TestCleanTextTruncatesAtUTF8Boundary(t *testing.T) {
+	tests := []struct {
+		name  string
+		value string
+		limit int
+		want  string
+	}{
+		{name: "two byte rune", value: "12345é", limit: 6, want: "12345"},
+		{name: "three byte rune", value: "12345€", limit: 7, want: "12345"},
+		{name: "four byte rune", value: "12345🌍", limit: 8, want: "12345"},
+		{name: "complete rune", value: "12345é", limit: 7, want: "12345é"},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			if got := cleanText(test.value, test.limit); got != test.want {
+				t.Fatalf("cleanText(%q, %d) = %q, want %q", test.value, test.limit, got, test.want)
+			}
+		})
+	}
+}
+
 func TestClientWorldObjectsSanitizesAndClassifiesActors(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/v1/api/game-data" {

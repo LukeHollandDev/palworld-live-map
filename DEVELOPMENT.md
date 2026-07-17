@@ -14,7 +14,7 @@ The service uses three upstream endpoints:
 
 Only fields needed by the UI are exposed publicly. Account names, player IDs, user IDs, IP addresses, the world GUID, and REST credentials are not represented in the browser-facing models.
 
-Player data is refreshed using `POLL_INTERVAL`; world objects use `WORLD_POLL_INTERVAL`; server information is refreshed once per minute. A single set of background pollers serves every connected browser. The last successful player, world-object, and server-information results are retained when Palworld is temporarily unavailable, with stale data identified in the UI.
+Player data is refreshed using `POLL_INTERVAL`; world objects use `WORLD_POLL_INTERVAL`; server information is refreshed once per minute. A single set of background pollers serves every connected browser. Browsers fetch `/api/players` and `/api/objects` independently at those same respective intervals, so unchanged world-object data is not retransmitted with every player update. The combined `/api/state` route remains available for compatibility. The last successful player, world-object, and server-information results are retained when Palworld is temporarily unavailable, with stale data identified in the UI.
 
 The game-data endpoint represents currently loaded characters and Palboxes. It does not contain every placed wall, chest, crafting station, or other building part. Supporting those would require a separate save-file parser.
 

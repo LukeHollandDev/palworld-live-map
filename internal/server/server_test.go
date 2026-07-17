@@ -49,6 +49,56 @@ func TestStateIsPublicAndSanitized(t *testing.T) {
 	}
 }
 
+func TestSplitStateEndpointsDoNotRepeatUnrelatedData(t *testing.T) {
+	cfg := testConfig()
+	source := fixedSnapshot{value: palworld.Snapshot{
+		Server:           palworld.ServerInfo{Name: "The Chaos"},
+		Connected:        true,
+		Players:          []palworld.Player{{Name: "Luke", Level: 55, X: 10, Y: -20, Map: "palpagos"}},
+		ObjectsAvailable: true,
+		Objects:          []palworld.WorldObject{{Kind: "bases", Name: "Home", X: 5, Y: 6, Map: "palpagos"}},
+	}}
+	service, err := New(cfg, source)
+	if err != nil {
+		t.Fatalf("New() error = %v", err)
+	}
+
+	players := httptest.NewRecorder()
+	service.Handler().ServeHTTP(players, httptest.NewRequest(http.MethodGet, "/api/players", nil))
+	if players.Code != http.StatusOK || !strings.Contains(players.Body.String(), `"name":"Luke"`) {
+		t.Fatalf("players response = status %d, body %s", players.Code, players.Body.String())
+	}
+	if strings.Contains(players.Body.String(), `"name":"Home"`) || strings.Contains(players.Body.String(), `"objects"`) {
+		t.Fatalf("players response contains world objects: %s", players.Body.String())
+	}
+
+	objects := httptest.NewRecorder()
+	service.Handler().ServeHTTP(objects, httptest.NewRequest(http.MethodGet, "/api/objects", nil))
+	if objects.Code != http.StatusOK || !strings.Contains(objects.Body.String(), `"name":"Home"`) {
+		t.Fatalf("objects response = status %d, body %s", objects.Code, objects.Body.String())
+	}
+	if strings.Contains(objects.Body.String(), `"name":"Luke"`) || strings.Contains(objects.Body.String(), `"players"`) {
+		t.Fatalf("objects response contains players: %s", objects.Body.String())
+	}
+}
+
+func TestPublicConfigAndObjectsExposeDisabledWorldData(t *testing.T) {
+	cfg := testConfig()
+	cfg.WorldDataEnabled = false
+	service, err := New(cfg, fixedSnapshot{})
+	if err != nil {
+		t.Fatalf("New() error = %v", err)
+	}
+
+	for _, path := range []string{"/api/config", "/api/objects"} {
+		response := httptest.NewRecorder()
+		service.Handler().ServeHTTP(response, httptest.NewRequest(http.MethodGet, path, nil))
+		if response.Code != http.StatusOK || !strings.Contains(response.Body.String(), `"enabled":false`) && !strings.Contains(response.Body.String(), `"worldDataEnabled":false`) {
+			t.Fatalf("%s response = status %d, body %s", path, response.Code, response.Body.String())
+		}
+	}
+}
+
 func TestServerServesOnlyKnownEmbeddedMapArtwork(t *testing.T) {
 	service, err := New(testConfig(), fixedSnapshot{})
 	if err != nil {
