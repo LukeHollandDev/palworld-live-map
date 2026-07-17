@@ -6,9 +6,9 @@ import (
 	"io/fs"
 	"mime"
 	"net/http"
-	"os"
 	"path/filepath"
 
+	mapassets "github.com/LukeHollandDev/palworld-live-map/assets"
 	"github.com/LukeHollandDev/palworld-live-map/internal/config"
 	"github.com/LukeHollandDev/palworld-live-map/internal/palworld"
 	"github.com/LukeHollandDev/palworld-live-map/web"
@@ -22,6 +22,7 @@ type Server struct {
 	cfg     config.Config
 	source  snapshotSource
 	assets  fs.FS
+	maps    fs.FS
 	handler http.Handler
 }
 
@@ -33,13 +34,17 @@ type mapLayer struct {
 }
 
 func New(cfg config.Config, source snapshotSource) (*Server, error) {
-	assets, err := fs.Sub(web.Assets, ".")
+	webAssets, err := fs.Sub(web.Assets, ".")
 	if err != nil {
 		return nil, fmt.Errorf("open embedded web assets: %w", err)
 	}
+	maps, err := fs.Sub(mapassets.Maps, "map")
+	if err != nil {
+		return nil, fmt.Errorf("open embedded map assets: %w", err)
+	}
 
 	s := &Server{
-		cfg: cfg, source: source, assets: assets,
+		cfg: cfg, source: source, assets: webAssets, maps: maps,
 	}
 	s.handler = s.securityHeaders(s.routes())
 	return s, nil
@@ -57,11 +62,8 @@ func (s *Server) routes() http.Handler {
 	mux.HandleFunc("GET /", s.index)
 	mux.HandleFunc("GET /app.js", s.static("app.js"))
 	mux.HandleFunc("GET /styles.css", s.static("styles.css"))
-
-	if s.cfg.MapAssetDir != "" {
-		mux.HandleFunc("GET /map-assets/palpagos.webp", s.mapAsset("palpagos.webp"))
-		mux.HandleFunc("GET /map-assets/world-tree.webp", s.mapAsset("world-tree.webp"))
-	}
+	mux.HandleFunc("GET /assets/map/palpagos.jpg", s.mapAsset("palpagos.jpg"))
+	mux.HandleFunc("GET /assets/map/world-tree.jpg", s.mapAsset("world-tree.jpg"))
 
 	return mux
 }
@@ -75,18 +77,17 @@ func (s *Server) publicConfig(w http.ResponseWriter, _ *http.Request) {
 		{
 			ID:       "palpagos",
 			Name:     "Palpagos",
-			ImageURL: s.mapImage("palpagos.webp"),
+			ImageURL: "/assets/map/palpagos.jpg",
 			Bounds:   [4]float64{349400, 724400, -1099400, -724400},
 		},
 		{
 			ID:       "world-tree",
 			Name:     "World Tree",
-			ImageURL: s.mapImage("world-tree.webp"),
+			ImageURL: "/assets/map/world-tree.jpg",
 			Bounds:   [4]float64{689148.5, -476400, 347351.5, -818197},
 		},
 	}
 	writeJSON(w, http.StatusOK, map[string]any{
-		"title":          s.cfg.SiteTitle,
 		"pollIntervalMs": s.cfg.PollInterval.Milliseconds(),
 		"layers":         layers,
 	})
@@ -124,27 +125,16 @@ func (s *Server) serveAsset(w http.ResponseWriter, r *http.Request, name string)
 	_, _ = w.Write(data)
 }
 
-func (s *Server) mapImage(name string) string {
-	if s.cfg.MapAssetDir == "" {
-		return ""
-	}
-	info, err := os.Stat(filepath.Join(s.cfg.MapAssetDir, name))
-	if err != nil || info.IsDir() {
-		return ""
-	}
-	return "/map-assets/" + name
-}
-
 func (s *Server) mapAsset(name string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		path := filepath.Join(s.cfg.MapAssetDir, name)
-		info, err := os.Stat(path)
-		if err != nil || info.IsDir() {
+		data, err := fs.ReadFile(s.maps, name)
+		if err != nil {
 			http.NotFound(w, r)
 			return
 		}
+		w.Header().Set("Content-Type", "image/jpeg")
 		w.Header().Set("Cache-Control", "public, max-age=3600")
-		http.ServeFile(w, r, path)
+		_, _ = w.Write(data)
 	}
 }
 

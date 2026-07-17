@@ -26,6 +26,12 @@ type Player struct {
 	Map   string  `json:"map"`
 }
 
+type ServerInfo struct {
+	Name        string `json:"name"`
+	Description string `json:"description,omitempty"`
+	Version     string `json:"version,omitempty"`
+}
+
 type WorldObject struct {
 	Kind   string  `json:"kind"`
 	Name   string  `json:"name"`
@@ -60,6 +66,12 @@ type playersResponse struct {
 	} `json:"players"`
 }
 
+type infoResponse struct {
+	Version     string `json:"version"`
+	ServerName  string `json:"servername"`
+	Description string `json:"description"`
+}
+
 type worldResponse struct {
 	ActorData []struct {
 		Type      string  `json:"Type"`
@@ -92,6 +104,41 @@ func NewClient(rawURL, adminPassword string, timeout, worldTimeout time.Duration
 		adminPassword: adminPassword,
 		httpClient:    &http.Client{Timeout: timeout, CheckRedirect: noRedirect},
 		worldClient:   &http.Client{Timeout: worldTimeout, CheckRedirect: noRedirect},
+	}, nil
+}
+
+func (c *Client) Info(ctx context.Context) (ServerInfo, error) {
+	endpoint := c.baseURL.ResolveReference(&url.URL{Path: "/v1/api/info"})
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint.String(), nil)
+	if err != nil {
+		return ServerInfo{}, fmt.Errorf("create server info request: %w", err)
+	}
+	req.Header.Set("Accept", "application/json")
+	req.SetBasicAuth("admin", c.adminPassword)
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return ServerInfo{}, fmt.Errorf("request server info: %w", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, 4096))
+		return ServerInfo{}, fmt.Errorf("request server info: %w", &HTTPStatusError{Status: resp.StatusCode})
+	}
+
+	var payload infoResponse
+	decoder := json.NewDecoder(io.LimitReader(resp.Body, maxResponseBytes))
+	if err := decoder.Decode(&payload); err != nil {
+		return ServerInfo{}, fmt.Errorf("decode server info response: %w", err)
+	}
+	name := cleanName(payload.ServerName)
+	if name == "" {
+		return ServerInfo{}, errors.New("server info response has no server name")
+	}
+	return ServerInfo{
+		Name:        name,
+		Description: cleanText(payload.Description, 256),
+		Version:     cleanName(payload.Version),
 	}, nil
 }
 
@@ -256,14 +303,18 @@ func humanizeClass(value string) string {
 }
 
 func cleanName(value string) string {
+	return cleanText(value, 96)
+}
+
+func cleanText(value string, limit int) string {
 	value = strings.TrimSpace(strings.Map(func(r rune) rune {
 		if r < 0x20 || r == 0x7f {
 			return -1
 		}
 		return r
 	}, value))
-	if len(value) > 96 {
-		value = value[:96]
+	if len(value) > limit {
+		value = value[:limit]
 	}
 	return value
 }

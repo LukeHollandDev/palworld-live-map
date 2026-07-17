@@ -3,8 +3,6 @@ package server
 import (
 	"net/http"
 	"net/http/httptest"
-	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -22,7 +20,7 @@ func testConfig() config.Config {
 		RESTURL: "http://palworld:8212", AdminPassword: "admin-secret-never-expose",
 		PollInterval: 5 * time.Second, UpstreamTimeout: 4 * time.Second,
 		WorldPollInterval: 15 * time.Second, WorldTimeout: 10 * time.Second,
-		WorldDataEnabled: true, SiteTitle: "Test Map",
+		WorldDataEnabled: true,
 	}
 }
 
@@ -51,27 +49,18 @@ func TestStateIsPublicAndSanitized(t *testing.T) {
 	}
 }
 
-func TestServerRestrictsMapArtworkToKnownFiles(t *testing.T) {
-	dir := t.TempDir()
-	if err := os.WriteFile(filepath.Join(dir, "palpagos.webp"), []byte("private-map"), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(filepath.Join(dir, "secret.txt"), []byte("do-not-serve"), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	cfg := testConfig()
-	cfg.MapAssetDir = dir
-	service, err := New(cfg, fixedSnapshot{})
+func TestServerServesOnlyKnownEmbeddedMapArtwork(t *testing.T) {
+	service, err := New(testConfig(), fixedSnapshot{})
 	if err != nil {
 		t.Fatalf("New() error = %v", err)
 	}
 
 	allowed := httptest.NewRecorder()
-	service.Handler().ServeHTTP(allowed, httptest.NewRequest(http.MethodGet, "/map-assets/palpagos.webp", nil))
-	if allowed.Code != http.StatusOK || allowed.Body.String() != "private-map" {
-		t.Fatalf("map response = %d %q", allowed.Code, allowed.Body.String())
+	service.Handler().ServeHTTP(allowed, httptest.NewRequest(http.MethodGet, "/assets/map/palpagos.jpg", nil))
+	if allowed.Code != http.StatusOK || allowed.Header().Get("Content-Type") != "image/jpeg" || allowed.Body.Len() < 1_000_000 {
+		t.Fatalf("map response = status %d, type %q, size %d", allowed.Code, allowed.Header().Get("Content-Type"), allowed.Body.Len())
 	}
-	for _, path := range []string{"/map-assets/secret.txt", "/map-assets/"} {
+	for _, path := range []string{"/assets/map/secret.txt", "/assets/map/"} {
 		response := httptest.NewRecorder()
 		service.Handler().ServeHTTP(response, httptest.NewRequest(http.MethodGet, path, nil))
 		if response.Code != http.StatusNotFound {

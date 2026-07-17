@@ -10,6 +10,37 @@ import (
 	"time"
 )
 
+func TestClientInfoSanitizesUpstreamResponse(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/v1/api/info" {
+			t.Fatalf("path = %q", r.URL.Path)
+		}
+		username, password, ok := r.BasicAuth()
+		if !ok || username != "admin" || password != "admin-secret" {
+			t.Fatalf("unexpected basic auth: %q %q %v", username, password, ok)
+		}
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"servername":  " The Chaos\u0000 ",
+			"description": " Official Palworld server. ",
+			"version":     "v1.0.0",
+			"worldguid":   "private-world-id",
+		})
+	}))
+	defer server.Close()
+
+	client, err := NewClient(server.URL, "admin-secret", time.Second, time.Second)
+	if err != nil {
+		t.Fatal(err)
+	}
+	info, err := client.Info(context.Background())
+	if err != nil {
+		t.Fatalf("Info() error = %v", err)
+	}
+	if info.Name != "The Chaos" || info.Description != "Official Palworld server." || info.Version != "v1.0.0" {
+		t.Fatalf("info = %#v", info)
+	}
+}
+
 func TestClientPlayersSanitizesUpstreamResponse(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/v1/api/players" {

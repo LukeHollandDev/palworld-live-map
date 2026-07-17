@@ -11,10 +11,16 @@ import (
 )
 
 type stubSource struct {
+	info      ServerInfo
+	infoErr   error
 	players   []Player
 	playerErr error
 	objects   []WorldObject
 	objectErr error
+}
+
+func (s *stubSource) Info(context.Context) (ServerInfo, error) {
+	return s.info, s.infoErr
 }
 
 func (s *stubSource) Players(context.Context) ([]Player, error) {
@@ -31,25 +37,30 @@ func testPoller(source Source) *Poller {
 
 func TestPollerRetainsLastGoodSnapshots(t *testing.T) {
 	source := &stubSource{
+		info:    ServerInfo{Name: "The Chaos", Description: "A Palworld server", Version: "v1.0.0"},
 		players: []Player{{Name: "Lamball", Level: 3}},
 		objects: []WorldObject{{Kind: "bases", Name: "Home"}},
 	}
 	poller := testPoller(source)
+	poller.refreshInfo(context.Background())
 	poller.refreshPlayers(context.Background())
 	poller.refreshWorld(context.Background())
 	first := poller.Snapshot()
-	if !first.Connected || first.Stale || !first.ObjectsAvailable || len(first.Objects) != 1 {
+	if first.Server.Name != "The Chaos" || !first.Connected || first.Stale || !first.ObjectsAvailable || len(first.Objects) != 1 {
 		t.Fatalf("first snapshot = %#v", first)
 	}
 
 	source.players = nil
+	source.info = ServerInfo{}
+	source.infoErr = errors.New("offline")
 	source.playerErr = errors.New("offline")
 	source.objects = nil
 	source.objectErr = errors.New("offline")
+	poller.refreshInfo(context.Background())
 	poller.refreshPlayers(context.Background())
 	poller.refreshWorld(context.Background())
 	stale := poller.Snapshot()
-	if stale.Connected || !stale.Stale || !stale.ObjectsStale || len(stale.Players) != 1 || len(stale.Objects) != 1 {
+	if stale.Server.Name != "The Chaos" || stale.Connected || !stale.Stale || !stale.ObjectsStale || len(stale.Players) != 1 || len(stale.Objects) != 1 {
 		t.Fatalf("stale snapshot = %#v", stale)
 	}
 
