@@ -18,8 +18,6 @@ type Config struct {
 	WorldPollInterval time.Duration
 	WorldTimeout      time.Duration
 	WorldDataEnabled  bool
-	MapAssetDir       string
-	SiteTitle         string
 }
 
 func Load() (Config, error) {
@@ -53,8 +51,6 @@ func Load() (Config, error) {
 		WorldPollInterval: worldPollInterval,
 		WorldTimeout:      worldTimeout,
 		WorldDataEnabled:  worldDataEnabled,
-		MapAssetDir:       strings.TrimSpace(os.Getenv("MAP_ASSET_DIR")),
-		SiteTitle:         envOr("SITE_TITLE", "Palworld Live Map"),
 	}
 
 	var missing []string

@@ -10,6 +10,7 @@ import (
 )
 
 type Snapshot struct {
+	Server             ServerInfo    `json:"server"`
 	Connected          bool          `json:"connected"`
 	Stale              bool          `json:"stale"`
 	LastSuccessAt      time.Time     `json:"lastSuccessAt,omitzero"`
@@ -22,6 +23,7 @@ type Snapshot struct {
 }
 
 type Source interface {
+	Info(context.Context) (ServerInfo, error)
 	Players(context.Context) ([]Player, error)
 	WorldObjects(context.Context) ([]WorldObject, error)
 }
@@ -48,7 +50,11 @@ func NewPoller(source Source, playerEvery, worldEvery time.Duration, worldEnable
 
 func (p *Poller) Run(ctx context.Context) {
 	var workers sync.WaitGroup
-	workers.Add(1)
+	workers.Add(2)
+	go func() {
+		defer workers.Done()
+		p.runInfo(ctx)
+	}()
 	go func() {
 		defer workers.Done()
 		p.runPlayers(ctx)
@@ -61,6 +67,20 @@ func (p *Poller) Run(ctx context.Context) {
 		}()
 	}
 	workers.Wait()
+}
+
+func (p *Poller) runInfo(ctx context.Context) {
+	p.refreshInfo(ctx)
+	ticker := time.NewTicker(time.Minute)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			p.refreshInfo(ctx)
+		}
+	}
 }
 
 func (p *Poller) runPlayers(ctx context.Context) {
@@ -98,6 +118,17 @@ func (p *Poller) Snapshot() Snapshot {
 	result.Players = append([]Player(nil), p.snapshot.Players...)
 	result.Objects = append([]WorldObject(nil), p.snapshot.Objects...)
 	return result
+}
+
+func (p *Poller) refreshInfo(ctx context.Context) {
+	info, err := p.source.Info(ctx)
+	if err != nil {
+		p.logger.Warn("Palworld server-info refresh failed", "error", err)
+		return
+	}
+	p.mu.Lock()
+	p.snapshot.Server = info
+	p.mu.Unlock()
 }
 
 func (p *Poller) refreshPlayers(ctx context.Context) {

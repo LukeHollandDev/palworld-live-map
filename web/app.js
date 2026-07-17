@@ -6,6 +6,7 @@
   const enabledKinds = new Set(['players', 'bases'])
 
   const siteTitle = document.querySelector('#siteTitle')
+  const serverDescription = document.querySelector('#serverDescription')
   const statusDot = document.querySelector('#statusDot')
   const statusText = document.querySelector('#statusText')
   const updatedText = document.querySelector('#updatedText')
@@ -40,8 +41,6 @@
     try {
       config = await requestJSON('/api/config')
       activeLayer = config.layers[0]
-      document.title = config.title
-      siteTitle.textContent = config.title
       buildLayerTabs()
       resetView()
       await refresh()
@@ -62,6 +61,7 @@
   }
 
   function render() {
+    renderServerInfo()
     const playerCount = snapshot.players?.length || 0
     if (snapshot.connected && !snapshot.stale) setStatus('live', `${playerCount} player${playerCount === 1 ? '' : 's'} online`)
     else if (snapshot.stale) setStatus('stale', `${playerCount} last known`)
@@ -70,6 +70,16 @@
     renderLegendCounts()
     renderMarkers()
     updateAge()
+  }
+
+  function renderServerInfo() {
+    const server = snapshot.server
+    if (!server?.name) return
+    document.title = server.name
+    siteTitle.textContent = server.name
+    serverDescription.textContent = server.description || ''
+    serverDescription.hidden = !server.description
+    serverDescription.title = server.version ? `Palworld ${server.version}` : ''
   }
 
   function setStatus(kind, text) {
