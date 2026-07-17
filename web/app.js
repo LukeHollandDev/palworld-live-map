@@ -10,6 +10,8 @@
   const statusDot = document.querySelector('#statusDot')
   const statusText = document.querySelector('#statusText')
   const updatedText = document.querySelector('#updatedText')
+  const toggleFilters = document.querySelector('#toggleFilters')
+  const closeFilters = document.querySelector('#closeFilters')
   const layerTabs = document.querySelector('#layerTabs')
   const filterPanel = document.querySelector('#filterPanel')
   const searchInput = document.querySelector('#searchInput')
@@ -20,16 +22,23 @@
   const mapScene = document.querySelector('#mapScene')
   const mapImage = document.querySelector('#mapImage')
   const markerLayer = document.querySelector('#markerLayer')
+  const objectMarkerLayer = document.querySelector('#objectMarkerLayer')
+  const playerMarkerLayer = document.querySelector('#playerMarkerLayer')
   const mapNotice = document.querySelector('#mapNotice')
   const cursorCoordinates = document.querySelector('#cursorCoordinates')
 
   let config = null
-  let snapshot = null
+  let playerState = null
+  let objectState = emptyObjectState(false)
   let activeLayer = null
-  let selectedMarker = null
-  let refreshTimer = null
+  let selectedMarkerKey = null
+  let selectedMarkerLayer = null
   let view = { scale: 1, x: 0, y: 0 }
   let drag = null
+
+  function emptyObjectState(enabled) {
+    return { enabled, available: false, stale: false, unsupported: false, objects: [] }
+  }
 
   async function requestJSON(path) {
     const response = await fetch(path, { cache: 'no-store' })
@@ -40,40 +49,59 @@
   async function boot() {
     try {
       config = await requestJSON('/api/config')
+      objectState = emptyObjectState(config.worldDataEnabled)
       activeLayer = config.layers[0]
       buildLayerTabs()
       resetView()
-      await refresh()
+      renderObjectAvailability()
+      renderLegendCounts()
+      void refreshPlayers()
+      if (config.worldDataEnabled) void refreshObjects()
     } catch {
       setStatus('offline', 'Map unavailable')
     }
   }
 
-  async function refresh() {
+  async function refreshPlayers() {
     try {
-      snapshot = await requestJSON('/api/state')
-      render()
+      playerState = await requestJSON('/api/players')
+      renderPlayerState()
     } catch {
       setStatus('offline', 'Map unavailable')
     } finally {
-      refreshTimer = window.setTimeout(refresh, config?.pollIntervalMs || 5000)
+      window.setTimeout(refreshPlayers, config?.pollIntervalMs || 5000)
     }
   }
 
-  function render() {
+  async function refreshObjects() {
+    try {
+      objectState = await requestJSON('/api/objects')
+      renderObjectAvailability()
+      renderLegendCounts()
+      renderObjectMarkers()
+    } catch {
+      objectNotice.hidden = false
+      objectNotice.textContent = objectState.available || objectState.stale
+        ? 'World object refresh failed; showing the last received snapshot.'
+        : 'World objects are temporarily unavailable.'
+    } finally {
+      window.setTimeout(refreshObjects, config?.worldPollIntervalMs || 15000)
+    }
+  }
+
+  function renderPlayerState() {
     renderServerInfo()
-    const playerCount = snapshot.players?.length || 0
-    if (snapshot.connected && !snapshot.stale) setStatus('live', `${playerCount} player${playerCount === 1 ? '' : 's'} online`)
-    else if (snapshot.stale) setStatus('stale', `${playerCount} last known`)
+    const playerCount = playerState.players?.length || 0
+    if (playerState.connected && !playerState.stale) setStatus('live', `${playerCount} player${playerCount === 1 ? '' : 's'} online`)
+    else if (playerState.stale) setStatus('stale', `${playerCount} last known`)
     else setStatus('offline', 'Server unavailable')
-    renderObjectAvailability()
     renderLegendCounts()
-    renderMarkers()
+    renderPlayerMarkers()
     updateAge()
   }
 
   function renderServerInfo() {
-    const server = snapshot.server
+    const server = playerState?.server
     if (!server?.name) return
     document.title = server.name
     siteTitle.textContent = server.name
@@ -83,20 +111,27 @@
   }
 
   function setStatus(kind, text) {
-    statusDot.className = `status-dot ${kind}`
-    statusText.textContent = text
+    const className = `status-dot ${kind}`
+    if (statusDot.className !== className) statusDot.className = className
+    if (statusText.textContent !== text) statusText.textContent = text
+  }
+
+  function playerItems() {
+    return (playerState?.players || []).map((player) => ({ ...player, kind: 'players', detail: `Level ${player.level}` }))
+  }
+
+  function objectItems() {
+    return objectState.objects || []
   }
 
   function allItems() {
-    if (!snapshot) return []
-    const players = (snapshot.players || []).map((player) => ({ ...player, kind: 'players', detail: `Level ${player.level}` }))
-    return players.concat(snapshot.objects || [])
+    return playerItems().concat(objectItems())
   }
 
-  function filteredItems() {
+  function filteredItems(items) {
     const query = searchInput.value.trim().toLowerCase()
     const minimumLevel = Number(levelFilter.value)
-    return allItems().filter((item) => {
+    return items.filter((item) => {
       if (item.map !== activeLayer.id || !enabledKinds.has(item.kind)) return false
       if ((item.level || 0) < minimumLevel) return false
       if (query && !`${item.name} ${item.detail || ''}`.toLowerCase().includes(query)) return false
@@ -105,19 +140,23 @@
   }
 
   function renderObjectAvailability() {
-    const available = snapshot.objectsAvailable || snapshot.objectsStale
+    const enabled = config?.worldDataEnabled && objectState.enabled
+    const available = enabled && (objectState.available || objectState.stale)
     for (const label of legend.querySelectorAll('label')) {
       const input = label.querySelector('input')
       if (input.value === 'players') continue
       input.disabled = !available
       label.classList.toggle('disabled', !available)
     }
+
     objectNotice.hidden = false
-    if (snapshot.objectsUnsupported) {
+    if (!enabled) {
+      objectNotice.textContent = 'Extra live layers are disabled by this map’s configuration.'
+    } else if (objectState.unsupported) {
       objectNotice.textContent = 'Extra live layers need ENABLE_GAMEDATA_API=true and a Palworld server restart.'
-    } else if (snapshot.objectsStale) {
+    } else if (objectState.stale) {
       objectNotice.textContent = 'World objects are using the last successful snapshot.'
-    } else if (!snapshot.objectsAvailable) {
+    } else if (!objectState.available) {
       objectNotice.textContent = 'Loading bases, Pals and NPCs…'
     } else {
       objectNotice.hidden = true
@@ -135,31 +174,73 @@
     }
   }
 
+  function renderPlayerMarkers() {
+    renderMarkerGroup(playerMarkerLayer, playerItems())
+  }
+
+  function renderObjectMarkers() {
+    renderMarkerGroup(objectMarkerLayer, objectItems())
+  }
+
   function renderMarkers() {
-    markerLayer.replaceChildren()
-    for (const item of filteredItems()) {
+    renderPlayerMarkers()
+    renderObjectMarkers()
+  }
+
+  function renderMarkerGroup(container, items) {
+    const focusedMarker = container.contains(document.activeElement) ? document.activeElement.closest('.map-marker') : null
+    const focusedKey = focusedMarker?.dataset.markerKey || null
+    const replacingSelection = selectedMarkerLayer === container.id
+    const occurrences = new Map()
+    const fragment = document.createDocumentFragment()
+
+    for (const item of filteredItems(items)) {
       const position = toScene(item, activeLayer)
       if (!position) continue
+      const baseKey = JSON.stringify([item.kind, item.map, item.name, item.detail || ''])
+      const occurrence = occurrences.get(baseKey) || 0
+      occurrences.set(baseKey, occurrence + 1)
+
       const marker = document.createElement('button')
       marker.type = 'button'
       marker.className = `map-marker ${item.kind}`
+      marker.dataset.markerKey = `${baseKey}:${occurrence}`
       marker.style.left = `${position.x}px`
       marker.style.top = `${position.y}px`
       marker.style.setProperty('--marker-inverse', String(1 / view.scale))
       marker.setAttribute('aria-label', markerText(item))
-      marker.addEventListener('pointerdown', (event) => event.stopPropagation())
-      marker.addEventListener('click', (event) => {
-        event.stopPropagation()
-        if (selectedMarker) selectedMarker.classList.remove('selected')
-        selectedMarker = marker
-        marker.classList.add('selected')
-      })
+
       const label = document.createElement('span')
       label.className = 'marker-label'
       label.textContent = markerText(item)
       marker.append(label)
-      markerLayer.append(marker)
+      fragment.append(marker)
     }
+
+    container.replaceChildren(fragment)
+
+    if (selectedMarkerKey) {
+      const selected = findMarker(selectedMarkerLayer, selectedMarkerKey)
+      if (selected) selected.classList.add('selected')
+      else if (replacingSelection) clearSelection()
+    }
+    if (focusedKey) {
+      const focused = findMarker(container.id, focusedKey)
+      if (focused) focused.focus({ preventScroll: true })
+    }
+  }
+
+  function findMarker(layerID, key) {
+    const layer = document.getElementById(layerID)
+    if (!layer) return null
+    return Array.from(layer.querySelectorAll('.map-marker')).find((marker) => marker.dataset.markerKey === key) || null
+  }
+
+  function clearSelection() {
+    const selected = selectedMarkerKey ? findMarker(selectedMarkerLayer, selectedMarkerKey) : null
+    if (selected) selected.classList.remove('selected')
+    selectedMarkerKey = null
+    selectedMarkerLayer = null
   }
 
   function markerText(item) {
@@ -172,16 +253,17 @@
     for (const layer of config.layers) {
       const button = document.createElement('button')
       button.type = 'button'
-      button.role = 'tab'
       button.textContent = layer.name
       button.className = layer.id === activeLayer.id ? 'active' : ''
-      button.setAttribute('aria-selected', String(layer.id === activeLayer.id))
+      button.setAttribute('aria-pressed', String(layer.id === activeLayer.id))
       button.addEventListener('click', () => {
+        if (layer.id === activeLayer.id) return
         activeLayer = layer
-        selectedMarker = null
+        clearSelection()
         buildLayerTabs()
         resetView()
-        if (snapshot) render()
+        renderLegendCounts()
+        renderMarkers()
       })
       layerTabs.append(button)
     }
@@ -239,7 +321,7 @@
 
   function applyView() {
     mapScene.style.transform = `translate(${view.x}px, ${view.y}px) scale(${view.scale})`
-    for (const marker of markerLayer.children) marker.style.setProperty('--marker-inverse', String(1 / view.scale))
+    for (const marker of markerLayer.querySelectorAll('.map-marker')) marker.style.setProperty('--marker-inverse', String(1 / view.scale))
   }
 
   function zoomAt(nextScale, clientX, clientY) {
@@ -256,6 +338,19 @@
     clampView()
     applyView()
   }
+
+  markerLayer.addEventListener('pointerdown', (event) => {
+    if (event.target.closest('.map-marker')) event.stopPropagation()
+  })
+  markerLayer.addEventListener('click', (event) => {
+    const marker = event.target.closest('.map-marker')
+    if (!marker || !markerLayer.contains(marker)) return
+    event.stopPropagation()
+    clearSelection()
+    selectedMarkerKey = marker.dataset.markerKey
+    selectedMarkerLayer = marker.parentElement.id
+    marker.classList.add('selected')
+  })
 
   mapViewport.addEventListener('wheel', (event) => {
     event.preventDefault()
@@ -304,8 +399,14 @@
   })
   searchInput.addEventListener('input', renderMarkers)
   levelFilter.addEventListener('change', renderMarkers)
-  document.querySelector('#toggleFilters').addEventListener('click', () => { filterPanel.hidden = !filterPanel.hidden })
-  document.querySelector('#closeFilters').addEventListener('click', () => { filterPanel.hidden = true })
+
+  function setFiltersOpen(open) {
+    filterPanel.hidden = !open
+    toggleFilters.setAttribute('aria-expanded', String(open))
+  }
+
+  toggleFilters.addEventListener('click', () => setFiltersOpen(filterPanel.hidden))
+  closeFilters.addEventListener('click', () => setFiltersOpen(false))
   document.querySelector('#zoomIn').addEventListener('click', () => {
     const rect = mapViewport.getBoundingClientRect()
     zoomAt(view.scale * 1.35, rect.left + rect.width / 2, rect.top + rect.height / 2)
@@ -318,11 +419,11 @@
   new ResizeObserver(resetView).observe(mapViewport)
 
   function updateAge() {
-    if (!snapshot?.lastSuccessAt) {
+    if (!playerState?.lastSuccessAt) {
       updatedText.textContent = 'Waiting for data'
       return
     }
-    const seconds = Math.max(0, Math.round((Date.now() - new Date(snapshot.lastSuccessAt).getTime()) / 1000))
+    const seconds = Math.max(0, Math.round((Date.now() - new Date(playerState.lastSuccessAt).getTime()) / 1000))
     updatedText.textContent = seconds < 2 ? 'Updated now' : `Updated ${seconds}s ago`
   }
 

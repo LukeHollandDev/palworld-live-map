@@ -7,6 +7,7 @@ import (
 	"mime"
 	"net/http"
 	"path/filepath"
+	"time"
 
 	mapassets "github.com/LukeHollandDev/palworld-live-map/assets"
 	"github.com/LukeHollandDev/palworld-live-map/internal/config"
@@ -31,6 +32,23 @@ type mapLayer struct {
 	Name     string     `json:"name"`
 	ImageURL string     `json:"imageUrl,omitempty"`
 	Bounds   [4]float64 `json:"bounds"`
+}
+
+type playerState struct {
+	Server        palworld.ServerInfo `json:"server"`
+	Connected     bool                `json:"connected"`
+	Stale         bool                `json:"stale"`
+	LastSuccessAt time.Time           `json:"lastSuccessAt,omitzero"`
+	Players       []palworld.Player   `json:"players"`
+}
+
+type objectState struct {
+	Enabled     bool                   `json:"enabled"`
+	Available   bool                   `json:"available"`
+	Stale       bool                   `json:"stale"`
+	Unsupported bool                   `json:"unsupported"`
+	UpdatedAt   time.Time              `json:"updatedAt,omitzero"`
+	Objects     []palworld.WorldObject `json:"objects"`
 }
 
 func New(cfg config.Config, source snapshotSource) (*Server, error) {
@@ -58,6 +76,8 @@ func (s *Server) routes() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /-/health", s.health)
 	mux.HandleFunc("GET /api/config", s.publicConfig)
+	mux.HandleFunc("GET /api/players", s.players)
+	mux.HandleFunc("GET /api/objects", s.objects)
 	mux.HandleFunc("GET /api/state", s.state)
 	mux.HandleFunc("GET /", s.index)
 	mux.HandleFunc("GET /app.js", s.static("app.js"))
@@ -88,8 +108,33 @@ func (s *Server) publicConfig(w http.ResponseWriter, _ *http.Request) {
 		},
 	}
 	writeJSON(w, http.StatusOK, map[string]any{
-		"pollIntervalMs": s.cfg.PollInterval.Milliseconds(),
-		"layers":         layers,
+		"pollIntervalMs":      s.cfg.PollInterval.Milliseconds(),
+		"worldPollIntervalMs": s.cfg.WorldPollInterval.Milliseconds(),
+		"worldDataEnabled":    s.cfg.WorldDataEnabled,
+		"layers":              layers,
+	})
+}
+
+func (s *Server) players(w http.ResponseWriter, _ *http.Request) {
+	snapshot := s.source.Snapshot()
+	writeJSON(w, http.StatusOK, playerState{
+		Server:        snapshot.Server,
+		Connected:     snapshot.Connected,
+		Stale:         snapshot.Stale,
+		LastSuccessAt: snapshot.LastSuccessAt,
+		Players:       snapshot.Players,
+	})
+}
+
+func (s *Server) objects(w http.ResponseWriter, _ *http.Request) {
+	snapshot := s.source.Snapshot()
+	writeJSON(w, http.StatusOK, objectState{
+		Enabled:     s.cfg.WorldDataEnabled,
+		Available:   snapshot.ObjectsAvailable,
+		Stale:       snapshot.ObjectsStale,
+		Unsupported: snapshot.ObjectsUnsupported,
+		UpdatedAt:   snapshot.ObjectsUpdatedAt,
+		Objects:     snapshot.Objects,
 	})
 }
 
