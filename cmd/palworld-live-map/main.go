@@ -35,12 +35,19 @@ func main() {
 		os.Exit(1)
 	}
 
-	client, err := palworld.NewClient(cfg.RESTURL, cfg.AdminPassword, cfg.UpstreamTimeout, cfg.WorldTimeout)
-	if err != nil {
-		logger.Error("Palworld client configuration error", "error", err)
-		os.Exit(1)
+	var source palworld.Source
+	if cfg.DemoMode {
+		source = palworld.NewDemoSource()
+		logger.Info("demo mode enabled; no Palworld server will be contacted")
+	} else {
+		client, clientErr := palworld.NewClient(cfg.RESTURL, cfg.AdminPassword, cfg.UpstreamTimeout, cfg.WorldTimeout)
+		if clientErr != nil {
+			logger.Error("Palworld client configuration error", "error", clientErr)
+			os.Exit(1)
+		}
+		source = client
 	}
-	poller := palworld.NewPoller(client, cfg.PollInterval, cfg.WorldPollInterval, cfg.WorldDataEnabled, logger)
+	poller := palworld.NewPoller(source, cfg.PollInterval, cfg.WorldPollInterval, cfg.WorldDataEnabled, logger)
 	app, err := webserver.New(cfg, poller)
 	if err != nil {
 		logger.Error("web server setup failed", "error", err)

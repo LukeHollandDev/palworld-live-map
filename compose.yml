@@ -4,11 +4,6 @@ services:
   map:
     image: ghcr.io/lukehollanddev/palworld-live-map:latest
     restart: unless-stopped
-    read_only: true
-    security_opt:
-      - no-new-privileges:true
-    cap_drop:
-      - ALL
     env_file:
       - .env
     extra_hosts:

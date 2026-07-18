@@ -1,0 +1,54 @@
+{
+  "schemaVersion": 1,
+  "gameVersion": "1.0",
+  "generator": "palworld-map-exporter/1",
+  "decoder": "CUE4Parse/1.2.2.202607",
+  "mappings": {
+    "file": "mappings.usmap",
+    "bytes": 2321933,
+    "sha256": "241c45de9d5b55b246cd4b39d62b9209faf7758ce0637e1f7a545aa0f75f71f0"
+  },
+  "paks": [
+    {
+      "file": "Pal-Windows.pak",
+      "bytes": 40526106335,
+      "sha256": "fe2d7b8548d5be0649b6bb3e49aadc79529c2e7d138baaacece3a3563a864227"
+    }
+  ],
+  "layers": [
+    {
+      "id": "palpagos",
+      "name": "Palpagos",
+      "file": "palpagos.jpg",
+      "sourceObject": "Pal/Content/Pal/Texture/UI/Map/T_WorldMap.T_WorldMap",
+      "bounds": [
+        349400,
+        724400,
+        -1099400,
+        -724400
+      ],
+      "sourceWidth": 8192,
+      "sourceHeight": 8192,
+      "width": 8192,
+      "height": 8192,
+      "sha256": "9961632d5c38a0a67fd18713fa63af0ac6f192e71fadeb5ba53ae696b8914dd1"
+    },
+    {
+      "id": "world-tree",
+      "name": "World Tree",
+      "file": "world-tree.jpg",
+      "sourceObject": "Pal/Content/Pal/Texture/UI/Map/T_TreeMap.T_TreeMap",
+      "bounds": [
+        689148.5,
+        -476400,
+        347351.5,
+        -818197
+      ],
+      "sourceWidth": 8192,
+      "sourceHeight": 8192,
+      "width": 8192,
+      "height": 8192,
+      "sha256": "77fee7b2bb90fa62f26eeb862396d54dbc8c7d2f0f5b12339c12585474f7c521"
+    }
+  ]
+}

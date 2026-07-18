@@ -24,6 +24,7 @@ type Server struct {
 	source  snapshotSource
 	assets  fs.FS
 	maps    fs.FS
+	layers  []mapLayer
 	handler http.Handler
 }
 
@@ -32,6 +33,19 @@ type mapLayer struct {
 	Name     string     `json:"name"`
 	ImageURL string     `json:"imageUrl,omitempty"`
 	Bounds   [4]float64 `json:"bounds"`
+}
+
+type mapManifest struct {
+	SchemaVersion int                `json:"schemaVersion"`
+	Layers        []mapManifestLayer `json:"layers"`
+}
+
+type mapManifestLayer struct {
+	ID     string     `json:"id"`
+	Name   string     `json:"name"`
+	File   string     `json:"file"`
+	Bounds [4]float64 `json:"bounds"`
+	SHA256 string     `json:"sha256"`
 }
 
 type playerState struct {
@@ -63,9 +77,13 @@ func New(cfg config.Config, source snapshotSource) (*Server, error) {
 	if err != nil {
 		return nil, fmt.Errorf("open embedded map assets: %w", err)
 	}
+	layers, err := loadMapLayers(maps)
+	if err != nil {
+		return nil, err
+	}
 
 	s := &Server{
-		cfg: cfg, source: source, assets: webAssets, maps: maps,
+		cfg: cfg, source: source, assets: webAssets, maps: maps, layers: layers,
 	}
 	s.handler = s.securityHeaders(s.routes())
 	return s, nil
@@ -96,26 +114,41 @@ func (s *Server) health(w http.ResponseWriter, _ *http.Request) {
 }
 
 func (s *Server) publicConfig(w http.ResponseWriter, _ *http.Request) {
-	layers := []mapLayer{
-		{
-			ID:       "palpagos",
-			Name:     "Palpagos",
-			ImageURL: "/assets/map/palpagos.jpg?v=8192",
-			Bounds:   [4]float64{349400, 724400, -1099400, -724400},
-		},
-		{
-			ID:       "world-tree",
-			Name:     "World Tree",
-			ImageURL: "/assets/map/world-tree.jpg?v=8192",
-			Bounds:   [4]float64{689148.5, -476400, 347351.5, -818197},
-		},
-	}
 	writeJSON(w, http.StatusOK, map[string]any{
+		"demoMode":            s.cfg.DemoMode,
 		"pollIntervalMs":      s.cfg.PollInterval.Milliseconds(),
 		"worldPollIntervalMs": s.cfg.WorldPollInterval.Milliseconds(),
 		"worldDataEnabled":    s.cfg.WorldDataEnabled,
-		"layers":              layers,
+		"layers":              s.layers,
 	})
+}
+
+func loadMapLayers(maps fs.FS) ([]mapLayer, error) {
+	data, err := fs.ReadFile(maps, "manifest.json")
+	if err != nil {
+		return nil, fmt.Errorf("read embedded map manifest: %w", err)
+	}
+	var manifest mapManifest
+	if err := json.Unmarshal(data, &manifest); err != nil {
+		return nil, fmt.Errorf("decode embedded map manifest: %w", err)
+	}
+	if manifest.SchemaVersion != 1 || len(manifest.Layers) == 0 {
+		return nil, fmt.Errorf("unsupported or empty embedded map manifest")
+	}
+	layers := make([]mapLayer, 0, len(manifest.Layers))
+	for _, source := range manifest.Layers {
+		if source.ID == "" || source.Name == "" || source.File == "" || len(source.SHA256) < 12 {
+			return nil, fmt.Errorf("invalid embedded map layer %q", source.ID)
+		}
+		if _, err := fs.Stat(maps, source.File); err != nil {
+			return nil, fmt.Errorf("open artwork for map layer %q: %w", source.ID, err)
+		}
+		layers = append(layers, mapLayer{
+			ID: source.ID, Name: source.Name, Bounds: source.Bounds,
+			ImageURL: fmt.Sprintf("/assets/map/%s?v=%s", source.File, source.SHA256[:12]),
+		})
+	}
+	return layers, nil
 }
 
 func (s *Server) players(w http.ResponseWriter, _ *http.Request) {
