@@ -2,7 +2,7 @@
 
 Thanks for helping improve Palworld Live Map. Keep changes focused, easy to review, and safe for operators exposing the read-only site publicly.
 
-## Development workflow
+## Development Workflow
 
 1. Create a branch from `main`.
 2. Make one cohesive change per pull request.
@@ -30,7 +30,7 @@ docs: explain reverse-proxy deployment
 
 Keep formatting-only or generated-file updates separate from behavioral changes when that makes the history easier to review. Rebase or squash fixup commits before requesting review.
 
-## Pull requests
+## Pull Requests
 
 A pull request should:
 

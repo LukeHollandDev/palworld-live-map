@@ -1,8 +1,8 @@
-# Development and implementation
+# Development and Implementation
 
 This document covers the technical details intentionally kept out of the main README. See [CONTRIBUTING.md](CONTRIBUTING.md) for commit and pull-request expectations.
 
-## How it works
+## How It Works
 
 The Go service connects to one Palworld dedicated server and polls its official REST API. Browsers only talk to the live-map service; they never connect directly to Palworld or receive the REST admin password.
 
@@ -19,7 +19,7 @@ Player and server-metric data are refreshed using `POLL_INTERVAL`; world objects
 
 When `DEMO_MODE=true`, the application does not construct the REST client or contact a Palworld server. A deterministic fictional source implements the same internal interface, so the regular poller, snapshots, public API, and browser UI are all exercised. Demo mode is suitable for screenshots, smoke tests, and public evaluation—not load or upstream-compatibility testing.
 
-## Run from source
+## Run from Source
 
 Go 1.26 or newer is required.
 
@@ -37,7 +37,7 @@ For a local demo without Palworld:
 make demo
 ```
 
-To regenerate the map artwork from a local Palworld installation, follow [`tools/maps/README.md`](tools/maps/README.md). The Dockerised exporter is intentionally outside the production image and Go dependency graph.
+To regenerate the map artwork from a local Palworld installation, follow [`tools/map-exporter/README.md`](tools/map-exporter/README.md). The Dockerised exporter is intentionally outside the production image and Go dependency graph.
 
 ## Verification
 

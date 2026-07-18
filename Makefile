@@ -23,4 +23,4 @@ demo:
 	DEMO_MODE=true go run ./cmd/palworld-live-map
 
 maps:
-	./tools/maps/export
+	./tools/map-exporter/export.sh

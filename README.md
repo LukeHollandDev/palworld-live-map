@@ -8,7 +8,7 @@ A self-hosted, read-only live map for Palworld dedicated servers. Players can se
 
 ![A populated Palworld Live Map demo showing players, bases, Pals and NPCs](assets/images/demo.png)
 
-## What is Palworld Live Map?
+## What Is Palworld Live Map?
 
 Palworld Live Map is a self-hosted website for communities running a Palworld dedicated server. It connects to Palworld's official REST API and displays the current server state on interactive Palpagos and World Tree maps, including online players, bases, Pals, NPCs, and server health.
 
