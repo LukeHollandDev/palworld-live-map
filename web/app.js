@@ -3,21 +3,23 @@
 
   const MAP_PIXEL_SIZE = 8192
   const SCENE_SIZE = MAP_PIXEL_SIZE / Math.max(1, window.devicePixelRatio || 1)
-  const kinds = ['players', 'bases', 'workers', 'companions', 'wild-pals', 'npcs']
-  const enabledKinds = new Set(['players', 'bases'])
+  const MAX_ZOOM_RATIO = 96
+  const allKinds = ['players', 'bases', 'workers', 'companions', 'wild-pals', 'npcs']
+  const enabledKinds = new Set(allKinds)
 
   const siteTitle = document.querySelector('#siteTitle')
   const serverDescription = document.querySelector('#serverDescription')
   const statusDot = document.querySelector('#statusDot')
   const statusText = document.querySelector('#statusText')
+  const metricsSummary = document.querySelector('#metricsSummary')
+  const serverDetailsButton = document.querySelector('#serverDetailsButton')
   const updatedText = document.querySelector('#updatedText')
   const toggleFilters = document.querySelector('#toggleFilters')
   const closeFilters = document.querySelector('#closeFilters')
   const layerTabs = document.querySelector('#layerTabs')
   const filterPanel = document.querySelector('#filterPanel')
   const searchInput = document.querySelector('#searchInput')
-  const levelFilter = document.querySelector('#levelFilter')
-  const legend = document.querySelector('#legend')
+  const mapExplorer = document.querySelector('#mapExplorer')
   const objectNotice = document.querySelector('#objectNotice')
   const mapViewport = document.querySelector('#mapViewport')
   const mapScene = document.querySelector('#mapScene')
@@ -27,6 +29,11 @@
   const playerMarkerLayer = document.querySelector('#playerMarkerLayer')
   const mapNotice = document.querySelector('#mapNotice')
   const cursorCoordinates = document.querySelector('#cursorCoordinates')
+  const detailsDialog = document.querySelector('#detailsDialog')
+  const closeDetails = document.querySelector('#closeDetails')
+  const detailsKind = document.querySelector('#detailsKind')
+  const detailsTitle = document.querySelector('#detailsTitle')
+  const detailsBody = document.querySelector('#detailsBody')
 
   mapScene.style.setProperty('--scene-size', `${SCENE_SIZE}px`)
 
@@ -36,8 +43,14 @@
   let activeLayer = null
   let selectedMarkerKey = null
   let selectedMarkerLayer = null
+  let detailsReturnFocus = null
+  const hiddenItemKeys = new Set()
+  const expandedGuildIDs = new Set()
+  const expandedBaseIDs = new Set()
   let view = { scale: 1, x: 0, y: 0 }
   let drag = null
+  const markerItems = new WeakMap()
+  const explorerItems = new Map()
 
   function emptyObjectState(enabled) {
     return { enabled, available: false, stale: false, unsupported: false, objects: [] }
@@ -57,7 +70,7 @@
       buildLayerTabs()
       resetView()
       renderObjectAvailability()
-      renderLegendCounts()
+      renderExplorer()
       void refreshPlayers()
       if (config.worldDataEnabled) void refreshObjects()
     } catch {
@@ -80,7 +93,7 @@
     try {
       objectState = await requestJSON('/api/objects')
       renderObjectAvailability()
-      renderLegendCounts()
+      renderExplorer()
       renderObjectMarkers()
     } catch {
       objectNotice.hidden = false
@@ -95,10 +108,17 @@
   function renderPlayerState() {
     renderServerInfo()
     const playerCount = playerState.players?.length || 0
-    if (playerState.connected && !playerState.stale) setStatus('live', `${playerCount} player${playerCount === 1 ? '' : 's'} online`)
-    else if (playerState.stale) setStatus('stale', `${playerCount} last known`)
+    const metrics = playerState.metricsAvailable ? playerState.metrics : null
+    const currentPlayers = metrics?.currentPlayers ?? playerCount
+    const playerStatus = metrics
+      ? `${currentPlayers} / ${metrics.maxPlayers} players`
+      : `${playerCount} player${playerCount === 1 ? '' : 's'} online`
+    if (playerState.connected && !playerState.stale) setStatus('live', playerStatus)
+    else if (playerState.stale) setStatus('stale', `${currentPlayers}${metrics ? ` / ${metrics.maxPlayers}` : ''} last known`)
     else setStatus('offline', 'Server unavailable')
-    renderLegendCounts()
+    metricsSummary.hidden = !metrics
+    metricsSummary.textContent = metrics ? `· ${metrics.serverFps} FPS · Up ${formatUptime(metrics.uptimeSeconds)} · Day ${metrics.days}` : ''
+    renderExplorer()
     renderPlayerMarkers()
     updateAge()
   }
@@ -131,26 +151,32 @@
     return playerItems().concat(objectItems())
   }
 
+  function searchQuery() {
+    return searchInput.value.trim().toLowerCase()
+  }
+
+  function assignedBase(item) {
+    if (!item.baseId) return null
+    return objectItems().find((candidate) => candidate.kind === 'bases' && candidate.baseId === item.baseId) || null
+  }
+
+  function matchesSearch(item) {
+    const query = searchQuery()
+    if (!query) return true
+    const baseName = item.kind === 'workers' ? assignedBase(item)?.name || '' : ''
+    return `${item.name} ${item.detail || ''} ${item.level || ''} ${baseName}`.toLowerCase().includes(query)
+  }
+
   function filteredItems(items) {
-    const query = searchInput.value.trim().toLowerCase()
-    const minimumLevel = Number(levelFilter.value)
     return items.filter((item) => {
       if (item.map !== activeLayer.id || !enabledKinds.has(item.kind)) return false
-      if ((item.level || 0) < minimumLevel) return false
-      if (query && !`${item.name} ${item.detail || ''}`.toLowerCase().includes(query)) return false
-      return true
+      if (hiddenItemKeys.has(itemKey(item))) return false
+      return matchesSearch(item)
     })
   }
 
   function renderObjectAvailability() {
     const enabled = config?.worldDataEnabled && objectState.enabled
-    const available = enabled && (objectState.available || objectState.stale)
-    for (const label of legend.querySelectorAll('label')) {
-      const input = label.querySelector('input')
-      if (input.value === 'players') continue
-      input.disabled = !available
-      label.classList.toggle('disabled', !available)
-    }
 
     objectNotice.hidden = false
     if (!enabled) {
@@ -166,15 +192,255 @@
     }
   }
 
-  function renderLegendCounts() {
-    const counts = Object.fromEntries(kinds.map((kind) => [kind, 0]))
-    for (const item of allItems()) {
-      if (item.map === activeLayer.id && counts[item.kind] !== undefined) counts[item.kind]++
+  function createElement(tagName, className, text) {
+    const node = document.createElement(tagName)
+    if (className) node.className = className
+    if (text !== undefined) node.textContent = text
+    return node
+  }
+
+  function groupKinds(group) {
+    return group === 'bases' ? ['bases', 'workers'] : [group]
+  }
+
+  function itemKey(item) {
+    return JSON.stringify([item.kind, item.map, item.name, item.detail || '', item.x, item.y])
+  }
+
+  function itemIsVisible(item) {
+    return enabledKinds.has(item.kind) && !hiddenItemKeys.has(itemKey(item))
+  }
+
+  function createVisibilityToggle(items, visibilityID, label) {
+    const checkbox = document.createElement('input')
+    checkbox.type = 'checkbox'
+    checkbox.className = 'item-visibility'
+    checkbox.dataset.visibilityId = visibilityID
+    checkbox.dataset.visibilityKeys = JSON.stringify(items.map(itemKey))
+    const visibleCount = items.filter(itemIsVisible).length
+    checkbox.checked = items.length > 0 && visibleCount === items.length
+    checkbox.indeterminate = visibleCount > 0 && visibleCount < items.length
+    checkbox.disabled = items.length === 0 || !items.some((item) => enabledKinds.has(item.kind))
+    checkbox.setAttribute('aria-label', label)
+    return checkbox
+  }
+
+  function createCategory(group, title, items, count) {
+    const section = createElement('section', 'explorer-section')
+    section.dataset.group = group
+    const header = createElement('label', 'explorer-category')
+    const checkbox = document.createElement('input')
+    checkbox.type = 'checkbox'
+    checkbox.className = 'category-toggle'
+    checkbox.dataset.group = group
+    checkbox.dataset.kinds = groupKinds(group).join(',')
+    const enabledCount = groupKinds(group).filter((kind) => enabledKinds.has(kind)).length
+    const visibleCount = items.filter(itemIsVisible).length
+    checkbox.checked = items.length > 0 && enabledCount === groupKinds(group).length && visibleCount === items.length
+    checkbox.indeterminate = !checkbox.checked && visibleCount > 0
+    checkbox.disabled = items.length === 0
+    const symbol = createElement('span', `explorer-symbol ${group}`)
+    symbol.setAttribute('aria-hidden', 'true')
+    const name = createElement('strong', '', `${title} (${count})`)
+    header.append(checkbox, symbol, name)
+    section.append(header)
+    section.classList.toggle('category-hidden', enabledCount === 0)
+    return section
+  }
+
+  function createExplorerItem(item, meta, className = '', displayName = item.name) {
+    const key = itemKey(item)
+    explorerItems.set(key, item)
+    const button = createElement('button', `explorer-item ${className}`.trim())
+    button.type = 'button'
+    button.dataset.itemKey = key
+    button.setAttribute('aria-label', `View ${markerText(item)}`)
+    const symbol = createElement('span', `explorer-symbol ${item.kind}`)
+    symbol.setAttribute('aria-hidden', 'true')
+    const name = createElement('span', 'explorer-item-name', displayName)
+    button.append(symbol, name)
+    if (meta) button.append(createElement('span', 'explorer-item-meta', meta))
+    if (item.detail) button.title = item.detail
+    return button
+  }
+
+  function createObjectRow(item, meta, className = '', displayName = item.name) {
+    const row = createElement('div', `explorer-object-row ${className ? `${className}-row` : ''}`.trim())
+    row.append(
+      createVisibilityToggle([item], `item:${itemKey(item)}`, `Show ${markerText(item)}`),
+      createExplorerItem(item, meta, className, displayName)
+    )
+    return row
+  }
+
+  function itemMeta(item) {
+    if (item.level > 0) return `Lv ${item.level}`
+    if (item.kind === 'npcs') return item.detail
+    return ''
+  }
+
+  function emptyCategoryMessage(group, currentCount) {
+    const noun = {
+      players: 'players',
+      bases: 'bases',
+      companions: 'companion Pals',
+      'wild-pals': 'wild Pals',
+      npcs: 'NPCs'
+    }[group]
+    if (currentCount > 0 && searchQuery()) return `No ${noun} match “${searchInput.value.trim()}”.`
+    const existsElsewhere = allItems().some((item) => item.kind === group && item.map !== activeLayer?.id)
+    if (existsElsewhere) return `No ${noun} on this map.`
+    return {
+      players: 'No players online.',
+      bases: 'No bases are currently reported.',
+      companions: 'No companion Pals are currently reported.',
+      'wild-pals': 'No wild Pals are currently loaded.',
+      npcs: 'No NPCs are currently loaded.'
+    }[group]
+  }
+
+  function appendItemCategory(fragment, group, title, items) {
+    const sorted = items.slice().sort((left, right) => left.name.localeCompare(right.name))
+    const matching = sorted.filter(matchesSearch)
+    const section = createCategory(group, title, sorted, sorted.length)
+    const list = createElement('div', 'explorer-items')
+    if (matching.length === 0) {
+      list.append(createElement('p', 'explorer-empty', emptyCategoryMessage(group, sorted.length)))
+    } else {
+      for (const item of matching) list.append(createObjectRow(item, itemMeta(item)))
     }
-    for (const label of legend.querySelectorAll('label')) {
-      const kind = label.dataset.kind
-      label.querySelector('output').textContent = String(counts[kind])
+    section.append(list)
+    fragment.append(section)
+  }
+
+  function appendBaseCategory(fragment, bases, workers) {
+    const sortedBases = bases.slice().sort((left, right) => left.name.localeCompare(right.name) || left.x - right.x || left.y - right.y)
+    const section = createCategory('bases', 'Bases', bases.concat(workers), sortedBases.length)
+    const list = createElement('div', 'explorer-items base-tree')
+    const guilds = new Map()
+    for (const base of sortedBases) {
+      const guildID = base.guildKey || `base:${base.baseId}`
+      if (!guilds.has(guildID)) guilds.set(guildID, { id: guildID, name: base.name, bases: [] })
+      guilds.get(guildID).bases.push(base)
     }
+    const guildEntries = Array.from(guilds.values()).sort((left, right) => left.name.localeCompare(right.name))
+    const guildNameCounts = new Map()
+    const guildNameOccurrences = new Map()
+    for (const guild of guildEntries) guildNameCounts.set(guild.name, (guildNameCounts.get(guild.name) || 0) + 1)
+    let matchingGuilds = 0
+    for (const guild of guildEntries) {
+      const occurrence = (guildNameOccurrences.get(guild.name) || 0) + 1
+      guildNameOccurrences.set(guild.name, occurrence)
+      const displayGuildName = guildNameCounts.get(guild.name) > 1 ? `${guild.name} #${occurrence}` : guild.name
+      const baseEntries = guild.bases.map((base, index) => {
+        const baseWorkers = workers
+          .filter((worker) => worker.baseId === base.baseId)
+          .sort((left, right) => left.name.localeCompare(right.name))
+        return { base, baseWorkers, index, matchingWorkers: baseWorkers.filter(matchesSearch) }
+      }).filter(({ base, matchingWorkers }) => matchesSearch(base) || matchingWorkers.length > 0)
+      if (baseEntries.length === 0) continue
+      matchingGuilds++
+
+      const guildItems = guild.bases.flatMap((base) => [base].concat(workers.filter((worker) => worker.baseId === base.baseId)))
+      const guildBranch = createElement('div', 'guild-branch')
+      const guildRow = createElement('div', 'guild-row')
+      const guildExpanded = expandedGuildIDs.has(guild.id) || Boolean(searchQuery())
+      const guildExpand = createElement('button', 'branch-toggle', '›')
+      guildExpand.type = 'button'
+      guildExpand.dataset.branchKind = 'guild'
+      guildExpand.dataset.branchId = guild.id
+      guildExpand.dataset.branchName = displayGuildName
+      guildExpand.setAttribute('aria-label', `${guildExpanded ? 'Collapse' : 'Expand'} ${displayGuildName}`)
+      guildExpand.setAttribute('aria-expanded', String(guildExpanded))
+      const guildName = createElement('span', 'guild-name', displayGuildName)
+      const guildMeta = createElement('span', 'explorer-item-meta', `${guild.bases.length} base${guild.bases.length === 1 ? '' : 's'}`)
+      guildRow.append(
+        guildExpand,
+        createVisibilityToggle(guildItems, `guild:${guild.id}`, `Show guild ${displayGuildName}`),
+        guildName,
+        guildMeta
+      )
+      guildBranch.append(guildRow)
+
+      const guildChildren = createElement('div', 'guild-children')
+      guildChildren.hidden = !guildExpanded
+      for (const { base, baseWorkers, index, matchingWorkers } of baseEntries) {
+        const baseBranch = createElement('div', 'base-branch')
+        const row = createElement('div', 'base-row')
+        const baseExpanded = expandedBaseIDs.has(base.baseId) || Boolean(searchQuery())
+        const expand = createElement('button', 'branch-toggle', '›')
+        expand.type = 'button'
+        expand.dataset.branchKind = 'base'
+        expand.dataset.branchId = base.baseId
+        expand.dataset.branchName = guild.bases.length === 1 ? displayGuildName : `${displayGuildName} base ${index + 1}`
+        expand.setAttribute('aria-label', `${baseExpanded ? 'Collapse' : 'Expand'} ${expand.dataset.branchName}`)
+        expand.setAttribute('aria-expanded', String(baseExpanded))
+        const baseItems = [base].concat(baseWorkers)
+        const baseLabel = guild.bases.length === 1 ? 'Base' : `Base ${index + 1}`
+        row.append(
+          expand,
+          createVisibilityToggle(baseItems, `base:${base.baseId}`, `Show ${baseLabel} for ${displayGuildName}`),
+          createExplorerItem(base, `${baseWorkers.length} Pal${baseWorkers.length === 1 ? '' : 's'}`, 'base-item', baseLabel)
+        )
+        baseBranch.append(row)
+
+        const children = createElement('div', 'base-children')
+        children.hidden = !baseExpanded
+        const workersToShow = searchQuery() ? matchingWorkers : baseWorkers
+        for (const worker of workersToShow) children.append(createObjectRow(worker, itemMeta(worker), 'worker-item'))
+        baseBranch.append(children)
+        guildChildren.append(baseBranch)
+      }
+      guildBranch.append(guildChildren)
+      list.append(guildBranch)
+    }
+
+    const unassigned = workers.filter((worker) => !worker.baseId && matchesSearch(worker))
+    for (const worker of unassigned) list.append(createObjectRow(worker, itemMeta(worker), 'worker-item orphan-worker'))
+    if (matchingGuilds === 0 && unassigned.length === 0) {
+      list.append(createElement('p', 'explorer-empty', emptyCategoryMessage('bases', sortedBases.length)))
+    }
+    section.append(list)
+    fragment.append(section)
+  }
+
+  function renderExplorer() {
+    const scrollTop = mapExplorer.scrollTop
+    const focusedItemKey = mapExplorer.contains(document.activeElement) ? document.activeElement.closest('.explorer-item')?.dataset.itemKey : null
+    const focusedBranchID = mapExplorer.contains(document.activeElement) ? document.activeElement.closest('.branch-toggle')?.dataset.branchId : null
+    const focusedVisibilityID = mapExplorer.contains(document.activeElement) ? document.activeElement.closest('.item-visibility')?.dataset.visibilityId : null
+    const focusedGroup = mapExplorer.contains(document.activeElement) ? document.activeElement.closest('.explorer-section')?.dataset.group : null
+    explorerItems.clear()
+    const fragment = document.createDocumentFragment()
+    const currentItems = allItems().filter((item) => item.map === activeLayer?.id)
+    appendItemCategory(fragment, 'players', 'Players', currentItems.filter((item) => item.kind === 'players'))
+
+    const bases = currentItems.filter((item) => item.kind === 'bases')
+    const workers = currentItems.filter((item) => item.kind === 'workers')
+    appendBaseCategory(fragment, bases, workers)
+
+    const optionalGroups = [
+      ['companions', 'Companion Pals'],
+      ['wild-pals', 'Wild Pals'],
+      ['npcs', 'NPCs']
+    ]
+    for (const [group, title] of optionalGroups) {
+      const items = currentItems.filter((item) => item.kind === group)
+      appendItemCategory(fragment, group, title, items)
+    }
+
+    mapExplorer.replaceChildren(fragment)
+    mapExplorer.scrollTop = scrollTop
+    const focusTarget = focusedItemKey
+      ? Array.from(mapExplorer.querySelectorAll('.explorer-item')).find((item) => item.dataset.itemKey === focusedItemKey)
+      : focusedBranchID
+        ? Array.from(mapExplorer.querySelectorAll('.branch-toggle')).find((item) => item.dataset.branchId === focusedBranchID)
+        : focusedVisibilityID
+          ? Array.from(mapExplorer.querySelectorAll('.item-visibility')).find((item) => item.dataset.visibilityId === focusedVisibilityID)
+          : focusedGroup
+            ? mapExplorer.querySelector(`[data-group="${focusedGroup}"] .category-toggle`)
+            : null
+    focusTarget?.focus({ preventScroll: true })
   }
 
   function renderPlayerMarkers() {
@@ -194,24 +460,23 @@
     const focusedMarker = container.contains(document.activeElement) ? document.activeElement.closest('.map-marker') : null
     const focusedKey = focusedMarker?.dataset.markerKey || null
     const replacingSelection = selectedMarkerLayer === container.id
-    const occurrences = new Map()
     const fragment = document.createDocumentFragment()
 
     for (const item of filteredItems(items)) {
       const position = toScene(item, activeLayer)
       if (!position) continue
-      const baseKey = JSON.stringify([item.kind, item.map, item.name, item.detail || ''])
-      const occurrence = occurrences.get(baseKey) || 0
-      occurrences.set(baseKey, occurrence + 1)
+      const key = itemKey(item)
 
       const marker = document.createElement('button')
       marker.type = 'button'
       marker.className = `map-marker ${item.kind}`
-      marker.dataset.markerKey = `${baseKey}:${occurrence}`
+      marker.dataset.markerKey = key
+      marker.dataset.itemKey = key
       marker.style.left = `${position.x}px`
       marker.style.top = `${position.y}px`
-      marker.style.setProperty('--marker-scale', String(markerScale()))
+      marker.style.setProperty('--marker-scale', String(markerScale(marker)))
       marker.setAttribute('aria-label', markerText(item))
+      markerItems.set(marker, item)
 
       const label = document.createElement('span')
       label.className = 'marker-label'
@@ -247,8 +512,143 @@
   }
 
   function markerText(item) {
-    const detail = item.detail || (item.level ? `Level ${item.level}` : '')
-    return detail ? `${item.name} · ${detail}` : item.name
+    if (item.kind === 'bases' || item.kind === 'npcs' || !item.level) return item.name
+    return `${item.name} · Lv ${item.level}`
+  }
+
+  function kindLabel(kind) {
+    return {
+      players: 'Player',
+      bases: 'Base',
+      workers: 'Base worker',
+      companions: 'Companion Pal',
+      'wild-pals': 'Wild Pal',
+      npcs: 'NPC'
+    }[kind] || 'Map object'
+  }
+
+  function layerName(mapID) {
+    return config?.layers.find((layer) => layer.id === mapID)?.name || mapID
+  }
+
+  function createFactList(entries) {
+    const list = document.createElement('dl')
+    list.className = 'details-facts'
+    for (const [label, value] of entries) {
+      if (value === undefined || value === null || value === '') continue
+      const term = document.createElement('dt')
+      term.textContent = label
+      const description = document.createElement('dd')
+      description.textContent = String(value)
+      list.append(term, description)
+    }
+    return list
+  }
+
+  function showDetails(kind, title, returnFocus, render) {
+    detailsKind.textContent = kind
+    detailsTitle.textContent = title
+    detailsBody.replaceChildren()
+    detailsReturnFocus = returnFocus
+    render(detailsBody)
+    if (!detailsDialog.open) detailsDialog.showModal()
+  }
+
+  function itemDetails(item, marker, returnFocus) {
+    const base = assignedBase(item)
+    const workers = item.kind === 'bases'
+      ? objectItems().filter((candidate) => candidate.kind === 'workers' && candidate.baseId === item.baseId)
+      : []
+    const entries = []
+    if (item.level > 0) entries.push(['Level', item.level])
+    if (item.detail && item.kind !== 'players') {
+      entries.push([item.kind === 'npcs' ? 'Type' : 'Species', item.detail])
+    }
+    if (item.kind === 'workers' && base) entries.push(['Assigned base', base.name])
+    if (item.kind === 'bases') entries.push(['Workers', workers.length])
+    entries.push(['Region', layerName(item.map)])
+    entries.push(['Coordinates', `X ${Math.round(item.x)} · Y ${Math.round(item.y)}`])
+
+    showDetails(kindLabel(item.kind), item.name, returnFocus || {
+      element: marker,
+      layerID: marker.parentElement.id,
+      markerKey: marker.dataset.markerKey
+    }, (body) => {
+      body.append(createFactList(entries))
+      if (item.kind !== 'bases') return
+
+      const section = document.createElement('section')
+      section.className = 'details-section'
+      const heading = document.createElement('h3')
+      heading.textContent = 'Base workers'
+      section.append(heading)
+      if (workers.length === 0) {
+        const empty = document.createElement('p')
+        empty.className = 'details-empty'
+        empty.textContent = 'No workers are currently reported for this base.'
+        section.append(empty)
+      } else {
+        const roster = document.createElement('ul')
+        roster.className = 'details-roster'
+        workers
+          .slice()
+          .sort((left, right) => left.name.localeCompare(right.name))
+          .forEach((worker) => {
+            const row = document.createElement('li')
+            const name = document.createElement('span')
+            name.textContent = worker.level > 0 ? `${worker.name} · Lv ${worker.level}` : worker.name
+            const species = document.createElement('span')
+            species.textContent = worker.detail || 'Pal'
+            row.append(name, species)
+            roster.append(row)
+          })
+        section.append(roster)
+      }
+      body.append(section)
+    })
+  }
+
+  function formatUptime(seconds) {
+    const days = Math.floor(seconds / 86400)
+    const hours = Math.floor((seconds % 86400) / 3600)
+    const minutes = Math.floor((seconds % 3600) / 60)
+    const parts = []
+    if (days) parts.push(`${days}d`)
+    if (days || hours) parts.push(`${hours}h`)
+    parts.push(`${minutes}m`)
+    return parts.join(' ')
+  }
+
+  function serverDetails() {
+    const server = playerState?.server || {}
+    const metrics = playerState?.metricsAvailable ? playerState.metrics : null
+    showDetails('Server', server.name || 'Palworld server', { element: serverDetailsButton }, (body) => {
+      if (server.description) {
+        const description = document.createElement('p')
+        description.className = 'details-description'
+        description.textContent = server.description
+        body.append(description)
+      }
+      const entries = []
+      if (metrics) {
+        entries.push(
+          ['Players', `${metrics.currentPlayers} / ${metrics.maxPlayers}`],
+          ['Server FPS', metrics.serverFps],
+          ['Average FPS', metrics.averageFps.toFixed(1)],
+          ['Frame time', `${metrics.serverFrameTime.toFixed(2)} ms`],
+          ['Uptime', formatUptime(metrics.uptimeSeconds)],
+          ['Base camps', metrics.baseCount],
+          ['In-game day', metrics.days]
+        )
+      } else {
+        entries.push(['Metrics', 'Temporarily unavailable'])
+      }
+      if (server.version) entries.push(['Version', server.version])
+      if (playerState?.metricsUpdatedAt) {
+        entries.push(['Metrics updated', new Date(playerState.metricsUpdatedAt).toLocaleString()])
+      }
+      body.append(createFactList(entries))
+    })
   }
 
   function buildLayerTabs() {
@@ -265,7 +665,7 @@
         clearSelection()
         buildLayerTabs()
         resetView()
-        renderLegendCounts()
+        renderExplorer()
         renderMarkers()
       })
       layerTabs.append(button)
@@ -324,20 +724,21 @@
 
   function applyView() {
     mapScene.style.transform = `translate(${view.x}px, ${view.y}px) scale(${view.scale})`
-    const scale = String(markerScale())
-    for (const marker of markerLayer.querySelectorAll('.map-marker')) marker.style.setProperty('--marker-scale', scale)
+    for (const marker of markerLayer.querySelectorAll('.map-marker')) {
+      marker.style.setProperty('--marker-scale', String(markerScale(marker)))
+    }
   }
 
-  function markerScale() {
+  function markerScale(marker) {
     const zoomRatio = Math.max(1, view.scale / fitScale())
-    const screenScale = Math.min(2, Math.sqrt(zoomRatio))
+    const screenScale = marker?.classList.contains('workers') ? 1 : Math.min(2, Math.sqrt(zoomRatio))
     return screenScale / view.scale
   }
 
   function zoomAt(nextScale, clientX, clientY) {
     const rect = mapViewport.getBoundingClientRect()
     const minimum = fitScale()
-    nextScale = Math.min(minimum * 12, Math.max(minimum, nextScale))
+    nextScale = Math.min(minimum * MAX_ZOOM_RATIO, Math.max(minimum, nextScale))
     const pointerX = clientX - rect.left
     const pointerY = clientY - rect.top
     const sceneX = (pointerX - view.x) / view.scale
@@ -347,6 +748,37 @@
     view.scale = nextScale
     clampView()
     applyView()
+  }
+
+  function findMarkerForItem(key) {
+    return Array.from(markerLayer.querySelectorAll('.map-marker')).find((marker) => marker.dataset.itemKey === key) || null
+  }
+
+  function focusExplorerItem(button) {
+    const item = explorerItems.get(button.dataset.itemKey)
+    if (!item) return
+    for (const kind of groupKinds(item.kind === 'workers' ? 'bases' : item.kind)) enabledKinds.add(kind)
+    hiddenItemKeys.delete(button.dataset.itemKey)
+    renderExplorer()
+    const refreshedButton = Array.from(mapExplorer.querySelectorAll('.explorer-item')).find((candidate) => candidate.dataset.itemKey === button.dataset.itemKey) || button
+    renderMarkers()
+    const marker = findMarkerForItem(button.dataset.itemKey)
+    if (!marker) return
+
+    const position = toScene(item, activeLayer)
+    const viewport = mapViewport.getBoundingClientRect()
+    const targetZoom = fitScale() * (item.kind === 'workers' ? 24 : 8)
+    view.scale = Math.min(fitScale() * MAX_ZOOM_RATIO, Math.max(view.scale, targetZoom))
+    view.x = viewport.width / 2 - position.x * view.scale
+    view.y = viewport.height / 2 - position.y * view.scale
+    clampView()
+    applyView()
+
+    clearSelection()
+    selectedMarkerKey = marker.dataset.markerKey
+    selectedMarkerLayer = marker.parentElement.id
+    marker.classList.add('selected')
+    itemDetails(item, marker, { element: refreshedButton, explorerKey: button.dataset.itemKey })
   }
 
   markerLayer.addEventListener('pointerdown', (event) => {
@@ -360,6 +792,8 @@
     selectedMarkerKey = marker.dataset.markerKey
     selectedMarkerLayer = marker.parentElement.id
     marker.classList.add('selected')
+    const item = markerItems.get(marker)
+    if (item) itemDetails(item, marker)
   })
 
   mapViewport.addEventListener('wheel', (event) => {
@@ -368,7 +802,7 @@
   }, { passive: false })
 
   mapViewport.addEventListener('pointerdown', (event) => {
-    if (event.button !== 0 || event.target.closest('.layer-tabs, .filter-panel, .map-controls')) return
+    if (event.button !== 0 || event.target.closest('.filter-panel, .filter-toggle, .map-controls')) return
     drag = { pointer: event.pointerId, x: event.clientX, y: event.clientY, viewX: view.x, viewY: view.y }
     mapViewport.setPointerCapture(event.pointerId)
     mapViewport.classList.add('dragging')
@@ -401,22 +835,79 @@
     cursorCoordinates.textContent = `X ${Math.round(worldX)} · Y ${Math.round(worldY)}`
   }
 
-  legend.addEventListener('change', (event) => {
-    if (!event.target.matches('input[type="checkbox"]')) return
-    if (event.target.checked) enabledKinds.add(event.target.value)
-    else enabledKinds.delete(event.target.value)
+  mapExplorer.addEventListener('change', (event) => {
+    if (event.target.matches('.category-toggle')) {
+      const categoryKinds = event.target.dataset.kinds.split(',')
+      for (const kind of categoryKinds) {
+        if (event.target.checked) enabledKinds.add(kind)
+        else enabledKinds.delete(kind)
+      }
+      if (event.target.checked) {
+        for (const item of allItems()) {
+          if (item.map === activeLayer.id && categoryKinds.includes(item.kind)) hiddenItemKeys.delete(itemKey(item))
+        }
+      }
+      renderExplorer()
+      renderMarkers()
+      return
+    }
+    if (event.target.matches('.item-visibility')) {
+      for (const key of JSON.parse(event.target.dataset.visibilityKeys)) {
+        if (event.target.checked) hiddenItemKeys.delete(key)
+        else hiddenItemKeys.add(key)
+      }
+      renderExplorer()
+      renderMarkers()
+    }
+  })
+  mapExplorer.addEventListener('click', (event) => {
+    const branchToggle = event.target.closest('.branch-toggle')
+    if (branchToggle) {
+      const expanded = branchToggle.getAttribute('aria-expanded') !== 'true'
+      branchToggle.setAttribute('aria-expanded', String(expanded))
+      branchToggle.setAttribute('aria-label', `${expanded ? 'Collapse' : 'Expand'} ${branchToggle.dataset.branchName}`)
+      const isGuild = branchToggle.dataset.branchKind === 'guild'
+      const branch = branchToggle.closest(isGuild ? '.guild-branch' : '.base-branch')
+      branch.querySelector(isGuild ? ':scope > .guild-children' : ':scope > .base-children').hidden = !expanded
+      const expandedIDs = isGuild ? expandedGuildIDs : expandedBaseIDs
+      if (expanded) expandedIDs.add(branchToggle.dataset.branchId)
+      else expandedIDs.delete(branchToggle.dataset.branchId)
+      return
+    }
+    const itemButton = event.target.closest('.explorer-item')
+    if (itemButton) focusExplorerItem(itemButton)
+  })
+  searchInput.addEventListener('input', () => {
+    renderExplorer()
     renderMarkers()
   })
-  searchInput.addEventListener('input', renderMarkers)
-  levelFilter.addEventListener('change', renderMarkers)
 
   function setFiltersOpen(open) {
     filterPanel.hidden = !open
+    toggleFilters.hidden = open
     toggleFilters.setAttribute('aria-expanded', String(open))
   }
 
-  toggleFilters.addEventListener('click', () => setFiltersOpen(filterPanel.hidden))
+  toggleFilters.addEventListener('click', () => setFiltersOpen(true))
   closeFilters.addEventListener('click', () => setFiltersOpen(false))
+  serverDetailsButton.addEventListener('click', serverDetails)
+  closeDetails.addEventListener('click', () => detailsDialog.close())
+  detailsDialog.addEventListener('click', (event) => {
+    if (event.target !== detailsDialog) return
+    const bounds = detailsDialog.getBoundingClientRect()
+    const inside = event.clientX >= bounds.left && event.clientX <= bounds.right && event.clientY >= bounds.top && event.clientY <= bounds.bottom
+    if (!inside) detailsDialog.close()
+  })
+  detailsDialog.addEventListener('close', () => {
+    const target = detailsReturnFocus?.element?.isConnected
+      ? detailsReturnFocus.element
+      : detailsReturnFocus?.explorerKey
+        ? Array.from(mapExplorer.querySelectorAll('.explorer-item')).find((item) => item.dataset.itemKey === detailsReturnFocus.explorerKey)
+        : findMarker(detailsReturnFocus?.layerID, detailsReturnFocus?.markerKey)
+    clearSelection()
+    detailsReturnFocus = null
+    target?.focus({ preventScroll: true })
+  })
   document.querySelector('#zoomIn').addEventListener('click', () => {
     const rect = mapViewport.getBoundingClientRect()
     zoomAt(view.scale * 1.35, rect.left + rect.width / 2, rect.top + rect.height / 2)

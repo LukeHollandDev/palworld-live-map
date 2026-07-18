@@ -15,6 +15,8 @@ type stubSource struct {
 	infoErr   error
 	players   []Player
 	playerErr error
+	metrics   ServerMetrics
+	metricErr error
 	objects   []WorldObject
 	objectErr error
 }
@@ -25,6 +27,10 @@ func (s *stubSource) Info(context.Context) (ServerInfo, error) {
 
 func (s *stubSource) Players(context.Context) ([]Player, error) {
 	return append([]Player(nil), s.players...), s.playerErr
+}
+
+func (s *stubSource) Metrics(context.Context) (ServerMetrics, error) {
+	return s.metrics, s.metricErr
 }
 
 func (s *stubSource) WorldObjects(context.Context) ([]WorldObject, error) {
@@ -39,14 +45,16 @@ func TestPollerRetainsLastGoodSnapshots(t *testing.T) {
 	source := &stubSource{
 		info:    ServerInfo{Name: "The Chaos", Description: "A Palworld server", Version: "v1.0.0"},
 		players: []Player{{Name: "Lamball", Level: 3}},
+		metrics: ServerMetrics{ServerFPS: 60, MaxPlayers: 20},
 		objects: []WorldObject{{Kind: "bases", Name: "Home"}},
 	}
 	poller := testPoller(source)
 	poller.refreshInfo(context.Background())
 	poller.refreshPlayers(context.Background())
+	poller.refreshMetrics(context.Background())
 	poller.refreshWorld(context.Background())
 	first := poller.Snapshot()
-	if first.Server.Name != "The Chaos" || !first.Connected || first.Stale || !first.ObjectsAvailable || len(first.Objects) != 1 {
+	if first.Server.Name != "The Chaos" || !first.Connected || first.Stale || !first.MetricsAvailable || first.Metrics.ServerFPS != 60 || !first.ObjectsAvailable || len(first.Objects) != 1 {
 		t.Fatalf("first snapshot = %#v", first)
 	}
 
@@ -54,13 +62,15 @@ func TestPollerRetainsLastGoodSnapshots(t *testing.T) {
 	source.info = ServerInfo{}
 	source.infoErr = errors.New("offline")
 	source.playerErr = errors.New("offline")
+	source.metricErr = errors.New("offline")
 	source.objects = nil
 	source.objectErr = errors.New("offline")
 	poller.refreshInfo(context.Background())
 	poller.refreshPlayers(context.Background())
+	poller.refreshMetrics(context.Background())
 	poller.refreshWorld(context.Background())
 	stale := poller.Snapshot()
-	if stale.Server.Name != "The Chaos" || stale.Connected || !stale.Stale || !stale.ObjectsStale || len(stale.Players) != 1 || len(stale.Objects) != 1 {
+	if stale.Server.Name != "The Chaos" || stale.Connected || !stale.Stale || !stale.MetricsAvailable || stale.Metrics.ServerFPS != 60 || !stale.ObjectsStale || len(stale.Players) != 1 || len(stale.Objects) != 1 {
 		t.Fatalf("stale snapshot = %#v", stale)
 	}
 

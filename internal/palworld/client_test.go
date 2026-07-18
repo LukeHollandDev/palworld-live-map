@@ -6,6 +6,7 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 )
@@ -94,6 +95,42 @@ func TestClientPlayersReportsUpstreamError(t *testing.T) {
 	}
 }
 
+func TestClientMetricsSanitizesUpstreamResponse(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/v1/api/metrics" {
+			t.Fatalf("path = %q", r.URL.Path)
+		}
+		username, password, ok := r.BasicAuth()
+		if !ok || username != "admin" || password != "admin-secret" {
+			t.Fatalf("unexpected basic auth: %q %q %v", username, password, ok)
+		}
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"currentplayernum": 2,
+			"maxplayernum":     20,
+			"serverfps":        59,
+			"serverfpsaverage": 59.48,
+			"serverframetime":  16.74,
+			"uptime":           26397,
+			"basecampnum":      11,
+			"days":             343,
+		})
+	}))
+	defer server.Close()
+
+	client, err := NewClient(server.URL, "admin-secret", time.Second, time.Second)
+	if err != nil {
+		t.Fatal(err)
+	}
+	metrics, err := client.Metrics(context.Background())
+	if err != nil {
+		t.Fatalf("Metrics() error = %v", err)
+	}
+	if metrics.CurrentPlayers != 2 || metrics.MaxPlayers != 20 || metrics.ServerFPS != 59 || metrics.AverageFPS != 59.48 ||
+		metrics.ServerFrameTime != 16.74 || metrics.UptimeSeconds != 26397 || metrics.BaseCount != 11 || metrics.Days != 343 {
+		t.Fatalf("metrics = %#v", metrics)
+	}
+}
+
 func TestNewClientRejectsUnsafeURL(t *testing.T) {
 	if _, err := NewClient("file:///etc/passwd", "secret", time.Second, time.Second); err == nil {
 		t.Fatal("NewClient() error = nil")
@@ -129,8 +166,9 @@ func TestClientWorldObjectsSanitizesAndClassifiesActors(t *testing.T) {
 		_ = json.NewEncoder(w).Encode(map[string]any{
 			"Time": "2026-07-17 10:00:00",
 			"ActorData": []map[string]any{
-				{"Type": "PalBox", "GuildName": "The Chaos", "LocationX": -100, "LocationY": 200, "ip": "private"},
-				{"Type": "Character", "UnitType": "BaseCampPal", "NickName": "Anubis", "level": 44, "LocationX": -200, "LocationY": 300, "IsActive": "true", "userid": "private"},
+				{"Type": "PalBox", "GuildID": "private-guild-id", "GuildName": "The Chaos", "LocationX": -100, "LocationY": 200, "ip": "private"},
+				{"Type": "PalBox", "GuildID": "private-guild-id", "GuildName": "The Chaos", "LocationX": -1000, "LocationY": 2000},
+				{"Type": "Character", "UnitType": "BaseCampPal", "GuildID": "private-guild-id", "NickName": "Anubis", "level": 44, "LocationX": -200, "LocationY": 300, "IsActive": "true", "userid": "private"},
 				{"Type": "Character", "UnitType": "NPC", "Class": "BP_Desert_Trader_C", "LocationX": -300, "LocationY": 400},
 				{"Type": "Character", "UnitType": "WildPal", "NickName": "Hidden", "LocationX": 1, "LocationY": 2, "IsActive": "false"},
 				{"Type": "Character", "UnitType": "Player", "NickName": "Duplicate", "LocationX": 1, "LocationY": 2},
@@ -147,17 +185,27 @@ func TestClientWorldObjectsSanitizesAndClassifiesActors(t *testing.T) {
 	if err != nil {
 		t.Fatalf("WorldObjects() error = %v", err)
 	}
-	if len(objects) != 3 {
+	if len(objects) != 4 {
 		t.Fatalf("objects = %#v", objects)
 	}
-	if objects[0].Kind != "bases" || objects[0].Name != "The Chaos" {
+	if objects[0].Kind != "bases" || objects[0].Name != "The Chaos" || objects[0].BaseID == "" || objects[0].GuildKey == "" {
 		t.Fatalf("base = %#v", objects[0])
 	}
-	if objects[1].Kind != "workers" || objects[1].Name != "Anubis" || objects[1].Level != 44 {
-		t.Fatalf("worker = %#v", objects[1])
+	if objects[1].Kind != "bases" || objects[1].GuildKey != objects[0].GuildKey || objects[1].BaseID == objects[0].BaseID {
+		t.Fatalf("second base = %#v", objects[1])
 	}
-	if objects[2].Kind != "npcs" || objects[2].Name != "Desert Trader" {
-		t.Fatalf("npc = %#v", objects[2])
+	if objects[2].Kind != "workers" || objects[2].Name != "Anubis" || objects[2].Level != 44 || objects[2].BaseID != objects[0].BaseID {
+		t.Fatalf("worker = %#v", objects[2])
+	}
+	if objects[3].Kind != "npcs" || objects[3].Name != "Desert Trader" {
+		t.Fatalf("npc = %#v", objects[3])
+	}
+	encoded, err := json.Marshal(objects)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(encoded), "private-guild-id") {
+		t.Fatalf("objects expose guild ID: %s", encoded)
 	}
 }
 

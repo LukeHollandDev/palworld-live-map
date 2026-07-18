@@ -16,12 +16,14 @@
           <p id="serverDescription" hidden></p>
         </div>
         <div class="server-state">
-          <span id="statusDot" class="status-dot" aria-hidden="true"></span>
-          <span id="statusText" role="status">Connecting…</span>
+          <button id="serverDetailsButton" class="server-details-button" type="button" aria-haspopup="dialog" aria-controls="detailsDialog" title="View server details">
+            <span id="statusDot" class="status-dot" aria-hidden="true"></span>
+            <span id="statusText" role="status">Connecting…</span>
+            <span id="metricsSummary" hidden></span>
+          </button>
           <span class="divider">·</span>
           <span id="updatedText">Waiting for data</span>
         </div>
-        <button id="toggleFilters" class="header-button" type="button" aria-controls="filterPanel" aria-expanded="true">Layers</button>
       </header>
 
       <main class="map-shell">
@@ -35,69 +37,22 @@
             </div>
           </div>
 
-          <div id="layerTabs" class="layer-tabs" role="group" aria-label="World region"></div>
+          <button id="toggleFilters" class="filter-toggle" type="button" aria-controls="filterPanel" aria-expanded="true" hidden>Map</button>
 
           <aside id="filterPanel" class="filter-panel" aria-label="Map filters">
             <div class="panel-title">
-              <strong>Map layers</strong>
-              <button id="closeFilters" type="button" aria-label="Close layers">×</button>
+              <strong>Map</strong>
+              <button id="closeFilters" type="button" aria-label="Collapse map filter" title="Collapse map filter">‹</button>
             </div>
+
+            <div id="layerTabs" class="layer-tabs" role="group" aria-label="World region"></div>
 
             <label class="search-field">
-              <span>Find</span>
-              <input id="searchInput" type="search" placeholder="Player, Pal, base…" autocomplete="off">
+              <span>Filter map</span>
+              <input id="searchInput" type="search" placeholder="Player, Pal or base…" autocomplete="off">
             </label>
 
-            <label class="level-field">
-              <span>Minimum level</span>
-              <select id="levelFilter">
-                <option value="0">Any level</option>
-                <option value="10">10+</option>
-                <option value="20">20+</option>
-                <option value="30">30+</option>
-                <option value="40">40+</option>
-                <option value="50">50+</option>
-              </select>
-            </label>
-
-            <div id="legend" class="legend">
-              <label data-kind="players">
-                <input type="checkbox" value="players" checked>
-                <span class="legend-symbol players"></span>
-                <span>Players</span>
-                <output>0</output>
-              </label>
-              <label data-kind="bases">
-                <input type="checkbox" value="bases" checked>
-                <span class="legend-symbol bases"></span>
-                <span>Bases</span>
-                <output>0</output>
-              </label>
-              <label data-kind="workers">
-                <input type="checkbox" value="workers">
-                <span class="legend-symbol workers"></span>
-                <span>Base workers</span>
-                <output>0</output>
-              </label>
-              <label data-kind="companions">
-                <input type="checkbox" value="companions">
-                <span class="legend-symbol companions"></span>
-                <span>Companion Pals</span>
-                <output>0</output>
-              </label>
-              <label data-kind="wild-pals">
-                <input type="checkbox" value="wild-pals">
-                <span class="legend-symbol wild-pals"></span>
-                <span>Wild Pals</span>
-                <output>0</output>
-              </label>
-              <label data-kind="npcs">
-                <input type="checkbox" value="npcs">
-                <span class="legend-symbol npcs"></span>
-                <span>NPCs</span>
-                <output>0</output>
-              </label>
-            </div>
+            <div id="mapExplorer" class="map-explorer" aria-live="polite"></div>
 
             <p id="objectNotice" class="object-notice" hidden></p>
           </aside>
@@ -114,5 +69,18 @@
         </div>
       </main>
     </div>
+
+    <dialog id="detailsDialog" class="details-dialog" aria-labelledby="detailsTitle">
+      <article class="details-card">
+        <header class="details-header">
+          <div>
+            <p id="detailsKind" class="details-kind"></p>
+            <h2 id="detailsTitle"></h2>
+          </div>
+          <button id="closeDetails" class="details-close" type="button" aria-label="Close details">×</button>
+        </header>
+        <div id="detailsBody" class="details-body"></div>
+      </article>
+    </dialog>
   </body>
 </html>
