@@ -368,7 +368,7 @@
   }, { passive: false })
 
   mapViewport.addEventListener('pointerdown', (event) => {
-    if (event.button !== 0) return
+    if (event.button !== 0 || event.target.closest('.layer-tabs, .filter-panel, .map-controls')) return
     drag = { pointer: event.pointerId, x: event.clientX, y: event.clientY, viewX: view.x, viewY: view.y }
     mapViewport.setPointerCapture(event.pointerId)
     mapViewport.classList.add('dragging')
