@@ -50,12 +50,11 @@ button { color: inherit; }
 
 .map-scene {
   position: absolute;
-  width: 1000px;
-  height: 1000px;
+  width: var(--scene-size, 8192px);
+  height: var(--scene-size, 8192px);
   transform-origin: 0 0;
   background: #25302d;
   box-shadow: 0 0 0 1px #4c5553;
-  will-change: transform;
 }
 
 .map-image, .fallback-grid, .marker-layer { position: absolute; inset: 0; width: 100%; height: 100%; }
@@ -165,12 +164,12 @@ button { color: inherit; }
 .coordinate-readout { position: absolute; left: 12px; bottom: 12px; padding: 6px 8px; border-radius: 4px; background: rgb(24 28 31 / 82%); color: #d0d5d7; font: 11px ui-monospace, monospace; z-index: 9; }
 
 .map-marker {
-  --marker-inverse: 1;
+  --marker-scale: 1;
   position: absolute;
   width: 18px;
   height: 18px;
   translate: -50% -50%;
-  transform: scale(var(--marker-inverse));
+  transform: scale(var(--marker-scale));
   transform-origin: center;
   border: 2px solid #fff;
   border-radius: 50%;

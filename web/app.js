@@ -1,7 +1,8 @@
 (() => {
   'use strict'
 
-  const SCENE_SIZE = 1000
+  const MAP_PIXEL_SIZE = 8192
+  const SCENE_SIZE = MAP_PIXEL_SIZE / Math.max(1, window.devicePixelRatio || 1)
   const kinds = ['players', 'bases', 'workers', 'companions', 'wild-pals', 'npcs']
   const enabledKinds = new Set(['players', 'bases'])
 
@@ -26,6 +27,8 @@
   const playerMarkerLayer = document.querySelector('#playerMarkerLayer')
   const mapNotice = document.querySelector('#mapNotice')
   const cursorCoordinates = document.querySelector('#cursorCoordinates')
+
+  mapScene.style.setProperty('--scene-size', `${SCENE_SIZE}px`)
 
   let config = null
   let playerState = null
@@ -207,7 +210,7 @@
       marker.dataset.markerKey = `${baseKey}:${occurrence}`
       marker.style.left = `${position.x}px`
       marker.style.top = `${position.y}px`
-      marker.style.setProperty('--marker-inverse', String(1 / view.scale))
+      marker.style.setProperty('--marker-scale', String(markerScale()))
       marker.setAttribute('aria-label', markerText(item))
 
       const label = document.createElement('span')
@@ -321,7 +324,14 @@
 
   function applyView() {
     mapScene.style.transform = `translate(${view.x}px, ${view.y}px) scale(${view.scale})`
-    for (const marker of markerLayer.querySelectorAll('.map-marker')) marker.style.setProperty('--marker-inverse', String(1 / view.scale))
+    const scale = String(markerScale())
+    for (const marker of markerLayer.querySelectorAll('.map-marker')) marker.style.setProperty('--marker-scale', scale)
+  }
+
+  function markerScale() {
+    const zoomRatio = Math.max(1, view.scale / fitScale())
+    const screenScale = Math.min(2, Math.sqrt(zoomRatio))
+    return screenScale / view.scale
   }
 
   function zoomAt(nextScale, clientX, clientY) {

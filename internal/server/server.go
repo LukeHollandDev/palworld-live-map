@@ -97,13 +97,13 @@ func (s *Server) publicConfig(w http.ResponseWriter, _ *http.Request) {
 		{
 			ID:       "palpagos",
 			Name:     "Palpagos",
-			ImageURL: "/assets/map/palpagos.jpg",
+			ImageURL: "/assets/map/palpagos.jpg?v=8192",
 			Bounds:   [4]float64{349400, 724400, -1099400, -724400},
 		},
 		{
 			ID:       "world-tree",
 			Name:     "World Tree",
-			ImageURL: "/assets/map/world-tree.jpg",
+			ImageURL: "/assets/map/world-tree.jpg?v=8192",
 			Bounds:   [4]float64{689148.5, -476400, 347351.5, -818197},
 		},
 	}

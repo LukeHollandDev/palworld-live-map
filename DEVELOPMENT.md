@@ -27,7 +27,7 @@ The game-data endpoint represents currently loaded characters and Palboxes. It d
 - `web` contains the dependency-free browser application embedded into the binary.
 - `assets/map` contains the embedded Palpagos and World Tree artwork.
 
-The browser application uses a fixed 1000×1000 scene and converts Palworld world coordinates into that space using the bounds in `internal/server/server.go`. See [the map artwork notes](assets/map/README.md) for source and ownership details.
+The browser application uses a density-aware scene matching the 8192×8192 native map artwork without exceeding common browser compositor limits. It converts Palworld world coordinates into that space using the bounds in `internal/server/server.go`. See [the map artwork notes](assets/map/README.md) for source and ownership details.
 
 ## Run from source
 
