@@ -13,6 +13,7 @@ type Config struct {
 	Addr              string
 	RESTURL           string
 	AdminPassword     string
+	DemoMode          bool
 	PollInterval      time.Duration
 	UpstreamTimeout   time.Duration
 	WorldPollInterval time.Duration
@@ -21,6 +22,10 @@ type Config struct {
 }
 
 func Load() (Config, error) {
+	demoMode, err := boolean("DEMO_MODE", false)
+	if err != nil {
+		return Config{}, err
+	}
 	pollInterval, err := duration("POLL_INTERVAL", 5*time.Second)
 	if err != nil {
 		return Config{}, err
@@ -46,6 +51,7 @@ func Load() (Config, error) {
 		Addr:              envOr("ADDR", ":8080"),
 		RESTURL:           strings.TrimRight(os.Getenv("PALWORLD_REST_URL"), "/"),
 		AdminPassword:     os.Getenv("PALWORLD_ADMIN_PASSWORD"),
+		DemoMode:          demoMode,
 		PollInterval:      pollInterval,
 		UpstreamTimeout:   upstreamTimeout,
 		WorldPollInterval: worldPollInterval,
@@ -54,11 +60,13 @@ func Load() (Config, error) {
 	}
 
 	var missing []string
-	if cfg.RESTURL == "" {
-		missing = append(missing, "PALWORLD_REST_URL")
-	}
-	if cfg.AdminPassword == "" {
-		missing = append(missing, "PALWORLD_ADMIN_PASSWORD")
+	if !cfg.DemoMode {
+		if cfg.RESTURL == "" {
+			missing = append(missing, "PALWORLD_REST_URL")
+		}
+		if cfg.AdminPassword == "" {
+			missing = append(missing, "PALWORLD_ADMIN_PASSWORD")
+		}
 	}
 	if len(missing) > 0 {
 		return Config{}, fmt.Errorf("missing configuration: %s", strings.Join(missing, ", "))

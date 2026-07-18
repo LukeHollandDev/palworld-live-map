@@ -1,0 +1,26 @@
+name: Feature request
+description: Suggest a player-facing, read-only improvement
+title: "[Feature]: "
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Player problem
+      description: What becomes easier for players or server hosts?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed behavior
+    validations:
+      required: true
+  - type: checkboxes
+    id: scope
+    attributes:
+      label: Project scope
+      options:
+        - label: This remains read-only and does not add server administration controls.
+          required: true
+

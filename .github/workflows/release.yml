@@ -1,0 +1,40 @@
+name: Create release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out tagged source
+        uses: actions/checkout@v7
+
+      - name: Prepare full-stack assets
+        run: |
+          mkdir release-assets
+          cp deploy/full-stack/compose.yml release-assets/compose.full.yml
+          cp deploy/full-stack/.env.example release-assets/full-stack.env.example
+          cd release-assets
+          sha256sum compose.full.yml full-stack.env.example > SHA256SUMS
+
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view "${GITHUB_REF_NAME}" >/dev/null 2>&1; then
+            gh release upload "${GITHUB_REF_NAME}" release-assets/* --clobber
+          else
+            gh release create "${GITHUB_REF_NAME}" \
+              release-assets/compose.full.yml \
+              release-assets/full-stack.env.example \
+              release-assets/SHA256SUMS \
+              --verify-tag \
+              --generate-notes \
+              --title "${GITHUB_REF_NAME}"
+          fi

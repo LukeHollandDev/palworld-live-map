@@ -1,0 +1,26 @@
+name: Compatibility report
+description: Report map alignment or Palworld API compatibility after an update
+title: "[Compatibility]: "
+labels: [compatibility]
+body:
+  - type: input
+    id: versions
+    attributes:
+      label: Palworld and live-map versions
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Affected area
+      options: [Player positions, Palpagos artwork, World Tree artwork, World objects, Server metrics, Other]
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Evidence and reproduction
+      description: Include coordinates and screenshots where useful, without private player data.
+    validations:
+      required: true
+

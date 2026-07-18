@@ -104,6 +104,24 @@ func TestPublicConfigAndObjectsExposeDisabledWorldData(t *testing.T) {
 	}
 }
 
+func TestPublicConfigExposesDemoMode(t *testing.T) {
+	cfg := testConfig()
+	cfg.DemoMode = true
+	service, err := New(cfg, fixedSnapshot{})
+	if err != nil {
+		t.Fatalf("New() error = %v", err)
+	}
+	response := httptest.NewRecorder()
+	service.Handler().ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/api/config", nil))
+	body := response.Body.String()
+	if response.Code != http.StatusOK || !strings.Contains(body, `"demoMode":true`) {
+		t.Fatalf("config response = status %d, body %s", response.Code, response.Body.String())
+	}
+	if !strings.Contains(body, `/assets/map/palpagos.jpg?v=`) || strings.Contains(body, `?v=8192`) {
+		t.Fatalf("config response does not use manifest asset hash: %s", body)
+	}
+}
+
 func TestServerServesOnlyKnownEmbeddedMapArtwork(t *testing.T) {
 	service, err := New(testConfig(), fixedSnapshot{})
 	if err != nil {

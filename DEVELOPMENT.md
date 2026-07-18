@@ -19,6 +19,8 @@ Player and server-metric data are refreshed using `POLL_INTERVAL`; world objects
 
 The game-data endpoint represents currently loaded characters and Palboxes. It does not contain every placed wall, chest, crafting station, or other building part. Supporting those would require a separate save-file parser.
 
+When `DEMO_MODE=true`, the application does not construct the REST client or contact a Palworld server. A deterministic fictional source implements the same internal interface, so the regular poller, snapshots, public API, and browser UI are all exercised. Demo mode is suitable for screenshots, smoke tests, and public evaluation—not load or upstream-compatibility testing.
+
 ## Project layout
 
 - `cmd/palworld-live-map` starts the pollers and HTTP server.
@@ -26,9 +28,11 @@ The game-data endpoint represents currently loaded characters and Palboxes. It d
 - `internal/palworld` contains the REST client, data sanitisation, classification, and polling state.
 - `internal/server` exposes the read-only JSON and static-asset routes.
 - `web` contains the dependency-free browser application embedded into the binary.
-- `assets/map` contains the embedded Palpagos and World Tree artwork.
+- `assets/map` contains the embedded Palpagos and World Tree artwork plus its generated provenance manifest.
+- `tools/maps` contains the containerised, read-only map exporter for a locally installed game.
+- `deploy/full-stack` starts a new Palworld server and the map on one private Compose network.
 
-The browser application uses a density-aware scene matching the 8192×8192 native map artwork without exceeding common browser compositor limits. It converts Palworld world coordinates into that space using the bounds in `internal/server/server.go`. See [the map artwork notes](assets/map/README.md) for source and ownership details.
+The browser application uses a density-aware scene matching the 8192×8192 native map artwork without exceeding common browser compositor limits. It converts Palworld world coordinates into that space using bounds loaded from `assets/map/manifest.json`. See [the map artwork notes](assets/map/README.md) for source and ownership details.
 
 ## Run from source
 
@@ -43,6 +47,14 @@ go run ./cmd/palworld-live-map
 ```
 
 Open `http://localhost:8080`.
+
+For a local demo without Palworld:
+
+```bash
+make demo
+```
+
+To regenerate the map artwork from a local Palworld installation, follow [`tools/maps/README.md`](tools/maps/README.md). The Dockerised exporter is intentionally outside the production image and Go dependency graph.
 
 ## Verification
 

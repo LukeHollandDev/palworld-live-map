@@ -26,6 +26,8 @@ button { color: inherit; }
 
 .server-identity { display: flex; align-items: baseline; gap: 9px; min-width: 0; }
 .topbar h1 { margin: 0; flex: 0 0 auto; font-size: 16px; font-weight: 650; white-space: nowrap; }
+.demo-badge { flex: 0 0 auto; padding: 3px 6px; border: 1px solid #ae8748; border-radius: 999px; background: #3c3222; color: #f0c87d; font-size: 10px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
+.demo-badge[hidden] { display: none; }
 .server-identity p { margin: 0; overflow: hidden; color: #899298; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
 .server-state { display: flex; align-items: center; gap: 7px; min-width: 0; color: #b9c0c4; font-size: 13px; }
 .server-state span { white-space: nowrap; }

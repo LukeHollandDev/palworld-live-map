@@ -1,0 +1,35 @@
+name: Bug report
+description: Report a reproducible problem with the live map
+title: "[Bug]: "
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: Do not include passwords, player identifiers, IP addresses, or private hostnames.
+  - type: input
+    id: version
+    attributes:
+      label: Live-map version
+      placeholder: v0.2.0 or container digest
+    validations:
+      required: true
+  - type: input
+    id: palworld
+    attributes:
+      label: Palworld version and server image
+      placeholder: Palworld 1.0; thijsvanloef/palworld-server-docker:latest
+    validations:
+      required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: What happened?
+      description: Include expected behavior and exact reproduction steps.
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Sanitized logs
+      render: shell
+

@@ -8,6 +8,7 @@
   const enabledKinds = new Set(allKinds)
 
   const siteTitle = document.querySelector('#siteTitle')
+  const demoBadge = document.querySelector('#demoBadge')
   const serverDescription = document.querySelector('#serverDescription')
   const statusDot = document.querySelector('#statusDot')
   const statusText = document.querySelector('#statusText')
@@ -65,6 +66,7 @@
   async function boot() {
     try {
       config = await requestJSON('/api/config')
+      demoBadge.hidden = !config.demoMode
       objectState = emptyObjectState(config.worldDataEnabled)
       activeLayer = config.layers[0]
       buildLayerTabs()
