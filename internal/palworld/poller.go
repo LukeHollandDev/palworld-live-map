@@ -15,6 +15,9 @@ type Snapshot struct {
 	Stale              bool          `json:"stale"`
 	LastSuccessAt      time.Time     `json:"lastSuccessAt,omitzero"`
 	Players            []Player      `json:"players"`
+	Metrics            ServerMetrics `json:"metrics"`
+	MetricsAvailable   bool          `json:"metricsAvailable"`
+	MetricsUpdatedAt   time.Time     `json:"metricsUpdatedAt,omitzero"`
 	ObjectsAvailable   bool          `json:"objectsAvailable"`
 	ObjectsStale       bool          `json:"objectsStale"`
 	ObjectsUnsupported bool          `json:"objectsUnsupported"`
@@ -25,6 +28,7 @@ type Snapshot struct {
 type Source interface {
 	Info(context.Context) (ServerInfo, error)
 	Players(context.Context) ([]Player, error)
+	Metrics(context.Context) (ServerMetrics, error)
 	WorldObjects(context.Context) ([]WorldObject, error)
 }
 
@@ -50,7 +54,7 @@ func NewPoller(source Source, playerEvery, worldEvery time.Duration, worldEnable
 
 func (p *Poller) Run(ctx context.Context) {
 	var workers sync.WaitGroup
-	workers.Add(2)
+	workers.Add(3)
 	go func() {
 		defer workers.Done()
 		p.runInfo(ctx)
@@ -58,6 +62,10 @@ func (p *Poller) Run(ctx context.Context) {
 	go func() {
 		defer workers.Done()
 		p.runPlayers(ctx)
+	}()
+	go func() {
+		defer workers.Done()
+		p.runMetrics(ctx)
 	}()
 	if p.worldEnabled {
 		workers.Add(1)
@@ -93,6 +101,20 @@ func (p *Poller) runPlayers(ctx context.Context) {
 			return
 		case <-ticker.C:
 			p.refreshPlayers(ctx)
+		}
+	}
+}
+
+func (p *Poller) runMetrics(ctx context.Context) {
+	p.refreshMetrics(ctx)
+	ticker := time.NewTicker(p.playerEvery)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			p.refreshMetrics(ctx)
 		}
 	}
 }
@@ -146,6 +168,19 @@ func (p *Poller) refreshPlayers(ctx context.Context) {
 	p.snapshot.Stale = false
 	p.snapshot.LastSuccessAt = time.Now().UTC()
 	p.snapshot.Players = append([]Player(nil), players...)
+	p.mu.Unlock()
+}
+
+func (p *Poller) refreshMetrics(ctx context.Context) {
+	metrics, err := p.source.Metrics(ctx)
+	if err != nil {
+		p.logger.Warn("Palworld server-metrics refresh failed", "error", err)
+		return
+	}
+	p.mu.Lock()
+	p.snapshot.Metrics = metrics
+	p.snapshot.MetricsAvailable = true
+	p.snapshot.MetricsUpdatedAt = time.Now().UTC()
 	p.mu.Unlock()
 }
 

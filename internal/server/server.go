@@ -35,11 +35,14 @@ type mapLayer struct {
 }
 
 type playerState struct {
-	Server        palworld.ServerInfo `json:"server"`
-	Connected     bool                `json:"connected"`
-	Stale         bool                `json:"stale"`
-	LastSuccessAt time.Time           `json:"lastSuccessAt,omitzero"`
-	Players       []palworld.Player   `json:"players"`
+	Server           palworld.ServerInfo    `json:"server"`
+	Metrics          palworld.ServerMetrics `json:"metrics"`
+	MetricsAvailable bool                   `json:"metricsAvailable"`
+	MetricsUpdatedAt time.Time              `json:"metricsUpdatedAt,omitzero"`
+	Connected        bool                   `json:"connected"`
+	Stale            bool                   `json:"stale"`
+	LastSuccessAt    time.Time              `json:"lastSuccessAt,omitzero"`
+	Players          []palworld.Player      `json:"players"`
 }
 
 type objectState struct {
@@ -118,11 +121,14 @@ func (s *Server) publicConfig(w http.ResponseWriter, _ *http.Request) {
 func (s *Server) players(w http.ResponseWriter, _ *http.Request) {
 	snapshot := s.source.Snapshot()
 	writeJSON(w, http.StatusOK, playerState{
-		Server:        snapshot.Server,
-		Connected:     snapshot.Connected,
-		Stale:         snapshot.Stale,
-		LastSuccessAt: snapshot.LastSuccessAt,
-		Players:       snapshot.Players,
+		Server:           snapshot.Server,
+		Metrics:          snapshot.Metrics,
+		MetricsAvailable: snapshot.MetricsAvailable,
+		MetricsUpdatedAt: snapshot.MetricsUpdatedAt,
+		Connected:        snapshot.Connected,
+		Stale:            snapshot.Stale,
+		LastSuccessAt:    snapshot.LastSuccessAt,
+		Players:          snapshot.Players,
 	})
 }
 

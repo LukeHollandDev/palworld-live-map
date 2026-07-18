@@ -6,8 +6,11 @@ A self-hosted live map for Palworld dedicated servers. Players can see who is on
 
 - Detailed Palpagos and World Tree maps with pan, zoom, and coordinates
 - Live positions for all online players, refreshed at a configurable interval
-- Optional layers for bases, base workers, companion Pals, wild Pals, and NPCs
-- Search, minimum-level filtering, layer controls, and counts
+- A collapsible map explorer listing online players and guild-grouped bases with their current workers
+- Companion Pals, wild Pals, and NPCs appear only when the server is actively reporting them
+- Clickable details for players, bases, Pals, NPCs, and base worker rosters
+- Live player capacity, FPS, frame time, uptime, base count, and in-game day metrics
+- Search-driven map filtering, region controls, category visibility, and live counts
 - Server name and description taken directly from your Palworld configuration
 - Passwordless viewing with no separate account or sign-in
 - Standalone Docker setup that does not depend on an existing proxy or network

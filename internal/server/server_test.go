@@ -53,6 +53,8 @@ func TestSplitStateEndpointsDoNotRepeatUnrelatedData(t *testing.T) {
 	cfg := testConfig()
 	source := fixedSnapshot{value: palworld.Snapshot{
 		Server:           palworld.ServerInfo{Name: "The Chaos"},
+		Metrics:          palworld.ServerMetrics{ServerFPS: 59, MaxPlayers: 20},
+		MetricsAvailable: true,
 		Connected:        true,
 		Players:          []palworld.Player{{Name: "Luke", Level: 55, X: 10, Y: -20, Map: "palpagos"}},
 		ObjectsAvailable: true,
@@ -67,6 +69,9 @@ func TestSplitStateEndpointsDoNotRepeatUnrelatedData(t *testing.T) {
 	service.Handler().ServeHTTP(players, httptest.NewRequest(http.MethodGet, "/api/players", nil))
 	if players.Code != http.StatusOK || !strings.Contains(players.Body.String(), `"name":"Luke"`) {
 		t.Fatalf("players response = status %d, body %s", players.Code, players.Body.String())
+	}
+	if !strings.Contains(players.Body.String(), `"serverFps":59`) || !strings.Contains(players.Body.String(), `"maxPlayers":20`) {
+		t.Fatalf("players response has no metrics: %s", players.Body.String())
 	}
 	if strings.Contains(players.Body.String(), `"name":"Home"`) || strings.Contains(players.Body.String(), `"objects"`) {
 		t.Fatalf("players response contains world objects: %s", players.Body.String())

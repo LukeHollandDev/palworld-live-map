@@ -2,6 +2,7 @@ package palworld
 
 import (
 	"context"
+	"crypto/sha256"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -33,14 +34,32 @@ type ServerInfo struct {
 	Version     string `json:"version,omitempty"`
 }
 
+type ServerMetrics struct {
+	CurrentPlayers  int     `json:"currentPlayers"`
+	MaxPlayers      int     `json:"maxPlayers"`
+	ServerFPS       int     `json:"serverFps"`
+	AverageFPS      float64 `json:"averageFps"`
+	ServerFrameTime float64 `json:"serverFrameTime"`
+	UptimeSeconds   int64   `json:"uptimeSeconds"`
+	BaseCount       int     `json:"baseCount"`
+	Days            int     `json:"days"`
+}
+
 type WorldObject struct {
-	Kind   string  `json:"kind"`
-	Name   string  `json:"name"`
-	Detail string  `json:"detail,omitempty"`
-	Level  int     `json:"level,omitempty"`
-	X      float64 `json:"x"`
-	Y      float64 `json:"y"`
-	Map    string  `json:"map"`
+	Kind     string  `json:"kind"`
+	Name     string  `json:"name"`
+	Detail   string  `json:"detail,omitempty"`
+	BaseID   string  `json:"baseId,omitempty"`
+	GuildKey string  `json:"guildKey,omitempty"`
+	Level    int     `json:"level,omitempty"`
+	X        float64 `json:"x"`
+	Y        float64 `json:"y"`
+	Map      string  `json:"map"`
+}
+
+type parsedWorldObject struct {
+	object  WorldObject
+	guildID string
 }
 
 type HTTPStatusError struct {
@@ -73,11 +92,23 @@ type infoResponse struct {
 	Description string `json:"description"`
 }
 
+type metricsResponse struct {
+	CurrentPlayers  int     `json:"currentplayernum"`
+	MaxPlayers      int     `json:"maxplayernum"`
+	ServerFPS       int     `json:"serverfps"`
+	AverageFPS      float64 `json:"serverfpsaverage"`
+	ServerFrameTime float64 `json:"serverframetime"`
+	UptimeSeconds   int64   `json:"uptime"`
+	BaseCount       int     `json:"basecampnum"`
+	Days            int     `json:"days"`
+}
+
 type worldResponse struct {
 	ActorData []struct {
 		Type      string  `json:"Type"`
 		UnitType  string  `json:"UnitType"`
 		NickName  string  `json:"NickName"`
+		GuildID   string  `json:"GuildID"`
 		GuildName string  `json:"GuildName"`
 		Class     string  `json:"Class"`
 		Level     int     `json:"level"`
@@ -190,6 +221,43 @@ func (c *Client) Players(ctx context.Context) ([]Player, error) {
 	return players, nil
 }
 
+func (c *Client) Metrics(ctx context.Context) (ServerMetrics, error) {
+	endpoint := c.baseURL.ResolveReference(&url.URL{Path: "/v1/api/metrics"})
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint.String(), nil)
+	if err != nil {
+		return ServerMetrics{}, fmt.Errorf("create server metrics request: %w", err)
+	}
+	req.Header.Set("Accept", "application/json")
+	req.SetBasicAuth("admin", c.adminPassword)
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return ServerMetrics{}, fmt.Errorf("request server metrics: %w", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, 4096))
+		return ServerMetrics{}, fmt.Errorf("request server metrics: %w", &HTTPStatusError{Status: resp.StatusCode})
+	}
+
+	var payload metricsResponse
+	decoder := json.NewDecoder(io.LimitReader(resp.Body, maxResponseBytes))
+	if err := decoder.Decode(&payload); err != nil {
+		return ServerMetrics{}, fmt.Errorf("decode server metrics response: %w", err)
+	}
+	if payload.CurrentPlayers < 0 || payload.MaxPlayers < 0 || payload.ServerFPS < 0 ||
+		payload.AverageFPS < 0 || !finite(payload.AverageFPS) ||
+		payload.ServerFrameTime < 0 || !finite(payload.ServerFrameTime) ||
+		payload.UptimeSeconds < 0 || payload.BaseCount < 0 || payload.Days < 0 {
+		return ServerMetrics{}, errors.New("server metrics response contains invalid values")
+	}
+	return ServerMetrics{
+		CurrentPlayers: payload.CurrentPlayers, MaxPlayers: payload.MaxPlayers,
+		ServerFPS: payload.ServerFPS, AverageFPS: payload.AverageFPS, ServerFrameTime: payload.ServerFrameTime,
+		UptimeSeconds: payload.UptimeSeconds, BaseCount: payload.BaseCount, Days: payload.Days,
+	}, nil
+}
+
 func (c *Client) WorldObjects(ctx context.Context) ([]WorldObject, error) {
 	endpoint := c.baseURL.ResolveReference(&url.URL{Path: "/v1/api/game-data"})
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint.String(), nil)
@@ -224,9 +292,9 @@ func (c *Client) WorldObjects(ctx context.Context) ([]WorldObject, error) {
 		return nil, fmt.Errorf("decode game-data response: %w", err)
 	}
 
-	objects := make([]WorldObject, 0, min(len(payload.ActorData), maxWorldObjects))
+	parsed := make([]parsedWorldObject, 0, min(len(payload.ActorData), maxWorldObjects))
 	for _, actor := range payload.ActorData {
-		if len(objects) == maxWorldObjects {
+		if len(parsed) == maxWorldObjects {
 			break
 		}
 		if strings.EqualFold(strings.TrimSpace(actor.IsActive), "false") || !finite(actor.LocationX) || !finite(actor.LocationY) {
@@ -253,12 +321,61 @@ func (c *Client) WorldObjects(ctx context.Context) ([]WorldObject, error) {
 		if name == "" {
 			name = objectKindLabel(kind)
 		}
-		objects = append(objects, WorldObject{
-			Kind: kind, Name: name, Detail: detail, Level: max(actor.Level, 0),
-			X: actor.LocationX, Y: actor.LocationY, Map: mapFor(actor.LocationX, actor.LocationY),
+		parsed = append(parsed, parsedWorldObject{
+			object: WorldObject{
+				Kind: kind, Name: name, Detail: detail, Level: max(actor.Level, 0),
+				X: actor.LocationX, Y: actor.LocationY, Map: mapFor(actor.LocationX, actor.LocationY),
+			},
+			guildID: strings.TrimSpace(actor.GuildID),
 		})
 	}
+	associateWorkersWithBases(parsed)
+	objects := make([]WorldObject, len(parsed))
+	for i := range parsed {
+		objects[i] = parsed[i].object
+	}
 	return objects, nil
+}
+
+func associateWorkersWithBases(objects []parsedWorldObject) {
+	for i := range objects {
+		if objects[i].object.Kind == "bases" {
+			objects[i].object.BaseID = publicBaseID(objects[i].object)
+			if objects[i].guildID != "" {
+				objects[i].object.GuildKey = publicGuildKey(objects[i].guildID)
+			}
+		}
+	}
+	for i := range objects {
+		if objects[i].object.Kind != "workers" || objects[i].guildID == "" {
+			continue
+		}
+		nearest := -1
+		nearestDistance := math.Inf(1)
+		for candidate := range objects {
+			base := objects[candidate]
+			if base.object.Kind != "bases" || base.guildID != objects[i].guildID || base.object.Map != objects[i].object.Map {
+				continue
+			}
+			distance := math.Hypot(objects[i].object.X-base.object.X, objects[i].object.Y-base.object.Y)
+			if distance < nearestDistance {
+				nearest = candidate
+				nearestDistance = distance
+			}
+		}
+		if nearest >= 0 {
+			objects[i].object.BaseID = objects[nearest].object.BaseID
+		}
+	}
+}
+
+func publicBaseID(base WorldObject) string {
+	return fmt.Sprintf("%s:%g:%g", base.Map, base.X, base.Y)
+}
+
+func publicGuildKey(guildID string) string {
+	digest := sha256.Sum256([]byte(guildID))
+	return fmt.Sprintf("guild:%x", digest[:12])
 }
 
 func objectKind(actorType, unitType string) string {
