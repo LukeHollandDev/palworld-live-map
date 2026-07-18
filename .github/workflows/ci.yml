@@ -10,7 +10,7 @@ permissions:
   contents: read
 
 jobs:
-  test:
+  ci:
     runs-on: ubuntu-latest
     steps:
       - name: Check out source
@@ -22,27 +22,5 @@ jobs:
           go-version-file: go.mod
           cache: false
 
-      - name: Check formatting
-        run: test -z "$(gofmt -l .)"
-
-      - name: Vet
-        run: go vet ./...
-
-      - name: Test
-        run: go test -race ./...
-
-      - name: Build
-        run: go build ./cmd/palworld-live-map
-
-  container:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Check out source
-        uses: actions/checkout@v7
-
-      - name: Build container
-        uses: docker/build-push-action@v7
-        with:
-          context: .
-          push: false
-          tags: palworld-live-map:test
+      - name: Check and build
+        run: make ci

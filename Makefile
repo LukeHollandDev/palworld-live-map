@@ -1,4 +1,6 @@
-.PHONY: build check test image run demo maps
+.PHONY: ci build check test image run demo maps
+
+ci: check build image
 
 build:
 	go build -o bin/palworld-live-map ./cmd/palworld-live-map

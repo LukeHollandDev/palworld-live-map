@@ -22,54 +22,25 @@ Palworld Live Map is a self-hosted website for communities running a Palworld de
 - Demo mode with fictional moving players and world objects
 - Browser-based interface with no client mods required
 
-## Try it without a Palworld server
+## Run with Docker
 
-Demo mode generates fictional moving players and world objects while exercising the production poller, API, and frontend:
+Enable Palworld's REST API, then start the map with the REST API URL and your server's admin password:
 
 ```bash
-docker run --rm -p 8080:8080 -e DEMO_MODE=true \
+docker run -d \
+  --name palworld-live-map \
+  --restart unless-stopped \
+  -p 8080:8080 \
+  -e PALWORLD_REST_URL="http://your-palworld-server:8212" \
+  -e PALWORLD_ADMIN_PASSWORD="your-admin-password" \
   ghcr.io/lukehollanddev/palworld-live-map:latest
 ```
 
-Open <http://localhost:8080>.
+Replace the URL and password with your server's values, then open <http://localhost:8080>. Enable Palworld's game-data API to also display bases, Pals, and NPCs.
 
-## Run the map with your Palworld server
+### Run with Palworld Server Docker
 
-First, enable Palworld's official REST API. Enable the game-data API as well if you want to display bases, Pals, and NPCs. With [`thijsvanloef/palworld-server-docker`](https://github.com/thijsvanloef/palworld-server-docker), use:
-
-```yaml
-environment:
-  REST_API_ENABLED: "true"
-  REST_API_PORT: "8212"
-  ENABLE_GAMEDATA_API: "true"
-```
-
-Clone this repository and create your local configuration:
-
-```bash
-git clone https://github.com/LukeHollandDev/palworld-live-map.git
-cd palworld-live-map
-cp .env.example .env
-```
-
-Edit `.env` and set the URL that the map container can use to reach your Palworld REST API, along with the same admin password configured on your server:
-
-```dotenv
-PALWORLD_REST_URL=http://your-palworld-server:8212
-PALWORLD_ADMIN_PASSWORD=replace-with-your-admin-password
-```
-
-Start the map:
-
-```bash
-docker compose up -d
-```
-
-Open <http://localhost:8080>, or change `HTTP_PORT` in `.env` to publish the map on another host port.
-
-### Run alongside Palworld Server Docker
-
-When both containers are in the same Compose project, the map can reach the REST API using the Palworld service name. The important parts of the configuration look like this:
+If you use [`thijsvanloef/palworld-server-docker`](https://github.com/thijsvanloef/palworld-server-docker), add the map to the same Compose file. Both services use the same `ADMIN_PASSWORD`, and the map connects using the `palworld` service name:
 
 ```yaml
 services:
@@ -91,17 +62,7 @@ services:
       - "${HTTP_PORT:-8080}:8080"
 ```
 
-Set `ADMIN_PASSWORD` in the project's `.env`; Compose passes the same value to Palworld and the map.
-
-A complete ready-to-run example is included in [`deploy/full-stack`](deploy/full-stack). After cloning the repository:
-
-```bash
-cd deploy/full-stack
-cp .env.example .env
-# Edit .env and replace the passwords before starting the services.
-docker compose up -d
-docker compose logs -f palworld
-```
+Set `ADMIN_PASSWORD` in the project's `.env`, then run `docker compose up -d`.
 
 ## Configuration
 
