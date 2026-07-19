@@ -19,9 +19,13 @@ Player and server-metric data are refreshed using `POLL_INTERVAL`; world objects
 
 When `DEMO_MODE=true`, the application does not construct the REST client or contact a Palworld server. A deterministic fictional source implements the same internal interface, so the regular poller, snapshots, public API, and browser UI are all exercised. Demo mode is suitable for screenshots, smoke tests, and public evaluation—not load or upstream-compatibility testing.
 
+## Frontend
+
+The browser application is a self-contained project in [`web/`](web). It uses React and TypeScript, Vite for development and production builds, Tailwind CSS for styling, Biome for formatting and linting, and Vitest for unit and component tests.
+
 ## Run from Source
 
-Go 1.26 or newer is required.
+Go 1.26 or newer and Node.js 24 or newer are required.
 
 ```bash
 cp .env.example .env
@@ -37,13 +41,27 @@ For a local demo without Palworld:
 make demo
 ```
 
+For frontend hot module replacement, run the Go demo server and Vite in separate terminals:
+
+```bash
+DEMO_MODE=true go run ./cmd/palworld-live-map
+```
+
+```bash
+cd web
+npm ci
+npm run dev
+```
+
+Open `http://localhost:5173`. Vite proxies the API and map artwork requests to the Go service on port 8080.
+
 To regenerate the map artwork from a local Palworld installation, follow [`tools/map-exporter/README.md`](tools/map-exporter/README.md). The Dockerised exporter is intentionally outside the production image and Go dependency graph.
 
 ## Verification
 
 ```bash
-make check  # formatting, vet, and race-enabled tests
-make image  # local container image
+make check  # Biome, TypeScript, Vitest, generated assets, Go formatting, vet, and race-enabled tests
+make image  # local production container image
 ```
 
-The CI workflow repeats formatting, vet, tests, the Go build, and the container build for pull requests and pushes to `main`.
+The CI workflow repeats all frontend and Go checks, the Go build, and the container build for pull requests and pushes to `main`.

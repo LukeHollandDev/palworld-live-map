@@ -5,3 +5,5 @@ README.md
 LICENSE
 SECURITY.md
 Dockerfile*
+web/node_modules
+web/dist

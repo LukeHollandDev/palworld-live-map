@@ -3,6 +3,7 @@ package server
 import (
 	"net/http"
 	"net/http/httptest"
+	"regexp"
 	"strings"
 	"testing"
 	"time"
@@ -139,6 +140,31 @@ func TestServerServesOnlyKnownEmbeddedMapArtwork(t *testing.T) {
 		if response.Code != http.StatusNotFound {
 			t.Fatalf("%s status = %d", path, response.Code)
 		}
+	}
+}
+
+func TestServerServesViteFrontendAssets(t *testing.T) {
+	service, err := New(testConfig(), fixedSnapshot{})
+	if err != nil {
+		t.Fatalf("New() error = %v", err)
+	}
+
+	index := httptest.NewRecorder()
+	service.Handler().ServeHTTP(index, httptest.NewRequest(http.MethodGet, "/", nil))
+	if index.Code != http.StatusOK || !strings.Contains(index.Body.String(), `<div id="root"></div>`) {
+		t.Fatalf("index response = status %d, body %s", index.Code, index.Body.String())
+	}
+	assetPath := regexp.MustCompile(`/assets/[^"']+\.js`).FindString(index.Body.String())
+	if assetPath == "" {
+		t.Fatalf("index has no JavaScript asset: %s", index.Body.String())
+	}
+	asset := httptest.NewRecorder()
+	service.Handler().ServeHTTP(asset, httptest.NewRequest(http.MethodGet, assetPath, nil))
+	if asset.Code != http.StatusOK || !strings.Contains(asset.Header().Get("Content-Type"), "javascript") {
+		t.Fatalf("asset response = status %d, type %q", asset.Code, asset.Header().Get("Content-Type"))
+	}
+	if !strings.Contains(asset.Header().Get("Cache-Control"), "immutable") {
+		t.Fatalf("built asset cache policy = %q", asset.Header().Get("Cache-Control"))
 	}
 }
 

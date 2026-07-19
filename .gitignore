@@ -3,3 +3,6 @@
 bin/
 coverage.out
 build/
+node_modules/
+web/coverage/
+web/dist/

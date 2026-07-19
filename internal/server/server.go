@@ -7,6 +7,7 @@ import (
 	"mime"
 	"net/http"
 	"path/filepath"
+	"strings"
 	"time"
 
 	mapassets "github.com/LukeHollandDev/palworld-live-map/assets"
@@ -69,7 +70,7 @@ type objectState struct {
 }
 
 func New(cfg config.Config, source snapshotSource) (*Server, error) {
-	webAssets, err := fs.Sub(web.Assets, ".")
+	webAssets, err := fs.Sub(web.Assets, "dist")
 	if err != nil {
 		return nil, fmt.Errorf("open embedded web assets: %w", err)
 	}
@@ -101,8 +102,7 @@ func (s *Server) routes() http.Handler {
 	mux.HandleFunc("GET /api/objects", s.objects)
 	mux.HandleFunc("GET /api/state", s.state)
 	mux.HandleFunc("GET /", s.index)
-	mux.HandleFunc("GET /app.js", s.static("app.js"))
-	mux.HandleFunc("GET /styles.css", s.static("styles.css"))
+	mux.HandleFunc("GET /assets/{path...}", s.webAsset)
 	mux.HandleFunc("GET /assets/map/palpagos.jpg", s.mapAsset("palpagos.jpg"))
 	mux.HandleFunc("GET /assets/map/world-tree.jpg", s.mapAsset("world-tree.jpg"))
 
@@ -189,12 +189,6 @@ func (s *Server) index(w http.ResponseWriter, r *http.Request) {
 	s.serveAsset(w, r, "index.html")
 }
 
-func (s *Server) static(name string) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		s.serveAsset(w, r, name)
-	}
-}
-
 func (s *Server) serveAsset(w http.ResponseWriter, r *http.Request, name string) {
 	data, err := fs.ReadFile(s.assets, name)
 	if err != nil {
@@ -206,6 +200,24 @@ func (s *Server) serveAsset(w http.ResponseWriter, r *http.Request, name string)
 		w.Header().Set("Content-Type", contentType)
 	}
 	w.Header().Set("Cache-Control", "no-cache")
+	_, _ = w.Write(data)
+}
+
+func (s *Server) webAsset(w http.ResponseWriter, r *http.Request) {
+	name := "assets/" + strings.TrimPrefix(r.PathValue("path"), "/")
+	if !fs.ValidPath(name) {
+		http.NotFound(w, r)
+		return
+	}
+	data, err := fs.ReadFile(s.assets, name)
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	if contentType := mime.TypeByExtension(filepath.Ext(name)); contentType != "" {
+		w.Header().Set("Content-Type", contentType)
+	}
+	w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
 	_, _ = w.Write(data)
 }
 
