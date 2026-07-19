@@ -196,48 +196,50 @@ function LiveMap({ config }: { config: PublicConfig }) {
           setDetail({ kind: 'server' })
         }}
       />
-      <main className="relative min-h-0 size-full">
-        <MapViewport
-          ref={mapRef}
-          activeLayer={activeLayer}
-          items={items}
-          enabledKinds={enabledKinds}
-          hiddenKeys={hiddenKeys}
-          search={search}
-          onShowItem={showItem}
-          inspectorOpen={Boolean(detail)}
-        >
-          <Explorer {...explorerProps} open={filtersOpen} onOpen={() => setFiltersOpen(true)} />
-          <label className={`command-search ${filtersOpen ? 'drawer-open' : ''} ${detail ? 'inspector-open' : ''}`}>
-            <span className="command-search-icon" aria-hidden="true" />
-            <input
-              ref={searchRef}
-              type="search"
-              placeholder="Search players, bases and Pals…"
-              autoComplete="off"
-              value={search}
-              onChange={(event) => setSearch(event.currentTarget.value)}
-            />
-            {search ? (
-              <button type="button" aria-label="Clear search" onClick={() => setSearch('')}>
-                ×
-              </button>
-            ) : (
-              <kbd>/</kbd>
-            )}
-          </label>
-          <DetailsDialog
-            detail={detail}
+      <main className={`map-workspace ${filtersOpen ? 'filter-open' : 'filter-collapsed'}`}>
+        <Explorer {...explorerProps} open={filtersOpen} onOpen={() => setFiltersOpen(true)} />
+        <div className="map-pane">
+          <MapViewport
+            ref={mapRef}
+            activeLayer={activeLayer}
             items={items}
-            layers={config.layers}
-            playerState={playerState}
-            returnFocus={returnFocus}
-            onClose={() => {
-              setDetail(null)
-              mapRef.current?.clearSelection()
-            }}
-          />
-        </MapViewport>
+            enabledKinds={enabledKinds}
+            hiddenKeys={hiddenKeys}
+            search={search}
+            onShowItem={showItem}
+            inspectorOpen={Boolean(detail)}
+          >
+            <label className={`command-search ${detail ? 'inspector-open' : ''}`}>
+              <span className="command-search-icon" aria-hidden="true" />
+              <input
+                ref={searchRef}
+                type="search"
+                placeholder="Search players, bases and Pals…"
+                autoComplete="off"
+                value={search}
+                onChange={(event) => setSearch(event.currentTarget.value)}
+              />
+              {search ? (
+                <button type="button" aria-label="Clear search" onClick={() => setSearch('')}>
+                  ×
+                </button>
+              ) : (
+                <kbd>/</kbd>
+              )}
+            </label>
+            <DetailsDialog
+              detail={detail}
+              items={items}
+              layers={config.layers}
+              playerState={playerState}
+              returnFocus={returnFocus}
+              onClose={() => {
+                setDetail(null)
+                mapRef.current?.clearSelection()
+              }}
+            />
+          </MapViewport>
+        </div>
       </main>
     </div>
   )

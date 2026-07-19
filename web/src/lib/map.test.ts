@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { MapLayer } from '../types'
-import { clampView, fitScale, fitView, formatUptime, itemKey, toScene, toWorld } from './map'
+import { clampView, coverScale, coverView, fitScale, fitView, formatUptime, itemKey, toScene, toWorld } from './map'
 
 const layer: MapLayer = {
   id: 'palpagos',
@@ -25,6 +25,11 @@ describe('map view', () => {
   it('fits and centres the scene in the viewport', () => {
     expect(fitScale(1200, 800, 1000)).toBe(0.8)
     expect(fitView(1200, 800, 1000)).toEqual({ scale: 0.8, x: 200, y: 0 })
+  })
+
+  it('covers and centres a map without viewport gutters', () => {
+    expect(coverScale(1200, 800, 1000)).toBe(1.2)
+    expect(coverView(1200, 800, 1000)).toEqual({ scale: 1.2, x: 0, y: -200 })
   })
 
   it('clamps a zoomed scene to the viewport edges', () => {

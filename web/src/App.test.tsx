@@ -86,8 +86,11 @@ describe('App', () => {
 
     await user.click(screen.getByRole('button', { name: 'Collapse map filter' }))
     await waitFor(() => expect(screen.queryByRole('complementary', { name: 'Map filters' })).not.toBeInTheDocument())
+    expect(screen.getByRole('main')).toHaveClass('filter-collapsed')
     expect(screen.getByRole('searchbox')).toHaveValue('missing')
-    expect(screen.getByRole('button', { name: 'Open map filters' })).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Open map filters' }))
+    expect(screen.getByRole('main')).toHaveClass('filter-open')
+    expect(screen.getByRole('complementary', { name: 'Map filters' })).toBeInTheDocument()
   })
 
   it('uses a non-modal inspector and removes individual markers from the tab order', async () => {

@@ -1,8 +1,8 @@
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react'
 import {
   clampView,
-  fitScale,
-  fitView,
+  coverScale,
+  coverView,
   itemKey,
   MAX_ZOOM_RATIO,
   markerText,
@@ -74,7 +74,7 @@ export const MapViewport = forwardRef<MapViewportHandle, MapViewportProps>(funct
       const viewport = viewportRef.current
       if (!scene || !viewport) return
       scene.style.transform = `translate(${view.x}px, ${view.y}px) scale(${view.scale})`
-      const minimum = fitScale(viewport.clientWidth, viewport.clientHeight, size)
+      const minimum = coverScale(viewport.clientWidth, viewport.clientHeight, size)
       const zoomRatio = Math.max(1, view.scale / minimum)
       scene.style.setProperty('--marker-scale', String(Math.min(2, Math.sqrt(zoomRatio)) / view.scale))
       scene.style.setProperty('--worker-scale', String(1 / view.scale))
@@ -85,17 +85,7 @@ export const MapViewport = forwardRef<MapViewportHandle, MapViewportProps>(funct
   const reset = useCallback(() => {
     const viewport = viewportRef.current
     if (!viewport?.clientWidth || !viewport.clientHeight) return
-    const fitted = fitView(viewport.clientWidth, viewport.clientHeight, size)
-    const boost = viewport.clientHeight > viewport.clientWidth ? 1.3 : 1.1
-    const scale = fitted.scale * boost
-    applyView(
-      clampView(
-        { scale, x: viewport.clientWidth / 2 - (size * scale) / 2, y: viewport.clientHeight / 2 - (size * scale) / 2 },
-        viewport.clientWidth,
-        viewport.clientHeight,
-        size
-      )
-    )
+    applyView(coverView(viewport.clientWidth, viewport.clientHeight, size))
   }, [applyView, size])
 
   const zoomAt = useCallback(
@@ -103,7 +93,7 @@ export const MapViewport = forwardRef<MapViewportHandle, MapViewportProps>(funct
       const viewport = viewportRef.current
       if (!viewport) return
       const rect = viewport.getBoundingClientRect()
-      const minimum = fitScale(rect.width, rect.height, size)
+      const minimum = coverScale(rect.width, rect.height, size)
       const scale = Math.min(minimum * MAX_ZOOM_RATIO, Math.max(minimum, nextScale))
       const pointerX = clientX - rect.left
       const pointerY = clientY - rect.top
@@ -131,7 +121,7 @@ export const MapViewport = forwardRef<MapViewportHandle, MapViewportProps>(funct
     const position = toScene(item, activeLayer, size)
     if (!viewport || !position) return
     const rect = viewport.getBoundingClientRect()
-    const minimum = fitScale(rect.width, rect.height, size)
+    const minimum = coverScale(rect.width, rect.height, size)
     const scale = Math.min(
       minimum * MAX_ZOOM_RATIO,
       Math.max(viewRef.current.scale, minimum * (item.kind === 'workers' ? 24 : 8))

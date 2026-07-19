@@ -1,4 +1,4 @@
-import { useEffect, useId, useMemo, useRef, useState } from 'react'
+import { useEffect, useId, useMemo, useRef } from 'react'
 import { itemKey, markerText } from '../lib/map'
 import type { ItemKind, MapItem, MapLayer } from '../types'
 
@@ -133,7 +133,6 @@ function ObjectRow({
 }
 
 export function Explorer(props: ExplorerProps) {
-  const [section, setSection] = useState<'all' | 'players' | 'bases' | 'pals' | 'npcs'>('all')
   const currentItems = useMemo(
     () => props.items.filter((item) => item.map === props.activeLayer.id),
     [props.activeLayer.id, props.items]
@@ -147,143 +146,109 @@ export function Explorer(props: ExplorerProps) {
     !query ||
     `${item.name} ${item.detail || ''} ${item.level || ''} ${assignedBaseName(item)}`.toLowerCase().includes(query)
 
-  const navItems = [
-    { id: 'all' as const, label: 'All', glyph: '⌖' },
-    { id: 'players' as const, label: 'Players', glyph: '◉' },
-    { id: 'bases' as const, label: 'Bases', glyph: '◇' },
-    { id: 'pals' as const, label: 'Pals', glyph: '◆' },
-    { id: 'npcs' as const, label: 'NPCs', glyph: '△' }
-  ]
-
   return (
     <>
-      <nav className="command-rail" aria-label="Map intelligence">
-        <div className="command-mark" aria-hidden="true">
-          <span>PL</span>
-        </div>
-        <div className="command-rail-tools">
-          {navItems.map((item) => (
-            <button
-              key={item.id}
-              type="button"
-              className={section === item.id && props.open ? 'active' : ''}
-              aria-label={item.label}
-              aria-pressed={section === item.id && props.open}
-              onClick={() => {
-                setSection(item.id)
-                props.onOpen()
-              }}
-            >
-              <span aria-hidden="true">{item.glyph}</span>
-              <small>{item.label}</small>
-            </button>
-          ))}
-        </div>
+      {!props.open && (
         <button
           type="button"
-          className="rail-collapse"
-          aria-label={props.open ? 'Collapse map filter' : 'Open map filters'}
-          aria-expanded={props.open}
-          onClick={props.open ? props.onClose : props.onOpen}
+          className="filter-reopen"
+          aria-label="Open map filters"
+          aria-expanded="false"
+          onClick={props.onOpen}
         >
-          {props.open ? '‹' : '›'}
+          <span aria-hidden="true">›</span>
+          Map filter
         </button>
-      </nav>
-      {props.open && (
-        <aside id="map-filter-panel" className="intel-drawer" aria-label="Map filters">
-          <div className="intel-drawer-header">
-            <div>
-              <span>MAP FILTER</span>
-              <strong>{navItems.find((item) => item.id === section)?.label}</strong>
-            </div>
+      )}
+      <aside
+        id="map-filter-panel"
+        className={`intel-drawer ${props.open ? 'open' : 'closed'}`}
+        aria-label="Map filters"
+        aria-hidden={!props.open}
+        inert={!props.open}
+      >
+        <div className="intel-drawer-header">
+          <div>
+            <span>MAP FILTER</span>
+            <strong>Map</strong>
+          </div>
+          <button
+            type="button"
+            className="drawer-close"
+            aria-label="Collapse map filter"
+            title="Collapse map filter"
+            onClick={props.onClose}
+          >
+            ×
+          </button>
+        </div>
+
+        <fieldset className="layer-switch" aria-label="World region">
+          {props.layers.map((layer) => (
             <button
+              key={layer.id}
               type="button"
-              className="drawer-close"
-              aria-label="Close intel drawer"
-              title="Close intel drawer"
-              onClick={props.onClose}
+              className={layer.id === props.activeLayer.id ? 'active' : ''}
+              aria-pressed={layer.id === props.activeLayer.id}
+              onClick={() => props.onLayerChange(layer)}
             >
-              ×
+              {layer.name}
             </button>
-          </div>
+          ))}
+        </fieldset>
 
-          <fieldset className="layer-switch" aria-label="World region">
-            {props.layers.map((layer) => (
-              <button
-                key={layer.id}
-                type="button"
-                className={layer.id === props.activeLayer.id ? 'active' : ''}
-                aria-pressed={layer.id === props.activeLayer.id}
-                onClick={() => props.onLayerChange(layer)}
-              >
-                {layer.name}
-              </button>
-            ))}
-          </fieldset>
-
-          <div className="intel-scroll" aria-live="polite">
-            {props.search && (
-              <p className="intel-query">
-                Results for <strong>“{props.search}”</strong>
-              </p>
-            )}
-            {(section === 'all' || section === 'players') && (
-              <SimpleCategory
-                {...props}
-                group="players"
-                title="Players"
-                items={currentItems.filter((item) => item.kind === 'players')}
-                matches={matches}
-                empty="No players online."
-              />
-            )}
-            {(section === 'all' || section === 'bases') && (
-              <BaseCategory
-                {...props}
-                bases={currentItems.filter((item) => item.kind === 'bases')}
-                workers={currentItems.filter((item) => item.kind === 'workers')}
-                matches={matches}
-              />
-            )}
-            {(section === 'all' || section === 'pals') && (
-              <>
-                <SimpleCategory
-                  {...props}
-                  group="companions"
-                  title="Companion Pals"
-                  items={currentItems.filter((item) => item.kind === 'companions')}
-                  matches={matches}
-                  empty="No companion Pals are currently reported."
-                />
-                <SimpleCategory
-                  {...props}
-                  group="wild-pals"
-                  title="Wild Pals"
-                  items={currentItems.filter((item) => item.kind === 'wild-pals')}
-                  matches={matches}
-                  empty="No wild Pals are currently loaded."
-                />
-              </>
-            )}
-            {(section === 'all' || section === 'npcs') && (
-              <SimpleCategory
-                {...props}
-                group="npcs"
-                title="NPCs"
-                items={currentItems.filter((item) => item.kind === 'npcs')}
-                matches={matches}
-                empty="No NPCs are currently loaded."
-              />
-            )}
-          </div>
-
-          {props.objectNotice && (
-            <p className="m-3 mt-1 rounded-md border border-[#554b37] bg-[#302b22] px-2.5 py-2 text-[11px] leading-4 text-[#d2b980]">
-              {props.objectNotice}
+        <div className="intel-scroll" aria-live="polite">
+          {props.search && (
+            <p className="intel-query">
+              Results for <strong>“{props.search}”</strong>
             </p>
           )}
-        </aside>
-      )}
+          <SimpleCategory
+            {...props}
+            group="players"
+            title="Players"
+            items={currentItems.filter((item) => item.kind === 'players')}
+            matches={matches}
+            empty="No players online."
+          />
+          <BaseCategory
+            {...props}
+            bases={currentItems.filter((item) => item.kind === 'bases')}
+            workers={currentItems.filter((item) => item.kind === 'workers')}
+            matches={matches}
+          />
+          <SimpleCategory
+            {...props}
+            group="companions"
+            title="Companion Pals"
+            items={currentItems.filter((item) => item.kind === 'companions')}
+            matches={matches}
+            empty="No companion Pals are currently reported."
+          />
+          <SimpleCategory
+            {...props}
+            group="wild-pals"
+            title="Wild Pals"
+            items={currentItems.filter((item) => item.kind === 'wild-pals')}
+            matches={matches}
+            empty="No wild Pals are currently loaded."
+          />
+          <SimpleCategory
+            {...props}
+            group="npcs"
+            title="NPCs"
+            items={currentItems.filter((item) => item.kind === 'npcs')}
+            matches={matches}
+            empty="No NPCs are currently loaded."
+          />
+        </div>
+
+        {props.objectNotice && (
+          <p className="m-3 mt-1 rounded-md border border-[#554b37] bg-[#302b22] px-2.5 py-2 text-[11px] leading-4 text-[#d2b980]">
+            {props.objectNotice}
+          </p>
+        )}
+      </aside>
     </>
   )
 }

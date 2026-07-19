@@ -41,8 +41,17 @@ export function fitScale(width: number, height: number, size: number): number {
   return Math.max(0.01, Math.min(width / size, height / size))
 }
 
+export function coverScale(width: number, height: number, size: number): number {
+  return Math.max(0.01, Math.max(width / size, height / size))
+}
+
 export function fitView(width: number, height: number, size: number): View {
   const scale = fitScale(width, height, size)
+  return { scale, x: (width - size * scale) / 2, y: (height - size * scale) / 2 }
+}
+
+export function coverView(width: number, height: number, size: number): View {
+  const scale = coverScale(width, height, size)
   return { scale, x: (width - size * scale) / 2, y: (height - size * scale) / 2 }
 }
 
