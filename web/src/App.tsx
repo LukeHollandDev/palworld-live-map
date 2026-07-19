@@ -37,7 +37,7 @@ export function App() {
 
   if (!config) {
     return (
-      <div className="grid h-dvh grid-rows-[52px_1fr] bg-[#171a1d] text-[#f4f5f5] max-sm:grid-rows-[48px_1fr]">
+      <div className="grid h-dvh grid-rows-[64px_1fr] bg-[#171a1d] text-[#f4f5f5] max-sm:grid-rows-[52px_1fr]">
         <StatusBar demoMode={false} playerState={null} offline={configError} onShowDetails={() => {}} />
         <main className="grid place-items-center bg-[#111416] text-sm text-[#8f989d]">
           {configError ? 'Map unavailable' : 'Loading map…'}
@@ -186,7 +186,7 @@ function LiveMap({ config }: { config: PublicConfig }) {
   }
 
   return (
-    <div className="grid h-dvh grid-rows-[52px_1fr] overflow-hidden bg-[#171a1d] text-[#f4f5f5] max-sm:grid-rows-[48px_1fr]">
+    <div className="grid h-dvh grid-rows-[64px_1fr] overflow-hidden bg-[#171a1d] text-[#f4f5f5] max-sm:grid-rows-[52px_1fr]">
       <StatusBar
         demoMode={config.demoMode}
         playerState={playerState}
@@ -213,7 +213,7 @@ function LiveMap({ config }: { config: PublicConfig }) {
             <input
               ref={searchRef}
               type="search"
-              placeholder="Search map intelligence…"
+              placeholder="Search players, bases and Pals…"
               autoComplete="off"
               value={search}
               onChange={(event) => setSearch(event.currentTarget.value)}

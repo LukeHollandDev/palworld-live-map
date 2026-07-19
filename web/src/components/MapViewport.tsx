@@ -183,7 +183,7 @@ export const MapViewport = forwardRef<MapViewportHandle, MapViewportProps>(funct
   return (
     <section
       ref={viewportRef}
-      className="relative size-full touch-pinch-zoom overflow-hidden bg-[#111416] active:cursor-grabbing"
+      className="map-viewport relative size-full touch-pinch-zoom overflow-hidden bg-[#111416] active:cursor-grabbing"
       role="application"
       aria-label="Interactive world map. Use arrow keys to pan and plus or minus to zoom."
       // biome-ignore lint/a11y/noNoninteractiveTabindex: the map is an interactive pan and zoom canvas
@@ -317,6 +317,13 @@ export const MapViewport = forwardRef<MapViewportHandle, MapViewportProps>(funct
 
       {children}
 
+      <div className="map-frame-ornaments" aria-hidden="true">
+        <i className="corner corner-nw" />
+        <i className="corner corner-ne" />
+        <i className="corner corner-sw" />
+        <i className="corner corner-se" />
+      </div>
+
       <fieldset
         className={`map-controls ${inspectorOpen ? 'inspector-open' : ''}`}
         aria-label="Map controls"
@@ -333,8 +340,8 @@ export const MapViewport = forwardRef<MapViewportHandle, MapViewportProps>(funct
         >
           −
         </button>
-        <button type="button" className="map-control map-frame" title="Frame the active region" onClick={reset}>
-          Frame
+        <button type="button" className="map-control map-frame" title="Fit the active region" onClick={reset}>
+          Fit
         </button>
         <button
           type="button"

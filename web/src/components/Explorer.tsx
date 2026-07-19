@@ -148,10 +148,10 @@ export function Explorer(props: ExplorerProps) {
     `${item.name} ${item.detail || ''} ${item.level || ''} ${assignedBaseName(item)}`.toLowerCase().includes(query)
 
   const navItems = [
-    { id: 'all' as const, label: 'All intel', glyph: '⌖' },
-    { id: 'players' as const, label: 'Operators', glyph: '◉' },
+    { id: 'all' as const, label: 'All', glyph: '⌖' },
+    { id: 'players' as const, label: 'Players', glyph: '◉' },
     { id: 'bases' as const, label: 'Bases', glyph: '◇' },
-    { id: 'pals' as const, label: 'Pal signals', glyph: '◆' },
+    { id: 'pals' as const, label: 'Pals', glyph: '◆' },
     { id: 'npcs' as const, label: 'NPCs', glyph: '△' }
   ]
 
@@ -193,7 +193,7 @@ export function Explorer(props: ExplorerProps) {
         <aside id="map-filter-panel" className="intel-drawer" aria-label="Map filters">
           <div className="intel-drawer-header">
             <div>
-              <span>LIVE CARTOGRAPHY</span>
+              <span>MAP FILTER</span>
               <strong>{navItems.find((item) => item.id === section)?.label}</strong>
             </div>
             <button

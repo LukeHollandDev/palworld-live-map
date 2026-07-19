@@ -48,7 +48,7 @@ export function StatusBar({ demoMode, playerState, offline, onShowDetails }: Sta
   return (
     <header className="status-commandbar">
       <div className="server-identity">
-        <span className="server-eyebrow">PALWORLD · LIVE OPS</span>
+        <span className="server-eyebrow">WORLD MAP · LIVE SERVER</span>
         <div className="flex min-w-0 items-center gap-2">
           <h1>{title}</h1>
           {demoMode && (

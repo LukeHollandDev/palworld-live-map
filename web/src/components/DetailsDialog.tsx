@@ -37,7 +37,7 @@ export function DetailsDialog({ detail, items, layers, playerState, returnFocus,
       <article>
         <header className="inspector-header">
           <div>
-            <p>{detail.kind === 'server' ? 'SYSTEM TELEMETRY' : `${kindLabel(detail.item.kind)} INTELLIGENCE`}</p>
+            <p>{detail.kind === 'server' ? 'SERVER STATUS' : `${kindLabel(detail.item.kind)} DETAILS`}</p>
             <h2 id="details-title">
               {detail.kind === 'server' ? playerState?.server.name || 'Palworld server' : detail.item.name}
             </h2>
