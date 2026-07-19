@@ -46,28 +46,29 @@ export function StatusBar({ demoMode, playerState, offline, onShowDetails }: Sta
   const title = server?.name || 'Palworld Live Map'
 
   return (
-    <header className="relative z-20 flex min-w-0 items-center gap-4 border-b border-[#32373b] bg-[#202428] px-4 max-sm:h-12 max-sm:gap-2.5 max-sm:px-2.5">
-      <div className="flex min-w-0 items-baseline gap-2">
-        <h1 className="shrink-0 whitespace-nowrap text-base font-semibold max-sm:text-sm">{title}</h1>
-        {demoMode && (
-          <span className="shrink-0 rounded-full border border-[#ae8748] bg-[#3c3222] px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-[.04em] text-[#f0c87d]">
-            Demo data
-          </span>
-        )}
-        {server?.description && (
-          <p
-            className="overflow-hidden text-ellipsis whitespace-nowrap text-xs text-[#899298] max-sm:hidden"
-            title={server.version ? `Palworld ${server.version}` : undefined}
-          >
-            {server.description}
-          </p>
-        )}
+    <header className="status-commandbar">
+      <div className="server-identity">
+        <span className="server-eyebrow">PALWORLD · LIVE OPS</span>
+        <div className="flex min-w-0 items-center gap-2">
+          <h1>{title}</h1>
+          {demoMode && (
+            <span className="shrink-0 rounded-full border border-[#ae8748] bg-[#3c3222] px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-[.04em] text-[#f0c87d]">
+              Demo data
+            </span>
+          )}
+          {server?.description && (
+            <p className="server-description" title={server.version ? `Palworld ${server.version}` : undefined}>
+              {server.description}
+            </p>
+          )}
+        </div>
       </div>
 
-      <div className="flex min-w-0 items-center gap-1.5 text-[13px] text-[#b9c0c4]">
+      <div className="server-actions">
+        <span className="last-sync">{age}</span>
         <button
           type="button"
-          className="flex min-w-0 cursor-pointer items-center gap-1.5 rounded-md px-2 py-1.5 hover:bg-[#2b3034] hover:text-[#eef0f1] focus-visible:bg-[#2b3034] focus-visible:text-[#eef0f1] focus-visible:outline-none"
+          className={`server-status-card status-card-${status.kind}`}
           aria-haspopup="dialog"
           title="View server details"
           onClick={(event) => onShowDetails(event.currentTarget)}
@@ -81,9 +82,10 @@ export function StatusBar({ demoMode, playerState, offline, onShowDetails }: Sta
               · {metrics.serverFps} FPS · Up {formatCompactUptime(metrics.uptimeSeconds)} · Day {metrics.days}
             </span>
           )}
+          <span className="status-disclosure" aria-hidden="true">
+            ›
+          </span>
         </button>
-        <span className="text-[#626a6f] max-sm:hidden">·</span>
-        <span className="whitespace-nowrap max-sm:hidden">{age}</span>
       </div>
     </header>
   )

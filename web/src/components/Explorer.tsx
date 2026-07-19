@@ -1,8 +1,9 @@
-import { useEffect, useId, useMemo, useRef } from 'react'
+import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import { itemKey, markerText } from '../lib/map'
 import type { ItemKind, MapItem, MapLayer } from '../types'
 
 interface ExplorerProps {
+  open: boolean
   activeLayer: MapLayer
   layers: MapLayer[]
   items: MapItem[]
@@ -19,6 +20,7 @@ interface ExplorerProps {
   onToggleBase: (id: string) => void
   onFocusItem: (item: MapItem, returnFocus: HTMLElement) => void
   onClose: () => void
+  onOpen: () => void
   onLayerChange: (layer: MapLayer) => void
 }
 
@@ -131,6 +133,7 @@ function ObjectRow({
 }
 
 export function Explorer(props: ExplorerProps) {
+  const [section, setSection] = useState<'all' | 'players' | 'bases' | 'pals' | 'npcs'>('all')
   const currentItems = useMemo(
     () => props.items.filter((item) => item.map === props.activeLayer.id),
     [props.activeLayer.id, props.items]
@@ -144,100 +147,144 @@ export function Explorer(props: ExplorerProps) {
     !query ||
     `${item.name} ${item.detail || ''} ${item.level || ''} ${assignedBaseName(item)}`.toLowerCase().includes(query)
 
+  const navItems = [
+    { id: 'all' as const, label: 'All intel', glyph: '⌖' },
+    { id: 'players' as const, label: 'Operators', glyph: '◉' },
+    { id: 'bases' as const, label: 'Bases', glyph: '◇' },
+    { id: 'pals' as const, label: 'Pal signals', glyph: '◆' },
+    { id: 'npcs' as const, label: 'NPCs', glyph: '△' }
+  ]
+
   return (
-    <aside
-      className="absolute inset-y-3 left-3 z-10 flex w-[330px] flex-col overflow-hidden rounded-lg border border-white/15 bg-[rgb(24_28_31/94%)] shadow-[0_10px_30px_rgb(0_0_0/28%)] backdrop-blur-sm max-sm:inset-y-0 max-sm:left-0 max-sm:w-[min(310px,88vw)] max-sm:rounded-none max-sm:border-y-0 max-sm:border-l-0"
-      aria-label="Map filters"
-    >
-      <div className="flex items-center justify-between px-3 py-2.5">
-        <strong className="text-sm">Map</strong>
+    <>
+      <nav className="command-rail" aria-label="Map intelligence">
+        <div className="command-mark" aria-hidden="true">
+          <span>PL</span>
+        </div>
+        <div className="command-rail-tools">
+          {navItems.map((item) => (
+            <button
+              key={item.id}
+              type="button"
+              className={section === item.id && props.open ? 'active' : ''}
+              aria-label={item.label}
+              aria-pressed={section === item.id && props.open}
+              onClick={() => {
+                setSection(item.id)
+                props.onOpen()
+              }}
+            >
+              <span aria-hidden="true">{item.glyph}</span>
+              <small>{item.label}</small>
+            </button>
+          ))}
+        </div>
         <button
           type="button"
-          className="grid size-7 cursor-pointer place-items-center rounded text-lg text-[#aeb6ba] hover:bg-white/10 hover:text-white"
-          aria-label="Collapse map filter"
-          title="Collapse map filter"
-          onClick={props.onClose}
+          className="rail-collapse"
+          aria-label={props.open ? 'Collapse map filter' : 'Open map filters'}
+          aria-expanded={props.open}
+          onClick={props.open ? props.onClose : props.onOpen}
         >
-          ‹
+          {props.open ? '‹' : '›'}
         </button>
-      </div>
+      </nav>
+      {props.open && (
+        <aside id="map-filter-panel" className="intel-drawer" aria-label="Map filters">
+          <div className="intel-drawer-header">
+            <div>
+              <span>LIVE CARTOGRAPHY</span>
+              <strong>{navItems.find((item) => item.id === section)?.label}</strong>
+            </div>
+            <button
+              type="button"
+              className="drawer-close"
+              aria-label="Close intel drawer"
+              title="Close intel drawer"
+              onClick={props.onClose}
+            >
+              ×
+            </button>
+          </div>
 
-      <fieldset
-        className="mx-3 mb-3 flex rounded-md border border-[#3a4145] bg-[#15191b] p-0.5"
-        aria-label="World region"
-      >
-        {props.layers.map((layer) => (
-          <button
-            key={layer.id}
-            type="button"
-            className={`min-w-0 flex-1 cursor-pointer overflow-hidden text-ellipsis whitespace-nowrap rounded px-2 py-1.5 text-xs ${layer.id === props.activeLayer.id ? 'bg-[#343b3f] text-white shadow-sm' : 'text-[#90999e] hover:text-[#d9dddf]'}`}
-            aria-pressed={layer.id === props.activeLayer.id}
-            onClick={() => props.onLayerChange(layer)}
-          >
-            {layer.name}
-          </button>
-        ))}
-      </fieldset>
+          <fieldset className="layer-switch" aria-label="World region">
+            {props.layers.map((layer) => (
+              <button
+                key={layer.id}
+                type="button"
+                className={layer.id === props.activeLayer.id ? 'active' : ''}
+                aria-pressed={layer.id === props.activeLayer.id}
+                onClick={() => props.onLayerChange(layer)}
+              >
+                {layer.name}
+              </button>
+            ))}
+          </fieldset>
 
-      <label className="mx-3 mb-3 grid gap-1 text-[11px] font-semibold uppercase tracking-[.05em] text-[#929ba0]">
-        <span>Filter map</span>
-        <input
-          type="search"
-          className="h-9 rounded-md border border-[#3d4448] bg-[#15191b] px-2.5 text-[13px] font-normal normal-case tracking-normal text-[#eef0f1] outline-none placeholder:text-[#687176] focus:border-[#6ba9cd] focus:ring-2 focus:ring-[#6ba9cd]/20"
-          placeholder="Player, Pal or base…"
-          autoComplete="off"
-          value={props.search}
-          onChange={(event) => props.onSearch(event.currentTarget.value)}
-        />
-      </label>
+          <div className="intel-scroll" aria-live="polite">
+            {props.search && (
+              <p className="intel-query">
+                Results for <strong>“{props.search}”</strong>
+              </p>
+            )}
+            {(section === 'all' || section === 'players') && (
+              <SimpleCategory
+                {...props}
+                group="players"
+                title="Players"
+                items={currentItems.filter((item) => item.kind === 'players')}
+                matches={matches}
+                empty="No players online."
+              />
+            )}
+            {(section === 'all' || section === 'bases') && (
+              <BaseCategory
+                {...props}
+                bases={currentItems.filter((item) => item.kind === 'bases')}
+                workers={currentItems.filter((item) => item.kind === 'workers')}
+                matches={matches}
+              />
+            )}
+            {(section === 'all' || section === 'pals') && (
+              <>
+                <SimpleCategory
+                  {...props}
+                  group="companions"
+                  title="Companion Pals"
+                  items={currentItems.filter((item) => item.kind === 'companions')}
+                  matches={matches}
+                  empty="No companion Pals are currently reported."
+                />
+                <SimpleCategory
+                  {...props}
+                  group="wild-pals"
+                  title="Wild Pals"
+                  items={currentItems.filter((item) => item.kind === 'wild-pals')}
+                  matches={matches}
+                  empty="No wild Pals are currently loaded."
+                />
+              </>
+            )}
+            {(section === 'all' || section === 'npcs') && (
+              <SimpleCategory
+                {...props}
+                group="npcs"
+                title="NPCs"
+                items={currentItems.filter((item) => item.kind === 'npcs')}
+                matches={matches}
+                empty="No NPCs are currently loaded."
+              />
+            )}
+          </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto border-t border-white/8 px-3 py-2" aria-live="polite">
-        <SimpleCategory
-          {...props}
-          group="players"
-          title="Players"
-          items={currentItems.filter((item) => item.kind === 'players')}
-          matches={matches}
-          empty="No players online."
-        />
-        <BaseCategory
-          {...props}
-          bases={currentItems.filter((item) => item.kind === 'bases')}
-          workers={currentItems.filter((item) => item.kind === 'workers')}
-          matches={matches}
-        />
-        <SimpleCategory
-          {...props}
-          group="companions"
-          title="Companion Pals"
-          items={currentItems.filter((item) => item.kind === 'companions')}
-          matches={matches}
-          empty="No companion Pals are currently reported."
-        />
-        <SimpleCategory
-          {...props}
-          group="wild-pals"
-          title="Wild Pals"
-          items={currentItems.filter((item) => item.kind === 'wild-pals')}
-          matches={matches}
-          empty="No wild Pals are currently loaded."
-        />
-        <SimpleCategory
-          {...props}
-          group="npcs"
-          title="NPCs"
-          items={currentItems.filter((item) => item.kind === 'npcs')}
-          matches={matches}
-          empty="No NPCs are currently loaded."
-        />
-      </div>
-
-      {props.objectNotice && (
-        <p className="m-3 mt-1 rounded-md border border-[#554b37] bg-[#302b22] px-2.5 py-2 text-[11px] leading-4 text-[#d2b980]">
-          {props.objectNotice}
-        </p>
+          {props.objectNotice && (
+            <p className="m-3 mt-1 rounded-md border border-[#554b37] bg-[#302b22] px-2.5 py-2 text-[11px] leading-4 text-[#d2b980]">
+              {props.objectNotice}
+            </p>
+          )}
+        </aside>
       )}
-    </aside>
+    </>
   )
 }
 

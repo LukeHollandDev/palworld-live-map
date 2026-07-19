@@ -75,7 +75,7 @@ describe('App', () => {
     expect(screen.getByText('X 10 · Y 20')).toBeInTheDocument()
   })
 
-  it('filters explorer items and allows the panel to collapse', async () => {
+  it('filters explorer items and keeps global search available when the intel drawer collapses', async () => {
     mockAPI()
     const user = userEvent.setup()
     render(<App />)
@@ -85,7 +85,22 @@ describe('App', () => {
     expect(screen.getByText('No players match “missing”.')).toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: 'Collapse map filter' }))
-    await waitFor(() => expect(screen.queryByRole('searchbox')).not.toBeInTheDocument())
-    expect(screen.getByRole('button', { name: 'Map' })).toBeInTheDocument()
+    await waitFor(() => expect(screen.queryByRole('complementary', { name: 'Map filters' })).not.toBeInTheDocument())
+    expect(screen.getByRole('searchbox')).toHaveValue('missing')
+    expect(screen.getByRole('button', { name: 'Open map filters' })).toBeInTheDocument()
+  })
+
+  it('uses a non-modal inspector and removes individual markers from the tab order', async () => {
+    mockAPI()
+    const user = userEvent.setup()
+    render(<App />)
+    await screen.findByRole('heading', { name: 'Test Realm' })
+
+    const marker = screen.getByRole('button', { name: 'Luke · Lv 55' })
+    expect(marker).toHaveAttribute('tabindex', '-1')
+    await user.click(marker)
+    const inspector = screen.getByRole('dialog')
+    expect(inspector).toHaveAttribute('aria-modal', 'false')
+    expect(screen.getByRole('searchbox')).toBeInTheDocument()
   })
 })

@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect } from 'react'
 import { formatUptime, kindLabel } from '../lib/map'
 import type { MapItem, MapLayer, PlayerState } from '../types'
 
@@ -14,85 +14,58 @@ interface DetailsDialogProps {
 }
 
 export function DetailsDialog({ detail, items, layers, playerState, returnFocus, onClose }: DetailsDialogProps) {
-  const dialogRef = useRef<HTMLDialogElement>(null)
-
   useEffect(() => {
-    const dialog = dialogRef.current
-    if (!dialog || !detail) return
-    if (!dialog.open) dialog.showModal()
-  }, [detail])
+    if (!detail) return
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return
+      onClose()
+      window.requestAnimationFrame(() => returnFocus?.isConnected && returnFocus.focus({ preventScroll: true }))
+    }
+    window.addEventListener('keydown', closeOnEscape)
+    return () => window.removeEventListener('keydown', closeOnEscape)
+  }, [detail, onClose, returnFocus])
 
-  const close = () => dialogRef.current?.close()
-  const finishClose = () => {
+  if (!detail) return null
+
+  const close = () => {
     onClose()
     window.requestAnimationFrame(() => returnFocus?.isConnected && returnFocus.focus({ preventScroll: true }))
   }
 
   return (
-    <dialog
-      ref={dialogRef}
-      className="m-auto max-h-[min(680px,calc(100vh-32px))] w-[min(520px,calc(100vw-28px))] overflow-hidden rounded-xl border border-[#41484c] bg-[#191d20] p-0 text-[#f4f5f5] shadow-[0_24px_80px_rgb(0_0_0/55%)] backdrop:bg-black/55"
-      aria-labelledby="details-title"
-      onClose={finishClose}
-      onCancel={(event) => {
-        event.preventDefault()
-        close()
-      }}
-      onClick={(event) => {
-        if (event.target !== event.currentTarget) return
-        const bounds = event.currentTarget.getBoundingClientRect()
-        const inside =
-          event.clientX >= bounds.left &&
-          event.clientX <= bounds.right &&
-          event.clientY >= bounds.top &&
-          event.clientY <= bounds.bottom
-        if (!inside) close()
-      }}
-      onKeyDown={(event) => {
-        if (event.key === 'Escape') close()
-      }}
-    >
-      {detail && (
-        <article className="max-h-[inherit] overflow-auto">
-          <header className="sticky top-0 z-10 flex items-start justify-between gap-4 border-b border-[#343a3e] bg-[#202529] px-5 py-4">
-            <div>
-              <p className="mb-1 text-[11px] font-bold uppercase tracking-[.08em] text-[#8e999f]">
-                {detail.kind === 'server' ? 'Server' : kindLabel(detail.item.kind)}
-              </p>
-              <h2 id="details-title" className="text-xl font-semibold">
-                {detail.kind === 'server' ? playerState?.server.name || 'Palworld server' : detail.item.name}
-              </h2>
-            </div>
-            <button
-              type="button"
-              className="grid size-8 shrink-0 cursor-pointer place-items-center rounded-md text-xl text-[#adb5b9] hover:bg-[#343a3e] hover:text-white focus-visible:outline-2 focus-visible:outline-[#76b5db]"
-              aria-label="Close details"
-              onClick={close}
-            >
-              ×
-            </button>
-          </header>
-          <div className="grid gap-5 p-5">
-            {detail.kind === 'server' ? (
-              <ServerDetails playerState={playerState} />
-            ) : (
-              <ItemDetails item={detail.item} items={items} layers={layers} />
-            )}
+    <aside className="details-inspector" role="dialog" aria-modal="false" aria-labelledby="details-title">
+      <article>
+        <header className="inspector-header">
+          <div>
+            <p>{detail.kind === 'server' ? 'SYSTEM TELEMETRY' : `${kindLabel(detail.item.kind)} INTELLIGENCE`}</p>
+            <h2 id="details-title">
+              {detail.kind === 'server' ? playerState?.server.name || 'Palworld server' : detail.item.name}
+            </h2>
           </div>
-        </article>
-      )}
-    </dialog>
+          <button type="button" className="inspector-close" aria-label="Close details" onClick={close}>
+            ×
+          </button>
+        </header>
+        <div className="inspector-body">
+          {detail.kind === 'server' ? (
+            <ServerDetails playerState={playerState} />
+          ) : (
+            <ItemDetails item={detail.item} items={items} layers={layers} />
+          )}
+        </div>
+      </article>
+    </aside>
   )
 }
 
 function FactList({ entries }: { entries: Array<[string, string | number | undefined]> }) {
   return (
-    <dl className="grid grid-cols-[minmax(110px,.7fr)_minmax(0,1fr)] gap-x-4 gap-y-2 text-[13px]">
+    <dl className="fact-list">
       {entries.map(([label, value]) =>
         value === undefined || value === '' ? null : (
           <div className="contents" key={label}>
-            <dt className="text-[#929ca1]">{label}</dt>
-            <dd className="m-0 text-right text-[#eef0f1]">{value}</dd>
+            <dt>{label}</dt>
+            <dd>{value}</dd>
           </div>
         )
       )}
@@ -120,7 +93,7 @@ function ServerDetails({ playerState }: { playerState: PlayerState | null }) {
 
   return (
     <>
-      {server?.description && <p className="m-0 text-sm leading-6 text-[#c7cdd0]">{server.description}</p>}
+      {server?.description && <p className="inspector-copy">{server.description}</p>}
       <FactList entries={entries} />
     </>
   )
@@ -147,7 +120,7 @@ function ItemDetails({ item, items, layers }: { item: MapItem; items: MapItem[];
       <FactList entries={entries} />
       {item.kind === 'bases' && (
         <section>
-          <h3 className="mb-2 text-sm font-semibold">Base workers</h3>
+          <h3 className="inspector-section-title">Base workers</h3>
           {workers.length === 0 ? (
             <p className="m-0 text-[13px] text-[#8f989d]">No workers are currently reported for this base.</p>
           ) : (
@@ -156,10 +129,7 @@ function ItemDetails({ item, items, layers }: { item: MapItem; items: MapItem[];
                 .slice()
                 .sort((left, right) => left.name.localeCompare(right.name))
                 .map((worker) => (
-                  <li
-                    className="flex justify-between gap-3.5 rounded-md border border-[#363c40] bg-[#202529] px-3 py-2 text-[13px]"
-                    key={worker.name}
-                  >
+                  <li className="inspector-list-row" key={worker.name}>
                     <span>{worker.level ? `${worker.name} · Lv ${worker.level}` : worker.name}</span>
                     <span className="text-right text-[#9fa7ab]">{worker.detail || 'Pal'}</span>
                   </li>

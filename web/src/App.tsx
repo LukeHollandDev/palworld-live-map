@@ -60,10 +60,11 @@ function LiveMap({ config }: { config: PublicConfig }) {
   const [expandedGuilds, setExpandedGuilds] = useState(() => new Set<string>())
   const [expandedBases, setExpandedBases] = useState(() => new Set<string>())
   const [search, setSearch] = useState('')
-  const [filtersOpen, setFiltersOpen] = useState(true)
+  const [filtersOpen, setFiltersOpen] = useState(() => typeof window === 'undefined' || window.innerWidth > 640)
   const [detail, setDetail] = useState<Detail | null>(null)
   const [returnFocus, setReturnFocus] = useState<HTMLElement | null>(null)
   const mapRef = useRef<MapViewportHandle>(null)
+  const searchRef = useRef<HTMLInputElement>(null)
 
   const items = useMemo<MapItem[]>(
     () => [
@@ -80,6 +81,17 @@ function LiveMap({ config }: { config: PublicConfig }) {
   useEffect(() => {
     document.title = playerState?.server.name || 'Palworld Live Map'
   }, [playerState?.server.name])
+
+  useEffect(() => {
+    const handleShortcut = (event: KeyboardEvent) => {
+      if (event.key !== '/' || event.metaKey || event.ctrlKey || event.altKey) return
+      if ((event.target as HTMLElement).matches('input, textarea, select')) return
+      event.preventDefault()
+      searchRef.current?.focus()
+    }
+    window.addEventListener('keydown', handleShortcut)
+    return () => window.removeEventListener('keydown', handleShortcut)
+  }, [])
 
   const showItem = (item: MapItem, focus: HTMLElement) => {
     setReturnFocus(focus)
@@ -193,33 +205,40 @@ function LiveMap({ config }: { config: PublicConfig }) {
           hiddenKeys={hiddenKeys}
           search={search}
           onShowItem={showItem}
+          inspectorOpen={Boolean(detail)}
         >
-          {filtersOpen ? (
-            <Explorer {...explorerProps} />
-          ) : (
-            <button
-              type="button"
-              className="absolute left-3 top-3 z-10 min-h-9 cursor-pointer rounded-md border border-white/20 bg-[#181c1f]/95 px-3 py-1.5 text-sm shadow-lg hover:bg-[#33393d] focus-visible:outline-2 focus-visible:outline-[#76b5db] max-sm:left-2.5 max-sm:top-2.5"
-              aria-controls="map-filter-panel"
-              aria-expanded="false"
-              onClick={() => setFiltersOpen(true)}
-            >
-              Map
-            </button>
-          )}
+          <Explorer {...explorerProps} open={filtersOpen} onOpen={() => setFiltersOpen(true)} />
+          <label className={`command-search ${filtersOpen ? 'drawer-open' : ''} ${detail ? 'inspector-open' : ''}`}>
+            <span className="command-search-icon" aria-hidden="true" />
+            <input
+              ref={searchRef}
+              type="search"
+              placeholder="Search map intelligence…"
+              autoComplete="off"
+              value={search}
+              onChange={(event) => setSearch(event.currentTarget.value)}
+            />
+            {search ? (
+              <button type="button" aria-label="Clear search" onClick={() => setSearch('')}>
+                ×
+              </button>
+            ) : (
+              <kbd>/</kbd>
+            )}
+          </label>
+          <DetailsDialog
+            detail={detail}
+            items={items}
+            layers={config.layers}
+            playerState={playerState}
+            returnFocus={returnFocus}
+            onClose={() => {
+              setDetail(null)
+              mapRef.current?.clearSelection()
+            }}
+          />
         </MapViewport>
       </main>
-      <DetailsDialog
-        detail={detail}
-        items={items}
-        layers={config.layers}
-        playerState={playerState}
-        returnFocus={returnFocus}
-        onClose={() => {
-          setDetail(null)
-          mapRef.current?.clearSelection()
-        }}
-      />
     </div>
   )
 }

@@ -26,6 +26,7 @@ interface MapViewportProps {
   hiddenKeys: Set<string>
   search: string
   onShowItem: (item: MapItem, returnFocus: HTMLElement) => void
+  inspectorOpen: boolean
   children: React.ReactNode
 }
 
@@ -38,10 +39,10 @@ interface Drag {
 }
 
 export const MapViewport = forwardRef<MapViewportHandle, MapViewportProps>(function MapViewport(
-  { activeLayer, items, enabledKinds, hiddenKeys, search, onShowItem, children },
+  { activeLayer, items, enabledKinds, hiddenKeys, search, onShowItem, inspectorOpen, children },
   ref
 ) {
-  const viewportRef = useRef<HTMLDivElement>(null)
+  const viewportRef = useRef<HTMLElement>(null)
   const sceneRef = useRef<HTMLDivElement>(null)
   const coordinatesRef = useRef<HTMLDivElement>(null)
   const viewRef = useRef<View>({ scale: 1, x: 0, y: 0 })
@@ -84,7 +85,17 @@ export const MapViewport = forwardRef<MapViewportHandle, MapViewportProps>(funct
   const reset = useCallback(() => {
     const viewport = viewportRef.current
     if (!viewport?.clientWidth || !viewport.clientHeight) return
-    applyView(fitView(viewport.clientWidth, viewport.clientHeight, size))
+    const fitted = fitView(viewport.clientWidth, viewport.clientHeight, size)
+    const boost = viewport.clientHeight > viewport.clientWidth ? 1.3 : 1.1
+    const scale = fitted.scale * boost
+    applyView(
+      clampView(
+        { scale, x: viewport.clientWidth / 2 - (size * scale) / 2, y: viewport.clientHeight / 2 - (size * scale) / 2 },
+        viewport.clientWidth,
+        viewport.clientHeight,
+        size
+      )
+    )
   }, [applyView, size])
 
   const zoomAt = useCallback(
@@ -170,9 +181,13 @@ export const MapViewport = forwardRef<MapViewportHandle, MapViewportProps>(funct
   }
 
   return (
-    <div
+    <section
       ref={viewportRef}
       className="relative size-full touch-pinch-zoom overflow-hidden bg-[#111416] active:cursor-grabbing"
+      role="application"
+      aria-label="Interactive world map. Use arrow keys to pan and plus or minus to zoom."
+      // biome-ignore lint/a11y/noNoninteractiveTabindex: the map is an interactive pan and zoom canvas
+      tabIndex={0}
       style={{ cursor: dragRef.current ? 'grabbing' : 'grab' }}
       onPointerDown={(event) => {
         if (event.button !== 0 || (event.target as Element).closest('button, input, aside')) return
@@ -222,6 +237,34 @@ export const MapViewport = forwardRef<MapViewportHandle, MapViewportProps>(funct
         dragRef.current = null
         event.currentTarget.style.cursor = 'grab'
       }}
+      onKeyDown={(event) => {
+        const rect = event.currentTarget.getBoundingClientRect()
+        const current = viewRef.current
+        const pan = 56
+        if (event.key === '+' || event.key === '=') {
+          event.preventDefault()
+          const point = center()
+          zoomAt(current.scale * 1.25, point.x, point.y)
+        } else if (event.key === '-') {
+          event.preventDefault()
+          const point = center()
+          zoomAt(current.scale / 1.25, point.x, point.y)
+        } else if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(event.key)) {
+          event.preventDefault()
+          applyView(
+            clampView(
+              {
+                ...current,
+                x: current.x + (event.key === 'ArrowLeft' ? pan : event.key === 'ArrowRight' ? -pan : 0),
+                y: current.y + (event.key === 'ArrowUp' ? pan : event.key === 'ArrowDown' ? -pan : 0)
+              },
+              rect.width,
+              rect.height,
+              size
+            )
+          )
+        }
+      }}
     >
       <div
         ref={sceneRef}
@@ -251,6 +294,7 @@ export const MapViewport = forwardRef<MapViewportHandle, MapViewportProps>(funct
                 className={`map-marker marker-${item.kind} ${selectedKey === key ? 'selected' : ''}`}
                 style={{ left: position.x, top: position.y }}
                 aria-label={markerText(item)}
+                tabIndex={-1}
                 onPointerDown={(event) => event.stopPropagation()}
                 onClick={(event) => {
                   event.stopPropagation()
@@ -274,7 +318,7 @@ export const MapViewport = forwardRef<MapViewportHandle, MapViewportProps>(funct
       {children}
 
       <fieldset
-        className="absolute bottom-3 right-3 z-10 flex overflow-hidden rounded-md border border-white/15 bg-[#181c1f]/95 shadow-lg max-sm:bottom-2.5 max-sm:right-2.5"
+        className={`map-controls ${inspectorOpen ? 'inspector-open' : ''}`}
         aria-label="Map controls"
         onPointerDown={(event) => event.stopPropagation()}
       >
@@ -289,8 +333,8 @@ export const MapViewport = forwardRef<MapViewportHandle, MapViewportProps>(funct
         >
           −
         </button>
-        <button type="button" className="map-control border-x border-white/10 px-3 text-xs" onClick={reset}>
-          Fit
+        <button type="button" className="map-control map-frame" title="Frame the active region" onClick={reset}>
+          Frame
         </button>
         <button
           type="button"
@@ -304,12 +348,9 @@ export const MapViewport = forwardRef<MapViewportHandle, MapViewportProps>(funct
           +
         </button>
       </fieldset>
-      <div
-        ref={coordinatesRef}
-        className="pointer-events-none absolute bottom-3 left-3 z-10 rounded bg-[#171b1d]/88 px-2 py-1 font-mono text-[11px] text-[#a8b0b4] max-sm:bottom-2.5 max-sm:left-2.5"
-      >
+      <div ref={coordinatesRef} className="map-coordinates">
         X 0 · Y 0
       </div>
-    </div>
+    </section>
   )
 })
