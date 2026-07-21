@@ -266,7 +266,7 @@ export function Explorer(props: ExplorerProps) {
           className={`filter-panel-header-motion relative z-[1] flex min-h-[70px] shrink-0 items-center justify-between border border-[#c4e4e9]/25 bg-[linear-gradient(90deg,#24b8dd_0_4px,rgb(25_40_47/95%)_4px_100%)] pr-3.5 pl-[18px] ${props.open ? 'is-panel-open' : 'is-panel-closed'}`}
         >
           <div>
-            <span className="mb-[3px] block text-[9px] font-semibold tracking-[.14em] text-[#79bfca]">MAP FILTER</span>
+            <span className="mb-[3px] block text-[10px] font-semibold tracking-[.14em] text-[#79bfca]">MAP FILTER</span>
             <strong className="text-[21px] font-normal tracking-[.035em]">Map</strong>
           </div>
           <button
@@ -877,7 +877,7 @@ function GuildCategory({ bases, workers, workersByBaseId, matches, ...props }: G
                 {expanded && requestedOutsideWorkers.length > 0 ? (
                   <fieldset className="m-0 mt-1 min-w-0 border-0 border-t border-white/10 p-0 pt-1">
                     <legend className="sr-only">Outside base perimeters for {displayName}</legend>
-                    <h4 className="m-0 px-2 py-1 text-[9px] font-normal tracking-[.1em] text-[#8eb8bf] uppercase">
+                    <h4 className="m-0 px-2 py-1 text-[10px] font-normal tracking-[.1em] text-[#8eb8bf] uppercase">
                       Outside base perimeters
                     </h4>
                     <div className="grid gap-px">
@@ -941,7 +941,7 @@ function GuildCategory({ bases, workers, workersByBaseId, matches, ...props }: G
                 </div>
               </div>
               <div className="ml-3 border-l border-white/10 pl-2">
-                <h4 className="m-0 px-2 py-1 text-[9px] font-normal tracking-[.1em] text-[#8eb8bf] uppercase">
+                <h4 className="m-0 px-2 py-1 text-[10px] font-normal tracking-[.1em] text-[#8eb8bf] uppercase">
                   Outside base perimeters
                 </h4>
                 <div className="grid gap-px">

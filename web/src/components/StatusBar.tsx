@@ -32,11 +32,11 @@ type MetricTone = keyof typeof metricTones
 function Metric({ label, value, tone = 'neutral' }: { label: string; value: React.ReactNode; tone?: MetricTone }) {
   return (
     <div className={metricClass}>
-      <dt className="w-full overflow-hidden text-center text-ellipsis whitespace-nowrap text-[8px] font-semibold tracking-[.08em] text-[#789096] uppercase max-md:text-[8px]">
+      <dt className="w-full overflow-hidden text-center text-ellipsis whitespace-nowrap text-[10px] font-semibold tracking-[.08em] text-[#789096] uppercase">
         {label}
       </dt>
       <dd
-        className={`m-0 w-full overflow-hidden text-center text-ellipsis whitespace-nowrap text-xs font-medium max-md:text-[10px] ${metricTones[tone]}`}
+        className={`m-0 w-full overflow-hidden text-center text-ellipsis whitespace-nowrap text-[13px] font-medium max-md:text-[11px] ${metricTones[tone]}`}
       >
         {value}
       </dd>
@@ -128,12 +128,12 @@ export function StatusBar({ playerState, offline }: StatusBarProps) {
           <StatusSummary status={status.kind} age={age} text={status.text} />
         )}
         <div className="relative z-[2] col-start-2 row-start-1 flex min-w-0 flex-col items-center justify-center border-x border-white/10 px-4 text-center max-lg:px-2 max-md:col-start-1 max-md:h-8 max-md:border-x-0 max-md:border-b">
-          <h1 className="m-0 w-full overflow-hidden text-ellipsis whitespace-nowrap text-[15px] leading-4 font-normal tracking-[.035em] text-[#f2fbfc] max-md:text-sm">
+          <h1 className="m-0 w-full overflow-hidden text-ellipsis whitespace-nowrap text-lg leading-5 font-normal tracking-[.035em] text-[#f2fbfc] max-md:text-base">
             {title}
           </h1>
           {server?.description && (
             <p
-              className="m-0 w-full overflow-hidden text-ellipsis whitespace-nowrap text-[9px] leading-3 text-[#9baab0]"
+              className="m-0 w-full overflow-hidden text-ellipsis whitespace-nowrap text-[11px] leading-4 text-[#9baab0] max-md:hidden"
               title={`${server.description}${server.version ? ` · Palworld ${server.version}` : ''}`}
             >
               {server.description}

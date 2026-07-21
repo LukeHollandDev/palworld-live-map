@@ -4,6 +4,7 @@ import {
   coverScale,
   isScenePointVisible,
   MAX_ZOOM_RATIO,
+  markerStackOrder,
   markerText,
   type Point,
   sceneSize,
@@ -604,7 +605,13 @@ export const MapViewport = forwardRef<MapViewportHandle, MapViewportProps>(funct
                 key={key}
                 type="button"
                 className={`map-marker marker-${item.kind} ${selectedId === item.id ? 'selected' : ''}`}
-                style={{ left: position.x, top: position.y }}
+                style={
+                  {
+                    left: position.x,
+                    top: position.y,
+                    '--marker-stack': markerStackOrder(item.kind)
+                  } as React.CSSProperties
+                }
                 aria-label={markerText(item)}
                 tabIndex={-1}
                 onPointerDown={(event) => event.stopPropagation()}
@@ -630,7 +637,7 @@ export const MapViewport = forwardRef<MapViewportHandle, MapViewportProps>(funct
       {children}
 
       <fieldset
-        className={`absolute right-[18px] bottom-[18px] z-[18] m-0 flex overflow-hidden border border-[#d3eff2]/50 bg-[#070f14]/80 p-0 shadow-[0_9px_22px_rgb(0_0_0/28%)] transition-[opacity,transform] ${
+        className={`absolute right-[18px] bottom-[18px] z-[18] m-0 flex h-11 overflow-hidden border border-[#d3eff2]/50 bg-[#070f14]/80 p-0 shadow-[0_9px_22px_rgb(0_0_0/28%)] transition-[opacity,transform] ${
           inspectorOpen ? 'pointer-events-none translate-y-2 opacity-0' : ''
         }`}
         aria-label="Map controls"
@@ -640,7 +647,7 @@ export const MapViewport = forwardRef<MapViewportHandle, MapViewportProps>(funct
       >
         <button
           type="button"
-          className="grid h-11 min-w-11 cursor-pointer place-items-center border-0 bg-transparent text-lg text-[#eefeff] hover:bg-[#087fab] focus-visible:bg-[#087fab] focus-visible:outline-none"
+          className="grid h-full min-w-11 cursor-pointer place-items-center border-0 bg-transparent text-lg text-[#eefeff] hover:bg-[#087fab] focus-visible:bg-[#087fab] focus-visible:outline-none"
           aria-label="Zoom out"
           onClick={() => {
             const point = center()
@@ -651,7 +658,7 @@ export const MapViewport = forwardRef<MapViewportHandle, MapViewportProps>(funct
         </button>
         <button
           type="button"
-          className="grid h-11 min-w-[58px] cursor-pointer place-items-center border-x border-y-0 border-[#cdeef3]/35 bg-transparent text-[10px] font-bold tracking-[.06em] text-[#eefeff] uppercase hover:bg-[#087fab] focus-visible:bg-[#087fab] focus-visible:outline-none"
+          className="grid h-full min-w-[58px] cursor-pointer place-items-center border-x border-y-0 border-[#cdeef3]/35 bg-transparent text-[11px] font-bold tracking-[.06em] text-[#eefeff] uppercase hover:bg-[#087fab] focus-visible:bg-[#087fab] focus-visible:outline-none"
           title="Fit the active region"
           onClick={animateFit}
         >
@@ -659,7 +666,7 @@ export const MapViewport = forwardRef<MapViewportHandle, MapViewportProps>(funct
         </button>
         <button
           type="button"
-          className="grid h-11 min-w-11 cursor-pointer place-items-center border-0 bg-transparent text-lg text-[#eefeff] hover:bg-[#087fab] focus-visible:bg-[#087fab] focus-visible:outline-none"
+          className="grid h-full min-w-11 cursor-pointer place-items-center border-0 bg-transparent text-lg text-[#eefeff] hover:bg-[#087fab] focus-visible:bg-[#087fab] focus-visible:outline-none"
           aria-label="Zoom in"
           onClick={() => {
             const point = center()

@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <title>Palworld Live Map</title>
+  <rect x="3" y="3" width="58" height="58" rx="15" fill="#09151b"/>
+  <path d="M12 18l13-5 14 5 13-5v34l-13 5-14-5-13 5z" fill="#102832"/>
+  <path d="M25 13v34M39 18v34" fill="none" stroke="#2b7180" stroke-width="2"/>
+  <path d="M12 18l13-5 14 5 13-5v34l-13 5-14-5-13 5z" fill="none" stroke="#55cfe3" stroke-width="2.5" stroke-linejoin="round"/>
+  <path d="M39 16c-7 0-12 5-12 12 0 9 12 20 12 20s12-11 12-20c0-7-5-12-12-12z" fill="#0b1b22" stroke="#c5f9ff" stroke-width="3" stroke-linejoin="round"/>
+  <circle cx="39" cy="28" r="4.5" fill="#ffd54a"/>
+</svg>

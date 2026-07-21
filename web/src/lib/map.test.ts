@@ -6,6 +6,7 @@ import {
   coverView,
   formatUptime,
   isScenePointVisible,
+  markerStackOrder,
   sceneViewportBounds,
   toScene,
   toWorld
@@ -52,5 +53,11 @@ describe('map display helpers', () => {
   it('formats server uptime', () => {
     expect(formatUptime(90)).toBe('1m')
     expect(formatUptime(90061)).toBe('1d 1h 1m')
+  })
+
+  it('stacks important markers above related and ambient markers', () => {
+    expect(markerStackOrder('players')).toBeGreaterThan(markerStackOrder('bases'))
+    expect(markerStackOrder('bases')).toBeGreaterThan(markerStackOrder('workers'))
+    expect(markerStackOrder('companions')).toBeGreaterThan(markerStackOrder('wild-pals'))
   })
 })

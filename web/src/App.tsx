@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { type Detail, DetailsDialog } from './components/DetailsDialog'
 import { Explorer } from './components/Explorer'
 import { MapViewport, type MapViewportHandle } from './components/MapViewport'
+import { ProjectLinks } from './components/ProjectLinks'
 import { StatusBar } from './components/StatusBar'
 import { usePolling } from './hooks/usePolling'
 import { guildIdForBase } from './lib/guilds'
@@ -399,6 +400,7 @@ function LiveMap({ config }: { config: PublicConfig }) {
                 ) : null}
               </button>
             </search>
+            <ProjectLinks hidden={Boolean(detail)} />
             <DetailsDialog
               detail={detail}
               items={items}

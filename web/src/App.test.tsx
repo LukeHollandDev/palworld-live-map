@@ -97,6 +97,14 @@ describe('App', () => {
     expect(screen.getByText('16.7 ms')).toBeVisible()
     expect(screen.getByText('Uptime')).toBeVisible()
     expect(screen.getByText('Bases')).toBeVisible()
+    expect(screen.getByRole('link', { name: 'Palworld Live Map on GitHub' })).toHaveAttribute(
+      'href',
+      'https://github.com/LukeHollandDev/palworld-live-map'
+    )
+    expect(screen.getByRole('link', { name: "Luke Holland's website" })).toHaveAttribute(
+      'href',
+      'https://lukeholland.dev'
+    )
 
     const explorer = screen.getByRole('complementary', { name: 'Map filters' })
     await user.click(within(explorer).getByRole('button', { name: 'View Luke · Lv 55' }))

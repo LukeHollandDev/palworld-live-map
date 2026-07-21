@@ -1,7 +1,16 @@
-import type { MapItem, MapLayer } from '../types'
+import type { ItemKind, MapItem, MapLayer } from '../types'
 
 export const MAP_PIXEL_SIZE = 8192
 export const MAX_ZOOM_RATIO = 96
+
+const MARKER_STACK_ORDER: Record<ItemKind, number> = {
+  'wild-pals': 10,
+  npcs: 20,
+  workers: 30,
+  companions: 40,
+  bases: 50,
+  players: 60
+}
 
 export interface Point {
   x: number
@@ -85,6 +94,10 @@ export function formatUptime(seconds: number): string {
 export function markerText(item: MapItem): string {
   if (item.kind === 'bases' || item.kind === 'npcs' || !item.level) return item.name
   return `${item.name} · Lv ${item.level}`
+}
+
+export function markerStackOrder(kind: ItemKind): number {
+  return MARKER_STACK_ORDER[kind]
 }
 
 export function kindLabel(kind: MapItem['kind']): string {

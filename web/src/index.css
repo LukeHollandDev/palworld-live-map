@@ -185,7 +185,7 @@
 
   .map-marker {
     position: absolute;
-    z-index: 2;
+    z-index: var(--marker-stack, 2);
     width: 44px;
     height: 44px;
     cursor: pointer;
@@ -283,7 +283,7 @@
       0 0 0 3px rgb(8 18 24 / 58%),
       0 0 10px rgb(44 213 243 / 32%);
     color: white;
-    font-size: 9px;
+    font-size: 10px;
     font-weight: 700;
   }
 
@@ -312,7 +312,7 @@
     border: 1px solid rgb(205 238 242 / 48%);
     background: rgb(6 13 17 / 94%);
     color: white;
-    font-size: 11px;
+    font-size: 12px;
     font-weight: 550;
     white-space: nowrap;
     opacity: 0;

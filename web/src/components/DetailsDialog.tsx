@@ -87,7 +87,7 @@ export function DetailsDialog({
     >
       <header className="relative z-[2] flex min-h-[78px] shrink-0 items-center justify-between gap-3.5 border-b border-[#c6e5ea]/20 bg-[linear-gradient(90deg,#72d7e5_0_3px,rgb(24_40_47/98%)_3px_100%)] pr-3.5 pl-5">
         <div>
-          <p className="m-0 mb-1 text-[9px] font-normal tracking-[.14em] text-[#b6f5fc]">{eyebrow}</p>
+          <p className="m-0 mb-1 text-[10px] font-normal tracking-[.14em] text-[#b6f5fc]">{eyebrow}</p>
           <h2
             ref={titleRef}
             id="details-title"
@@ -258,7 +258,7 @@ function ItemLink({ item, relation, title, detail, showRelation = false, onSelec
     >
       <span className="min-w-0">
         {showRelation ? (
-          <span className="mb-0.5 block text-[9px] tracking-[.1em] text-[#75cbd6] uppercase">{relation}</span>
+          <span className="mb-0.5 block text-[10px] tracking-[.1em] text-[#75cbd6] uppercase">{relation}</span>
         ) : null}
         <span className="block truncate text-[#f0f9fa]">{title}</span>
         {detail ? <span className="mt-0.5 block truncate text-[10px] text-[#8fa4aa]">{detail}</span> : null}
@@ -293,7 +293,7 @@ function GuildLink({
       onClick={(event) => onSelectGuild(guildId, event.currentTarget)}
     >
       <span className="min-w-0">
-        <span className="block text-[9px] tracking-[.12em] text-[#75cbd6] uppercase">Guild</span>
+        <span className="block text-[10px] tracking-[.12em] text-[#75cbd6] uppercase">Guild</span>
         <strong className="mt-0.5 block truncate text-sm font-medium text-[#f0fafb]">{name}</strong>
         <span className="mt-1 block text-[10px] text-[#91a6ac]">
           {plural(memberCount, 'online player')} · {plural(baseCount, 'base')} · {plural(palCount, 'Pal')}
