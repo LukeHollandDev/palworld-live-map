@@ -85,8 +85,8 @@ func (d *DemoSource) Info(ctx context.Context) (ServerInfo, error) {
 		return ServerInfo{}, err
 	}
 	return ServerInfo{
-		Name:        "Palpagos Community Demo",
-		Description: "Fictional live data — try the maps, filters and server details",
+		Name:        "Palpagos Live Demo",
+		Description: "Fictional data — explore maps, filters and details",
 		Version:     "1.0 demo",
 	}, nil
 }
