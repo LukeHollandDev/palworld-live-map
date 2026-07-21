@@ -51,18 +51,48 @@ interface RenderMarker {
   count?: number
 }
 
+interface ImageResult {
+  url: string
+  state: 'ready' | 'error'
+  background?: string
+}
+
 const MAX_INDIVIDUAL_MARKERS = 900
 const CLUSTER_SIZE_PX = 52
 const CONTROL_ZOOM_DURATION_MS = 220
 const RESIZE_RENDER_SYNC_DELAY_MS = 120
+const MAP_FIT_PADDING_PX = 64
 
 function fitScale(width: number, height: number, size: number): number {
-  return Math.max(0.01, Math.min(width / size, height / size))
+  const availableWidth = Math.max(1, width - MAP_FIT_PADDING_PX * 2)
+  const availableHeight = Math.max(1, height - MAP_FIT_PADDING_PX * 2)
+  return Math.max(0.001, Math.min(availableWidth / size, availableHeight / size))
 }
 
 function fitView(width: number, height: number, size: number): View {
   const scale = fitScale(width, height, size)
   return { scale, x: (width - size * scale) / 2, y: (height - size * scale) / 2 }
+}
+
+function sampleImageBackground(
+  image: HTMLImageElement,
+  adjustment: readonly [red: number, green: number, blue: number] = [0, 0, 0]
+): string | undefined {
+  try {
+    const canvas = document.createElement('canvas')
+    canvas.width = 1
+    canvas.height = 1
+    const context = canvas.getContext('2d', { colorSpace: 'srgb', willReadFrequently: true })
+    if (!context) return undefined
+    context.drawImage(image, 0, 0, 1, 1, 0, 0, 1, 1)
+    const sampled = context.getImageData(0, 0, 1, 1).data
+    const [red, green, blue] = adjustment.map((offset, channel) =>
+      Math.min(255, Math.max(0, sampled[channel] + offset))
+    )
+    return `rgb(${red} ${green} ${blue})`
+  } catch {
+    return undefined
+  }
 }
 
 export const MapViewport = forwardRef<MapViewportHandle, MapViewportProps>(function MapViewport(
@@ -86,9 +116,10 @@ export const MapViewport = forwardRef<MapViewportHandle, MapViewportProps>(funct
   const resizeSyncTimeoutRef = useRef<number | null>(null)
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [renderViewport, setRenderViewport] = useState(initialViewport)
-  const [imageState, setImageState] = useState<'loading' | 'ready' | 'error'>(
-    activeLayer.imageUrl ? 'loading' : 'error'
-  )
+  const [imageResult, setImageResult] = useState<ImageResult | null>(null)
+  const imageUrl = activeLayer.imageUrl
+  const imageState = !imageUrl ? 'error' : imageResult?.url === imageUrl ? imageResult.state : 'loading'
+  const imageBackground = imageUrl && imageResult?.url === imageUrl ? imageResult.background : undefined
 
   const current = useMemo(() => {
     const layerItems: MapItem[] = []
@@ -347,9 +378,9 @@ export const MapViewport = forwardRef<MapViewportHandle, MapViewportProps>(funct
 
   useImperativeHandle(ref, () => ({ focusItem, clearSelection: () => setSelectedId(null) }))
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: changing maps must reset the selection and fitted view
   useEffect(() => {
     setSelectedId(null)
-    setImageState(activeLayer.imageUrl ? 'loading' : 'error')
     reset()
   }, [activeLayer, reset])
 
@@ -397,12 +428,17 @@ export const MapViewport = forwardRef<MapViewportHandle, MapViewportProps>(funct
   return (
     <section
       ref={viewportRef}
-      className="map-viewport relative size-full touch-pinch-zoom overflow-hidden bg-[#0d161e] active:cursor-grabbing"
+      className={`map-viewport map-layer-${activeLayer.id} relative size-full touch-pinch-zoom overflow-hidden active:cursor-grabbing`}
       role="application"
       aria-label="Interactive world map. Use arrow keys to pan and plus or minus to zoom."
       // biome-ignore lint/a11y/noNoninteractiveTabindex: the map is an interactive pan and zoom canvas
       tabIndex={0}
-      style={{ cursor: dragRef.current ? 'grabbing' : 'grab' }}
+      style={
+        {
+          cursor: dragRef.current ? 'grabbing' : 'grab',
+          ...(imageBackground ? { '--map-background': imageBackground } : {})
+        } as React.CSSProperties
+      }
       onPointerDown={(event) => {
         if (event.button !== 0 || (event.target as Element).closest('button, input, aside, search, [role="search"]'))
           return
@@ -493,18 +529,33 @@ export const MapViewport = forwardRef<MapViewportHandle, MapViewportProps>(funct
       <div
         ref={sceneRef}
         className="map-scene"
-        style={{ width: size, height: size, '--marker-scale': '1' } as React.CSSProperties}
+        style={
+          {
+            width: size,
+            height: size,
+            '--marker-scale': '1'
+          } as React.CSSProperties
+        }
       >
-        {activeLayer.imageUrl && (
+        {imageUrl && (
           <img
             className={`map-artwork absolute inset-0 size-full select-none object-fill ${
-              activeLayer.id === 'palpagos' ? 'map-artwork-palpagos' : ''
-            } ${imageState === 'ready' ? 'block' : 'hidden'}`}
-            src={activeLayer.imageUrl}
+              imageState === 'ready' ? 'block' : 'hidden'
+            }`}
+            src={imageUrl}
             alt=""
             draggable={false}
-            onLoad={() => setImageState('ready')}
-            onError={() => setImageState('error')}
+            onLoad={(event) =>
+              setImageResult({
+                url: imageUrl,
+                state: 'ready',
+                background: sampleImageBackground(
+                  event.currentTarget,
+                  activeLayer.id === 'palpagos' ? [-1, -1, 0] : undefined
+                )
+              })
+            }
+            onError={() => setImageResult({ url: imageUrl, state: 'error' })}
           />
         )}
         {imageState !== 'ready' && <div className="fallback-grid absolute inset-0 size-full" aria-hidden="true" />}

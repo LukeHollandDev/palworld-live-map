@@ -1,4 +1,5 @@
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { useLayoutEffect } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { ItemKind, MapItem, MapLayer } from '../types'
 import { MapViewport } from './MapViewport'
@@ -110,6 +111,66 @@ afterEach(() => {
 })
 
 describe('MapViewport zoom controls', () => {
+  it('keeps a cached image ready when it loads before mount effects run', () => {
+    installViewportMocks()
+    const imageLayer = { ...layer, imageUrl: '/assets/map/palpagos.jpg?v=test' }
+    const canvasContext = {
+      drawImage: vi.fn(),
+      getImageData: vi.fn(() => ({ data: new Uint8ClampedArray([12, 21, 31, 255]) }))
+    }
+    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(
+      canvasContext as unknown as CanvasRenderingContext2D
+    )
+
+    function CompleteCachedImage() {
+      useLayoutEffect(() => {
+        document.querySelector<HTMLImageElement>('.map-artwork')?.dispatchEvent(new Event('load', { bubbles: true }))
+      }, [])
+      return null
+    }
+
+    const { container, rerender } = render(
+      <MapViewport
+        activeLayer={imageLayer}
+        items={[]}
+        enabledKinds={new Set<ItemKind>()}
+        hiddenIds={new Set<string>()}
+        search=""
+        onShowItem={() => undefined}
+        inspectorOpen={false}
+      >
+        <CompleteCachedImage />
+      </MapViewport>
+    )
+
+    expect(screen.getByRole('application')).toHaveClass('map-layer-palpagos')
+    expect(container.querySelector('.map-artwork')).toHaveClass('block')
+    expect(container.querySelector('.map-artwork')).not.toHaveClass('map-artwork-palpagos')
+    expect(container.querySelector('.fallback-grid')).not.toBeInTheDocument()
+    expect(container.querySelector('.map-cartography-frame')).not.toBeInTheDocument()
+    expect(screen.getByRole('application')).toHaveStyle({ '--map-background': 'rgb(11 20 31)' })
+    expect(canvasContext.drawImage).toHaveBeenCalledOnce()
+
+    rerender(
+      <MapViewport
+        activeLayer={{
+          ...imageLayer,
+          id: 'world-tree',
+          imageUrl: '/assets/map/world-tree.jpg?v=test'
+        }}
+        items={[]}
+        enabledKinds={new Set<ItemKind>()}
+        hiddenIds={new Set<string>()}
+        search=""
+        onShowItem={() => undefined}
+        inspectorOpen={false}
+      >
+        {null}
+      </MapViewport>
+    )
+    expect(screen.getByRole('application')).toHaveClass('map-layer-world-tree')
+  })
+
   it('removes visually hidden controls from keyboard and assistive technology navigation', () => {
     installViewportMocks()
     const props = {
@@ -185,7 +246,7 @@ describe('MapViewport zoom controls', () => {
     const scene = renderViewport()
     const fitted = readTransform(scene)
 
-    expect(fitted).toEqual({ x: 300, y: 0, scale: VIEWPORT_HEIGHT / MAP_SIZE })
+    expect(fitted).toEqual({ x: 364, y: 64, scale: (VIEWPORT_HEIGHT - 128) / MAP_SIZE })
 
     fireEvent.click(screen.getByRole('button', { name: 'Zoom in' }))
     expect(readTransform(scene)).toEqual(fitted)
@@ -210,6 +271,33 @@ describe('MapViewport zoom controls', () => {
     expect(readTransform(scene)).toEqual(zoomedAgain)
     advanceFrame(220)
     expect(readTransform(scene)).toEqual(fitted)
+  })
+
+  it('keeps the artwork padded on initial load and screen rotation', () => {
+    const dimensions = { width: 360, height: 640 }
+    installViewportMocks(dimensions)
+    const triggerResize = installResizeObserverMock()
+    const scene = renderViewport()
+
+    const expectPaddedMap = () => {
+      const view = readTransform(scene)
+      const renderedSize = MAP_SIZE * view.scale
+
+      expect(view.x).toBeGreaterThanOrEqual(63.9)
+      expect(view.y).toBeGreaterThanOrEqual(63.9)
+      expect(dimensions.width - (view.x + renderedSize)).toBeGreaterThanOrEqual(63.9)
+      expect(dimensions.height - (view.y + renderedSize)).toBeGreaterThanOrEqual(63.9)
+    }
+
+    expect(readTransform(scene)).toEqual({ x: 64, y: 204, scale: (dimensions.width - 128) / MAP_SIZE })
+    expectPaddedMap()
+
+    dimensions.width = 640
+    dimensions.height = 360
+    triggerResize()
+
+    expect(readTransform(scene)).toEqual({ x: 204, y: 64, scale: (dimensions.height - 128) / MAP_SIZE })
+    expectPaddedMap()
   })
 
   it('keeps wheel zoom immediate', () => {

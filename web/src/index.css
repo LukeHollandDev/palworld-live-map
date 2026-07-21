@@ -33,16 +33,6 @@
 }
 
 @layer components {
-  .status-commandbar::after {
-    position: absolute;
-    right: 22px;
-    bottom: -1px;
-    left: 22px;
-    height: 1px;
-    background: linear-gradient(90deg, #38c7e7, rgb(177 222 229 / 28%) 34%, transparent 82%);
-    content: "";
-  }
-
   .filter-trigger-motion,
   .filter-panel-header-motion {
     transform-origin: top left;
@@ -167,23 +157,26 @@
     clip-path: polygon(50% 0, 100% 100%, 0 100%);
   }
 
+  .map-viewport {
+    background: var(--map-background, #0d161e);
+  }
+
+  .map-layer-palpagos {
+    --map-background: #0c151f;
+  }
+
+  .map-layer-world-tree {
+    --map-background: #0d151b;
+  }
+
   .map-scene {
     position: absolute;
     transform-origin: 0 0;
-    background: #0d161e;
-  }
-
-  /* The source texture has a cyan perimeter; feather it into the matching ocean backdrop. */
-  .map-artwork-palpagos {
-    mask-image: url("./assets/palpagos-mask.svg");
-    mask-mode: alpha;
-    mask-position: center;
-    mask-repeat: no-repeat;
-    mask-size: 100% 100%;
+    background: var(--map-background, #0d161e);
   }
 
   .fallback-grid {
-    background-color: #0d161e;
+    background-color: var(--map-background, #0d161e);
     background-image:
       linear-gradient(rgb(255 255 255 / 7%) 1px, transparent 1px),
       linear-gradient(90deg, rgb(255 255 255 / 7%) 1px, transparent 1px);
