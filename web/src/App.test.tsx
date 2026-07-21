@@ -478,9 +478,17 @@ describe('App', () => {
     await user.type(screen.getByRole('searchbox'), 'Builders')
 
     const explorer = screen.getByRole('complementary', { name: 'Map filters' })
-    expect(within(explorer).getByRole('button', { name: 'View Luke · Lv 55' })).toBeVisible()
+    const explorerPlayer = within(explorer).getByRole('button', { name: 'View Luke · Lv 55' })
+    const mapPlayer = screen.getByRole('button', { name: 'Luke · Lv 55' })
+    const explorerGlyph = explorerPlayer.querySelector('[data-marker-kind="players"]')
+    const mapGlyph = mapPlayer.querySelector('[data-marker-kind="players"]')
+
+    expect(explorerPlayer).toBeVisible()
     expect(within(explorer).getByText('Lv 55 · Builders')).toBeVisible()
-    expect(screen.getByRole('button', { name: 'Luke · Lv 55' })).toBeInTheDocument()
+    expect(mapPlayer).toBeInTheDocument()
+    expect(explorerGlyph).toBeInTheDocument()
+    expect(mapGlyph).toBeInTheDocument()
+    expect(mapGlyph?.getAttribute('class')).toBe(explorerGlyph?.getAttribute('class'))
   })
 
   it('collapses and expands individual filter sections', async () => {

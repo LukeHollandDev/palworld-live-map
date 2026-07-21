@@ -370,3 +370,38 @@ describe('MapViewport zoom controls', () => {
     expect(vi.getTimerCount()).toBe(0)
   })
 })
+
+describe('MapViewport marker stacking', () => {
+  it('keeps category precedence at one coordinate and raises the selected marker above it', () => {
+    installViewportMocks()
+    const items: MapItem[] = [
+      { id: 'player', kind: 'players', name: 'Player marker', x: 0, y: 0, map: layer.id },
+      { id: 'base', kind: 'bases', name: 'Base marker', x: 0, y: 0, map: layer.id },
+      { id: 'worker', kind: 'workers', name: 'Worker marker', x: 0, y: 0, map: layer.id }
+    ]
+    renderViewport(items, new Set<ItemKind>(['players', 'bases', 'workers']))
+
+    const player = screen.getByRole('button', { name: 'Player marker' })
+    const base = screen.getByRole('button', { name: 'Base marker' })
+    const worker = screen.getByRole('button', { name: 'Worker marker' })
+    const stackOf = (marker: HTMLElement) => Number(marker.style.getPropertyValue('--marker-stack'))
+
+    expect(player.style.left).toBe(base.style.left)
+    expect(base.style.left).toBe(worker.style.left)
+    expect(player.style.top).toBe(base.style.top)
+    expect(base.style.top).toBe(worker.style.top)
+    expect(stackOf(player)).toBeGreaterThan(stackOf(base))
+    expect(stackOf(base)).toBeGreaterThan(stackOf(worker))
+    fireEvent.click(worker)
+
+    expect(worker).toHaveClass('selected')
+    expect(stackOf(worker)).toBeGreaterThan(stackOf(player))
+
+    fireEvent.click(base)
+
+    expect(base).toHaveClass('selected')
+    expect(worker).not.toHaveClass('selected')
+    expect(stackOf(worker)).toBeLessThan(stackOf(base))
+    expect(stackOf(base)).toBeGreaterThan(stackOf(player))
+  })
+})

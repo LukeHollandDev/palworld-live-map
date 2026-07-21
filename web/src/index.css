@@ -179,42 +179,47 @@
     }
   }
 
-  .explorer-symbol {
+  .marker-glyph {
+    --marker-glyph-color: #4ba3ff;
+
     display: block;
-    width: 10px;
-    height: 10px;
+    width: 20px;
+    height: 20px;
     flex: none;
-    border: 2px solid white;
-    border-radius: 9999px;
-    background: #4ba3ff;
+    overflow: visible;
+    pointer-events: none;
+    shape-rendering: geometricPrecision;
+    transition: filter 140ms ease;
   }
 
-  .kind-bases {
-    border-radius: 2px;
-    background: #f2a65a;
+  .marker-glyph-outline {
+    fill: none;
+    stroke: rgb(8 18 24 / 58%);
   }
 
-  .kind-workers {
-    rotate: 45deg;
-    border-radius: 1px;
-    background: #65c783;
+  .marker-glyph-fill {
+    fill: var(--marker-glyph-color);
+    stroke: #f1ffff;
   }
 
-  .kind-companions {
-    background: #ad7fea;
+  .marker-glyph.kind-bases {
+    --marker-glyph-color: #f2a65a;
   }
 
-  .kind-wild-pals {
-    width: 8px;
-    height: 8px;
-    background: #55c7bd;
+  .marker-glyph.kind-workers {
+    --marker-glyph-color: #65c783;
   }
 
-  .kind-npcs {
-    border: 0;
-    border-radius: 0;
-    background: #c9ced1;
-    clip-path: polygon(50% 0, 100% 100%, 0 100%);
+  .marker-glyph.kind-companions {
+    --marker-glyph-color: #ad7fea;
+  }
+
+  .marker-glyph.kind-wild-pals {
+    --marker-glyph-color: #55c7bd;
+  }
+
+  .marker-glyph.kind-npcs {
+    --marker-glyph-color: #c9ced1;
   }
 
   .map-viewport {
@@ -257,74 +262,11 @@
     background: transparent;
   }
 
-  .map-marker::before {
+  .map-marker > .marker-glyph {
     position: absolute;
     top: 50%;
     left: 50%;
-    width: 18px;
-    height: 18px;
     translate: -50% -50%;
-    rotate: 45deg;
-    border: 2px solid #f1ffff;
-    border-radius: 2px;
-    background: #119fe1;
-    box-shadow:
-      0 0 0 3px rgb(8 18 24 / 58%),
-      0 0 8px rgb(44 213 243 / 24%);
-    content: "";
-    transition: box-shadow 140ms ease;
-  }
-
-  .map-marker::after {
-    position: absolute;
-    top: calc(50% + 9px);
-    left: 50%;
-    width: 2px;
-    height: 8px;
-    translate: -50% 0;
-    background: #dbfeff;
-    box-shadow: 0 0 7px #52dff2;
-    content: "";
-  }
-
-  .marker-bases::before {
-    background: #dfa63b;
-  }
-
-  .marker-workers::before {
-    width: 12px;
-    height: 12px;
-    border-width: 1.5px;
-    border-radius: 1px;
-    background: #65c783;
-  }
-
-  .marker-companions::before {
-    background: #9277d3;
-  }
-
-  .marker-wild-pals::before {
-    z-index: 1;
-    width: 12px;
-    height: 12px;
-    border-width: 1.5px;
-    border-radius: 1px;
-    background: #55c7bd;
-  }
-
-  .marker-npcs::before {
-    width: 16px;
-    height: 16px;
-    rotate: 0deg;
-    border: 0;
-    border-radius: 0;
-    background: #d8e2e3;
-    clip-path: polygon(50% 0, 100% 100%, 0 100%);
-  }
-
-  .map-cluster::before,
-  .map-cluster::after {
-    display: none;
   }
 
   .map-cluster > span {
@@ -347,18 +289,25 @@
     font-weight: 700;
   }
 
-  .map-marker:hover,
-  .map-marker:focus-visible,
-  .map-marker.selected {
+  .map-marker:hover {
     z-index: 100;
     outline: none;
   }
 
-  .map-marker:hover::before,
-  .map-marker.selected::before {
-    box-shadow:
-      0 0 0 4px rgb(77 221 238 / 24%),
-      0 0 14px rgb(77 221 238 / 38%);
+  .map-marker:focus-visible {
+    z-index: 110;
+    outline: none;
+  }
+
+  .map-marker.selected {
+    z-index: var(--marker-stack);
+    outline: none;
+  }
+
+  .map-marker:hover > .marker-glyph,
+  .map-marker:focus-visible > .marker-glyph,
+  .map-marker.selected > .marker-glyph {
+    filter: drop-shadow(0 0 1px rgb(8 18 24 / 90%)) drop-shadow(0 0 7px rgb(77 221 238 / 58%));
   }
 
   .marker-label {

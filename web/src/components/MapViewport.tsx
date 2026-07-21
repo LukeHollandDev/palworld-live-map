@@ -15,6 +15,7 @@ import {
 } from '../lib/map'
 import { loadZoomRatio, saveZoomRatio } from '../lib/preferences'
 import type { ItemKind, MapItem, MapLayer } from '../types'
+import { MarkerGlyph } from './MarkerGlyph'
 
 export interface MapViewportHandle {
   focusItem: (item: MapItem, returnFocus: HTMLElement) => void
@@ -65,6 +66,7 @@ const CONTROL_ZOOM_DURATION_MS = 220
 const RESIZE_RENDER_SYNC_DELAY_MS = 120
 const MAP_FIT_PADDING_PX = 64
 const ZOOM_SAVE_DELAY_MS = 120
+const SELECTED_MARKER_STACK = 120
 
 function fitScale(width: number, height: number, size: number): number {
   const availableWidth = Math.max(1, width - MAP_FIT_PADDING_PX * 2)
@@ -631,16 +633,17 @@ export const MapViewport = forwardRef<MapViewportHandle, MapViewportProps>(funct
                 </button>
               )
             }
+            const selected = selectedId === item.id
             return (
               <button
                 key={key}
                 type="button"
-                className={`map-marker marker-${item.kind} ${selectedId === item.id ? 'selected' : ''}`}
+                className={`map-marker ${selected ? 'selected' : ''}`}
                 style={
                   {
                     left: position.x,
                     top: position.y,
-                    '--marker-stack': markerStackOrder(item.kind)
+                    '--marker-stack': selected ? SELECTED_MARKER_STACK : markerStackOrder(item.kind)
                   } as React.CSSProperties
                 }
                 aria-label={markerText(item)}
@@ -652,6 +655,7 @@ export const MapViewport = forwardRef<MapViewportHandle, MapViewportProps>(funct
                   onShowItem(item, event.currentTarget)
                 }}
               >
+                <MarkerGlyph kind={item.kind} />
                 <span className="marker-label">{markerText(item)}</span>
               </button>
             )

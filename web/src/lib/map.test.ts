@@ -56,8 +56,10 @@ describe('map display helpers', () => {
   })
 
   it('stacks important markers above related and ambient markers', () => {
-    expect(markerStackOrder('players')).toBeGreaterThan(markerStackOrder('bases'))
-    expect(markerStackOrder('bases')).toBeGreaterThan(markerStackOrder('workers'))
-    expect(markerStackOrder('companions')).toBeGreaterThan(markerStackOrder('wild-pals'))
+    const ascendingKinds = ['wild-pals', 'npcs', 'workers', 'companions', 'bases', 'players'] as const
+    const stack = ascendingKinds.map(markerStackOrder)
+
+    expect(stack).toEqual([...stack].sort((left, right) => left - right))
+    expect(new Set(stack).size).toBe(ascendingKinds.length)
   })
 })

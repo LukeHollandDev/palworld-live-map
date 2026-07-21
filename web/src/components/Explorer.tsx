@@ -2,6 +2,7 @@ import { type ReactNode, useEffect, useId, useLayoutEffect, useMemo, useRef, use
 import { guildIdForBase } from '../lib/guilds'
 import { markerText } from '../lib/map'
 import type { ItemKind, MapItem, MapLayer } from '../types'
+import { MarkerGlyph } from './MarkerGlyph'
 
 interface ExplorerProps {
   open: boolean
@@ -96,12 +97,12 @@ function ItemButton({
   return (
     <button
       type="button"
-      className="grid min-h-7 w-full min-w-0 flex-1 cursor-pointer grid-cols-[13px_minmax(0,1fr)_auto] items-center gap-1.5 border border-transparent bg-transparent px-1.5 py-1 text-left text-xs text-[#e3edef] transition-colors hover:border-[#c5edf3]/35 hover:bg-[#216d82]/35 hover:text-white focus-visible:border-[#c5edf3]/35 focus-visible:bg-[#216d82]/35 focus-visible:text-white focus-visible:outline-none"
+      className="grid min-h-7 w-full min-w-0 flex-1 cursor-pointer grid-cols-[20px_minmax(0,1fr)_auto] items-center gap-1.5 border border-transparent bg-transparent px-1.5 py-1 text-left text-xs text-[#e3edef] transition-colors hover:border-[#c5edf3]/35 hover:bg-[#216d82]/35 hover:text-white focus-visible:border-[#c5edf3]/35 focus-visible:bg-[#216d82]/35 focus-visible:text-white focus-visible:outline-none"
       aria-label={`View ${markerText(item)}`}
       title={item.detail}
       onClick={(event) => onFocus(item, event.currentTarget)}
     >
-      <span className={`explorer-symbol kind-${item.kind}`} aria-hidden="true" />
+      <MarkerGlyph kind={item.kind} />
       <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">{label || item.name}</span>
       {meta && <span className="ml-auto shrink-0 text-[11px] text-[#899398]">{meta}</span>}
     </button>
@@ -122,11 +123,11 @@ function GuildButton({
   return (
     <button
       type="button"
-      className="grid min-h-7 min-w-0 flex-1 cursor-pointer grid-cols-[13px_minmax(0,1fr)_auto] items-center gap-1.5 border border-transparent bg-transparent px-1.5 py-1 text-left text-xs text-[#e3edef] transition-colors hover:border-[#c5edf3]/35 hover:bg-[#216d82]/35 hover:text-white focus-visible:border-[#c5edf3]/35 focus-visible:bg-[#216d82]/35 focus-visible:text-white focus-visible:outline-none"
+      className="grid min-h-7 min-w-0 flex-1 cursor-pointer grid-cols-[20px_minmax(0,1fr)_auto] items-center gap-1.5 border border-transparent bg-transparent px-1.5 py-1 text-left text-xs text-[#e3edef] transition-colors hover:border-[#c5edf3]/35 hover:bg-[#216d82]/35 hover:text-white focus-visible:border-[#c5edf3]/35 focus-visible:bg-[#216d82]/35 focus-visible:text-white focus-visible:outline-none"
       aria-label={`View guild ${name}`}
       onClick={(event) => onFocus(guildId, event.currentTarget)}
     >
-      <span className="explorer-symbol kind-bases" aria-hidden="true" />
+      <MarkerGlyph kind="bases" />
       <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap font-medium">{name}</span>
       <span className="ml-auto shrink-0 text-[10px] text-[#7f898e]">{meta}</span>
     </button>
@@ -416,7 +417,7 @@ function CategoryHeader({
         />
       </span>
       <AccordionButton expanded={expanded} label={`${title} section`} controls={controls} onClick={onToggleExpanded}>
-        <span className={`explorer-symbol kind-${group}`} aria-hidden="true" />
+        <MarkerGlyph kind={group} />
         <strong className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-xs font-semibold">
           {title} ({itemCount})
         </strong>
@@ -551,8 +552,8 @@ function PlayerCategory({ players, companions, matches, ...props }: PlayerCatego
               }
             />
           </span>
-          <div className="grid min-h-7 min-w-0 flex-1 grid-cols-[13px_minmax(0,1fr)_auto] items-center gap-1.5 px-1.5 py-1 text-xs text-[#cbd7d9]">
-            <span className="explorer-symbol kind-companions" aria-hidden="true" />
+          <div className="grid min-h-7 min-w-0 flex-1 grid-cols-[20px_minmax(0,1fr)_auto] items-center gap-1.5 px-1.5 py-1 text-xs text-[#cbd7d9]">
+            <MarkerGlyph kind="companions" />
             <strong className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap font-medium">{title}</strong>
             <span className="ml-auto shrink-0 text-[10px] text-[#7f898e]">
               {items.length} Pal{items.length === 1 ? '' : 's'}
@@ -931,8 +932,8 @@ function GuildCategory({ bases, workers, workersByBaseId, matches, ...props }: G
                     }
                   />
                 </span>
-                <div className="grid min-h-7 min-w-0 flex-1 grid-cols-[13px_minmax(0,1fr)_auto] items-center gap-1.5 px-1.5 py-1 text-xs text-[#cbd7d9]">
-                  <span className="explorer-symbol kind-workers" aria-hidden="true" />
+                <div className="grid min-h-7 min-w-0 flex-1 grid-cols-[20px_minmax(0,1fr)_auto] items-center gap-1.5 px-1.5 py-1 text-xs text-[#cbd7d9]">
+                  <MarkerGlyph kind="workers" />
                   <strong className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap font-medium">
                     No linked guild
                   </strong>
