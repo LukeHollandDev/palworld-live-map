@@ -43,7 +43,7 @@ docker run -d \
   ghcr.io/lukehollanddev/palworld-live-map:latest
 ```
 
-Replace the URL and password with your server's values, then open <http://localhost:8080>. Enable Palworld's game-data API to also display bases, Pals, and NPCs.
+Replace the URL and password with your server's values, then open <http://localhost:8080>. Enable Palworld's game-data API to also display bases, Pals, and NPCs. A healthcheck endpoint is available at `/-/health`.
 
 The bundled Compose file provides the same single-service setup:
 
@@ -59,16 +59,6 @@ For a local preview that does not need a Palworld server or credentials:
 docker run --rm -p 127.0.0.1:8080:8080 -e DEMO_MODE=true \
   ghcr.io/lukehollanddev/palworld-live-map:latest
 ```
-
-### Connect through an SSH tunnel
-
-Keep the Palworld REST API private. If it is only reachable from a remote host, forward it to loopback instead of publishing port 8212:
-
-```bash
-ssh -N -L 127.0.0.1:8212:127.0.0.1:8212 user@palworld-host
-```
-
-The final host and port are resolved from `palworld-host`, so replace them if that machine reaches the REST API at another address. Keep the tunnel running, then use `PALWORLD_REST_URL=http://127.0.0.1:8212` with the [source run](DEVELOPMENT.md#run-from-source). Docker Desktop can normally reach the tunnel through `host.docker.internal`; native Linux containers cannot reach a host service bound only to loopback, so use the source run or put the tunnel in a private container network rather than exposing it on `0.0.0.0`.
 
 ### Run with Palworld Server Docker
 
@@ -98,28 +88,23 @@ Set `ADMIN_PASSWORD` in the project's `.env`, then run `docker compose up -d`.
 
 ## Configuration
 
-Most installations only need these settings:
+Every supported environment option and timeout is listed below and documented in [`.env.example`](.env.example).
 
-| Variable                  | Purpose                                        | Default  |
-| ------------------------- | ---------------------------------------------- | -------- |
-| `PALWORLD_REST_URL`       | Private URL of the official Palworld REST API  | required |
-| `PALWORLD_ADMIN_PASSWORD` | REST admin password; never sent to browsers    | required |
-| `DEMO_MODE`               | Use fictional data and do not contact Palworld | `false`  |
-| `HTTP_PORT`               | Host port used by Compose                      | `8080`   |
-| `POLL_INTERVAL`           | Player and metrics refresh interval            | `5s`     |
-| `WORLD_DATA_ENABLED`      | Poll bases, Pals, and NPCs                     | `true`   |
-| `WORLD_POLL_INTERVAL`     | World-object refresh interval                  | `15s`    |
-
-Every environment option and timeout is documented in [`.env.example`](.env.example).
-
-## Live-data scope
-
-The Explorer groups companion Pals under their matching online player and groups Palbox bases under their guild, with assigned base Pals nested below each base. Explicit fallback groups keep companion Pals with no currently online owner or with an owner on another map, and base Pals that cannot be linked to a reported base, visible rather than silently dropping them.
-
-Base membership is a conservative live-data projection because the REST response does not include an exact worker-container link or a configured base radius. A `BaseCampPal` is assigned only to a base in the same guild and map when it is within the standard 3,500-unit Palbox radius plus 2.5% tolerance; the nearest base wins when perimeters overlap. Travelling companion Pals and wild Pals are never assigned by proximity.
-
-The REST-only application cannot show offline guild rosters, stored Pals, exact Pal containers, or modded base radii. Save-data reading is not currently implemented; the privacy and isolation requirements for an optional future integration are documented in [DEVELOPMENT.md](DEVELOPMENT.md#optional-save-data-direction).
+| Variable                  | Purpose                                                           | Default  |
+| ------------------------- | ----------------------------------------------------------------- | -------- |
+| `PALWORLD_REST_URL`       | Private URL of the official Palworld REST API                     | required |
+| `PALWORLD_ADMIN_PASSWORD` | REST admin password; never sent to browsers                       | required |
+| `DEMO_MODE`               | Use fictional data and do not contact Palworld                    | `false`  |
+| `HTTP_PORT`               | Host port published by Compose                                    | `8080`   |
+| `ADDR`                    | Address the Go HTTP server listens on                             | `:8080`  |
+| `POLL_INTERVAL`           | Player and metrics refresh interval; minimum `2s`                 | `5s`     |
+| `UPSTREAM_TIMEOUT`        | Player and server-information timeout; must be below `POLL_INTERVAL` | `4s`  |
+| `WORLD_DATA_ENABLED`      | Poll bases, Pals, and NPCs                                        | `true`   |
+| `WORLD_POLL_INTERVAL`     | World-object refresh interval; minimum `5s`                       | `15s`    |
+| `WORLD_TIMEOUT`           | World-object timeout; must be below `WORLD_POLL_INTERVAL`         | `10s`    |
 
 ## License
 
 [MIT](LICENSE)
+
+Palworld Live Map is an independent, fan-made project. It is not affiliated with, endorsed by, or sponsored by Pocketpair, Inc. Palworld and related names and marks belong to their respective owners.

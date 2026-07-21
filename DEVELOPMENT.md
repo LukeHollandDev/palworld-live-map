@@ -85,21 +85,6 @@ Open `http://localhost:5173`. Vite proxies the API and map artwork requests to t
 
 To regenerate the map artwork from a local Palworld installation, follow [`tools/map-exporter/README.md`](tools/map-exporter/README.md). The Dockerised exporter is intentionally outside the production image and Go dependency graph.
 
-## Optional save-data direction
-
-Save-data support is not implemented. The live REST snapshot cannot provide offline guild rosters, stored or party Pals, exact Pal-container membership, or a modded base radius. Those gaps should not be filled by guesswork.
-
-If save inspection is added, it should be optional and disabled by default. A conservative design is a separate reader or sidecar that:
-
-- receives a read-only save mount and parses a stable copy on a slow interval;
-- retains its last valid result and leaves the REST-only application usable when absent or stale;
-- emits a versioned, allowlisted JSON snapshot rather than raw save data; and
-- replaces platform, actor, guild, container, and player identifiers with deployment-scoped opaque IDs before publication.
-
-Modern Palworld 1.0 `PlM` saves require an Oodle decoder supplied by the operator, which is another reason to keep parsing outside the static Go runtime. `GroupSaveDataMap` can supply guild rosters, `CharacterSaveParameterMap` can supply player and Pal ownership, and `BaseCampSaveData` can supply the exact worker-container link. Raw save JSON, filesystem paths, inventories, precise last-online timestamps, and parser errors containing private values must remain private.
-
-Local API captures, save experiments, and operator-specific tunnel notes belong under the gitignored `.local/` directory. Do not commit them or link public documentation to files that other checkouts will not contain.
-
 ## Verification
 
 ```bash

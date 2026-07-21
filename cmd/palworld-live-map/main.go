@@ -94,13 +94,9 @@ func main() {
 }
 
 func checkHealth() error {
-	endpoint := os.Getenv("HEALTHCHECK_URL")
-	if endpoint == "" {
-		var err error
-		endpoint, err = healthcheckEndpoint(os.Getenv("ADDR"))
-		if err != nil {
-			return err
-		}
+	endpoint, err := healthcheckEndpoint(os.Getenv("ADDR"))
+	if err != nil {
+		return err
 	}
 	client := &http.Client{Timeout: 2 * time.Second}
 	resp, err := client.Get(endpoint)
