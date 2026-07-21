@@ -6,6 +6,7 @@ import { ProjectLinks } from './components/ProjectLinks'
 import { StatusBar } from './components/StatusBar'
 import { usePolling } from './hooks/usePolling'
 import { guildIdForBase } from './lib/guilds'
+import { loadFilterPreferences, saveFilterPreferences } from './lib/preferences'
 import {
   ALL_KINDS,
   EMPTY_OBJECT_STATE,
@@ -57,7 +58,7 @@ export function App() {
 
   if (!config) {
     return (
-      <div className="grid h-dvh grid-rows-[64px_1fr] bg-[#171a1d] text-[#f4f5f5] max-md:grid-rows-[84px_1fr]">
+      <div className="grid h-dvh grid-rows-[64px_1fr] bg-[#171a1d] text-[#f4f5f5] max-md:grid-rows-[76px_1fr]">
         <StatusBar playerState={null} offline={configError} />
         <main className="grid place-items-center bg-[#111416] text-sm text-[#8f989d]">
           {configError ? (
@@ -90,9 +91,14 @@ function LiveMap({ config }: { config: PublicConfig }) {
   const objects = usePolling<ObjectState>('/api/objects', config.worldPollIntervalMs, config.worldDataEnabled)
   const playerState = players.data
   const objectState = objects.data || { ...EMPTY_OBJECT_STATE, enabled: config.worldDataEnabled }
-  const [activeLayer, setActiveLayer] = useState<MapLayer>(config.layers[0])
-  const [enabledKinds, setEnabledKinds] = useState(() => new Set<ItemKind>(ALL_KINDS))
-  const [hiddenIds, setHiddenIds] = useState(() => new Set<string>())
+  const initialPreferences = useMemo(loadFilterPreferences, [])
+  const [activeLayer, setActiveLayer] = useState<MapLayer>(
+    () => config.layers.find((layer) => layer.id === initialPreferences.activeLayerId) || config.layers[0]
+  )
+  const [enabledKinds, setEnabledKinds] = useState(
+    () => initialPreferences.enabledKinds || new Set<ItemKind>(ALL_KINDS)
+  )
+  const [hiddenIds, setHiddenIds] = useState(() => initialPreferences.hiddenIds || new Set<string>())
   const [expandedPlayers, setExpandedPlayers] = useState(() => new Set<string>())
   const [expandedGuilds, setExpandedGuilds] = useState(() => new Set<string>())
   const [expandedBases, setExpandedBases] = useState(() => new Set<string>())
@@ -105,6 +111,10 @@ function LiveMap({ config }: { config: PublicConfig }) {
   const pendingFocusRef = useRef<{ itemId: string; returnFocus: HTMLElement } | null>(null)
   const searchRef = useRef<HTMLInputElement>(null)
   const searchToggleRef = useRef<HTMLButtonElement>(null)
+
+  useEffect(() => {
+    saveFilterPreferences({ activeLayerId: activeLayer.id, enabledKinds, hiddenIds })
+  }, [activeLayer.id, enabledKinds, hiddenIds])
 
   const items = useMemo<MapItem[]>(
     () => [
@@ -294,7 +304,7 @@ function LiveMap({ config }: { config: PublicConfig }) {
   }
 
   return (
-    <div className="grid h-dvh grid-rows-[64px_1fr] overflow-hidden bg-[#171a1d] text-[#f4f5f5] max-md:grid-rows-[84px_1fr]">
+    <div className="grid h-dvh grid-rows-[64px_1fr] overflow-hidden bg-[#171a1d] text-[#f4f5f5] max-md:grid-rows-[76px_1fr]">
       <StatusBar playerState={playerState} offline={Boolean(players.error)} />
       <main className="relative min-h-0 w-full overflow-hidden bg-[#0d161e]">
         <Explorer {...explorerProps} open={filtersOpen} onOpen={() => setFiltersOpen(true)} />
@@ -313,7 +323,7 @@ function LiveMap({ config }: { config: PublicConfig }) {
               id="map-search-control"
               aria-label="Map search"
               className={`absolute top-4 z-20 h-12 overflow-hidden border border-[#cceaef]/35 bg-[#081115]/95 shadow-[0_8px_22px_rgb(0_0_0/24%)] transition-[width,right,border-color,box-shadow] duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] focus-within:border-[#62d6e7] focus-within:shadow-[inset_0_-2px_#22c7e8,0_8px_22px_rgb(0_0_0/24%)] motion-reduce:transition-none max-sm:top-3 ${
-                searchOpen ? 'w-[min(420px,calc(100%_-_32px))] max-sm:w-[calc(100%_-_154px)]' : 'w-12'
+                searchOpen ? 'w-[min(420px,calc(100%_-_32px))] max-sm:w-[calc(100%_-_128px)]' : 'w-12'
               } ${detail ? 'right-[402px] max-[1180px]:hidden max-sm:right-3 max-sm:block' : 'right-4 max-sm:right-3'}`}
             >
               <div
@@ -331,7 +341,7 @@ function LiveMap({ config }: { config: PublicConfig }) {
                   ref={searchRef}
                   type="search"
                   aria-label="Search players, bases, Pals and NPCs"
-                  placeholder="Search players, bases and Pals…"
+                  placeholder="Search map…"
                   autoComplete="off"
                   enterKeyHint="search"
                   spellCheck="false"

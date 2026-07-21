@@ -105,6 +105,7 @@ function renderViewport(items: MapItem[] = [], enabledKinds: Set<ItemKind> = new
 
 afterEach(() => {
   cleanup()
+  window.localStorage.clear()
   vi.useRealTimers()
   vi.restoreAllMocks()
   vi.unstubAllGlobals()
@@ -308,6 +309,20 @@ describe('MapViewport zoom controls', () => {
     fireEvent.wheel(screen.getByRole('application'), { clientX: 600, clientY: 300, deltaY: -100 })
 
     expect(readTransform(scene).scale).toBeGreaterThan(fitted.scale)
+  })
+
+  it('restores the saved zoom level for the active map', () => {
+    installViewportMocks()
+    const scene = renderViewport()
+    const fitted = readTransform(scene)
+
+    fireEvent.wheel(screen.getByRole('application'), { clientX: 600, clientY: 300, deltaY: -100 })
+    const zoomedScale = readTransform(scene).scale
+    expect(zoomedScale).toBeGreaterThan(fitted.scale)
+    cleanup()
+
+    const restoredScene = renderViewport()
+    expect(readTransform(restoredScene).scale).toBeCloseTo(zoomedScale)
   })
 
   it('updates the scene during resize and defers marker culling until resizing settles', () => {

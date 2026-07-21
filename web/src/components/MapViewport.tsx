@@ -13,6 +13,7 @@ import {
   toWorld,
   type View
 } from '../lib/map'
+import { loadZoomRatio, saveZoomRatio } from '../lib/preferences'
 import type { ItemKind, MapItem, MapLayer } from '../types'
 
 export interface MapViewportHandle {
@@ -63,6 +64,7 @@ const CLUSTER_SIZE_PX = 52
 const CONTROL_ZOOM_DURATION_MS = 220
 const RESIZE_RENDER_SYNC_DELAY_MS = 120
 const MAP_FIT_PADDING_PX = 64
+const ZOOM_SAVE_DELAY_MS = 120
 
 function fitScale(width: number, height: number, size: number): number {
   const availableWidth = Math.max(1, width - MAP_FIT_PADDING_PX * 2)
@@ -102,12 +104,12 @@ export const MapViewport = forwardRef<MapViewportHandle, MapViewportProps>(funct
 ) {
   const viewportRef = useRef<HTMLElement>(null)
   const sceneRef = useRef<HTMLDivElement>(null)
-  const coordinatesRef = useRef<HTMLDivElement>(null)
+  const coordinatesRef = useRef<HTMLSpanElement>(null)
   const size = useMemo(() => sceneSize(), [])
   const initialViewport = useMemo<RenderViewport>(() => {
     const compactHeader = window.innerWidth < 768
     const width = Math.max(1, window.innerWidth)
-    const height = Math.max(1, window.innerHeight - (compactHeader ? 84 : 64))
+    const height = Math.max(1, window.innerHeight - (compactHeader ? 76 : 64))
     return { view: fitView(width, height, size), width, height }
   }, [size])
   const viewRef = useRef<View>(initialViewport.view)
@@ -115,6 +117,8 @@ export const MapViewport = forwardRef<MapViewportHandle, MapViewportProps>(funct
   const dragRef = useRef<Drag | null>(null)
   const animationFrameRef = useRef<number | null>(null)
   const resizeSyncTimeoutRef = useRef<number | null>(null)
+  const zoomSaveTimeoutRef = useRef<number | null>(null)
+  const pendingZoomRef = useRef<{ layerId: string; ratio: number } | null>(null)
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [renderViewport, setRenderViewport] = useState(initialViewport)
   const [imageResult, setImageResult] = useState<ImageResult | null>(null)
@@ -223,6 +227,23 @@ export const MapViewport = forwardRef<MapViewportHandle, MapViewportProps>(funct
       syncRenderViewport()
   }, [renderViewport.view, syncRenderViewport])
 
+  const flushZoomPreference = useCallback(() => {
+    if (zoomSaveTimeoutRef.current !== null) window.clearTimeout(zoomSaveTimeoutRef.current)
+    zoomSaveTimeoutRef.current = null
+    const pending = pendingZoomRef.current
+    pendingZoomRef.current = null
+    if (pending) saveZoomRatio(pending.layerId, pending.ratio)
+  }, [])
+
+  const queueZoomPreference = useCallback(
+    (ratio: number) => {
+      pendingZoomRef.current = { layerId: activeLayer.id, ratio }
+      if (zoomSaveTimeoutRef.current !== null) window.clearTimeout(zoomSaveTimeoutRef.current)
+      zoomSaveTimeoutRef.current = window.setTimeout(flushZoomPreference, ZOOM_SAVE_DELAY_MS)
+    },
+    [activeLayer.id, flushZoomPreference]
+  )
+
   const applyView = useCallback(
     (view: View) => {
       viewRef.current = view
@@ -280,16 +301,20 @@ export const MapViewport = forwardRef<MapViewportHandle, MapViewportProps>(funct
     cancelViewAnimation()
     cancelResizeRenderSync()
     viewportSizeRef.current = { width: viewport.clientWidth, height: viewport.clientHeight }
-    applyView(fitView(viewport.clientWidth, viewport.clientHeight, size))
+    const fitted = fitView(viewport.clientWidth, viewport.clientHeight, size)
+    const maximum = coverScale(viewport.clientWidth, viewport.clientHeight, size) * MAX_ZOOM_RATIO
+    const scale = Math.min(maximum, fitted.scale * loadZoomRatio(activeLayer.id))
+    applyView({ scale, x: (viewport.clientWidth - size * scale) / 2, y: (viewport.clientHeight - size * scale) / 2 })
     syncRenderViewport()
-  }, [applyView, cancelResizeRenderSync, cancelViewAnimation, size, syncRenderViewport])
+  }, [activeLayer.id, applyView, cancelResizeRenderSync, cancelViewAnimation, size, syncRenderViewport])
 
   const animateFit = useCallback(() => {
     const viewport = viewportRef.current
     if (!viewport?.clientWidth || !viewport.clientHeight) return
     viewportSizeRef.current = { width: viewport.clientWidth, height: viewport.clientHeight }
     animateView(fitView(viewport.clientWidth, viewport.clientHeight, size))
-  }, [animateView, size])
+    queueZoomPreference(1)
+  }, [animateView, queueZoomPreference, size])
 
   const resizeView = useCallback(() => {
     const viewport = viewportRef.current
@@ -341,6 +366,7 @@ export const MapViewport = forwardRef<MapViewportHandle, MapViewportProps>(funct
         rect.height,
         size
       )
+      queueZoomPreference(Math.max(1, scale / fitScale(rect.width, rect.height, size)))
       if (animated) animateView(target)
       else {
         cancelViewAnimation()
@@ -349,7 +375,7 @@ export const MapViewport = forwardRef<MapViewportHandle, MapViewportProps>(funct
         syncRenderViewport()
       }
     },
-    [animateView, applyView, cancelResizeRenderSync, cancelViewAnimation, size, syncRenderViewport]
+    [animateView, applyView, cancelResizeRenderSync, cancelViewAnimation, queueZoomPreference, size, syncRenderViewport]
   )
 
   const focusItem = (item: MapItem, returnFocus: HTMLElement) => {
@@ -372,6 +398,7 @@ export const MapViewport = forwardRef<MapViewportHandle, MapViewportProps>(funct
         size
       )
     )
+    queueZoomPreference(Math.max(1, scale / fitScale(rect.width, rect.height, size)))
     syncRenderViewport()
     setSelectedId(item.id)
     onShowItem(item, returnFocus)
@@ -397,9 +424,13 @@ export const MapViewport = forwardRef<MapViewportHandle, MapViewportProps>(funct
     () => () => {
       cancelViewAnimation()
       cancelResizeRenderSync()
+      flushZoomPreference()
     },
-    [cancelResizeRenderSync, cancelViewAnimation]
+    [cancelResizeRenderSync, cancelViewAnimation, flushZoomPreference]
   )
+
+  // biome-ignore lint/correctness/useExhaustiveDependencies: changing maps must flush that map's pending zoom value
+  useEffect(() => () => flushZoomPreference(), [activeLayer.id, flushZoomPreference])
 
   useEffect(() => {
     if (selectedId && !current.items.some((item) => item.id === selectedId)) setSelectedId(null)
@@ -468,7 +499,7 @@ export const MapViewport = forwardRef<MapViewportHandle, MapViewportProps>(funct
           size
         )
         if (coordinatesRef.current)
-          coordinatesRef.current.textContent = `X ${Math.round(world.x)} · Y ${Math.round(world.y)}`
+          coordinatesRef.current.textContent = `X ${Math.round(world.x)}\u00a0\u00a0Y ${Math.round(world.y)}`
 
         const drag = dragRef.current
         if (!drag || drag.pointer !== event.pointerId) return
@@ -581,18 +612,18 @@ export const MapViewport = forwardRef<MapViewportHandle, MapViewportProps>(funct
                     const rect = viewport.getBoundingClientRect()
                     const minimum = coverScale(rect.width, rect.height, size)
                     const scale = Math.min(minimum * MAX_ZOOM_RATIO, viewRef.current.scale * 2.5)
-                    applyView(
-                      clampView(
-                        {
-                          scale,
-                          x: rect.width / 2 - position.x * scale,
-                          y: rect.height / 2 - position.y * scale
-                        },
-                        rect.width,
-                        rect.height,
-                        size
-                      )
+                    const target = clampView(
+                      {
+                        scale,
+                        x: rect.width / 2 - position.x * scale,
+                        y: rect.height / 2 - position.y * scale
+                      },
+                      rect.width,
+                      rect.height,
+                      size
                     )
+                    applyView(target)
+                    queueZoomPreference(Math.max(1, scale / fitScale(rect.width, rect.height, size)))
                     syncRenderViewport()
                   }}
                 >
@@ -636,51 +667,63 @@ export const MapViewport = forwardRef<MapViewportHandle, MapViewportProps>(funct
 
       {children}
 
-      <fieldset
-        className={`absolute right-[18px] bottom-[18px] z-[18] m-0 flex h-11 overflow-hidden border border-[#d3eff2]/50 bg-[#070f14]/80 p-0 shadow-[0_9px_22px_rgb(0_0_0/28%)] transition-[opacity,transform] ${
+      <div
+        className={`absolute right-[18px] bottom-[18px] z-[18] flex h-11 overflow-hidden border border-[#d3eff2]/50 bg-[#070f14]/80 shadow-[0_9px_22px_rgb(0_0_0/28%)] backdrop-blur-sm transition-[opacity,transform] max-sm:right-3 max-sm:bottom-3 ${
           inspectorOpen ? 'pointer-events-none translate-y-2 opacity-0' : ''
         }`}
-        aria-label="Map controls"
-        aria-hidden={inspectorOpen}
-        inert={inspectorOpen}
         onPointerDown={(event) => event.stopPropagation()}
       >
-        <button
-          type="button"
-          className="grid h-full min-w-11 cursor-pointer place-items-center border-0 bg-transparent text-lg text-[#eefeff] hover:bg-[#087fab] focus-visible:bg-[#087fab] focus-visible:outline-none"
-          aria-label="Zoom out"
-          onClick={() => {
-            const point = center()
-            zoomAt(viewRef.current.scale / 1.35, point.x, point.y, true)
-          }}
+        <div className="pointer-events-none flex w-[184px] shrink-0 items-center gap-2 border-r border-[#cdeef3]/35 px-3 text-[11px] tracking-[.055em] whitespace-nowrap text-[#cce8eb] tabular-nums max-sm:w-[150px] max-sm:px-2">
+          <svg
+            className="size-3.5 shrink-0 text-[#67cad8] max-sm:hidden"
+            viewBox="0 0 20 20"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.5"
+            aria-hidden="true"
+          >
+            <circle cx="10" cy="10" r="3.25" />
+            <path d="M10 2v3M10 15v3M2 10h3M15 10h3" />
+          </svg>
+          <span ref={coordinatesRef}>X 0&nbsp;&nbsp;Y 0</span>
+        </div>
+        <fieldset
+          className="m-0 flex h-full border-0 p-0"
+          aria-label="Map controls"
+          aria-hidden={inspectorOpen}
+          inert={inspectorOpen}
         >
-          −
-        </button>
-        <button
-          type="button"
-          className="grid h-full min-w-[58px] cursor-pointer place-items-center border-x border-y-0 border-[#cdeef3]/35 bg-transparent text-[11px] font-bold tracking-[.06em] text-[#eefeff] uppercase hover:bg-[#087fab] focus-visible:bg-[#087fab] focus-visible:outline-none"
-          title="Fit the active region"
-          onClick={animateFit}
-        >
-          Fit
-        </button>
-        <button
-          type="button"
-          className="grid h-full min-w-11 cursor-pointer place-items-center border-0 bg-transparent text-lg text-[#eefeff] hover:bg-[#087fab] focus-visible:bg-[#087fab] focus-visible:outline-none"
-          aria-label="Zoom in"
-          onClick={() => {
-            const point = center()
-            zoomAt(viewRef.current.scale * 1.35, point.x, point.y, true)
-          }}
-        >
-          +
-        </button>
-      </fieldset>
-      <div
-        ref={coordinatesRef}
-        className="pointer-events-none absolute bottom-[18px] left-[18px] z-[18] border-l-[3px] border-[#c3faff] bg-[#070f14]/75 px-2.5 py-[7px] text-xs tracking-[.06em] text-[#e5fbfd] max-sm:bottom-3.5 max-sm:left-3"
-      >
-        X 0 · Y 0
+          <button
+            type="button"
+            className="grid h-full min-w-11 cursor-pointer place-items-center border-0 bg-transparent text-lg text-[#eefeff] hover:bg-[#087fab] focus-visible:bg-[#087fab] focus-visible:outline-none"
+            aria-label="Zoom out"
+            onClick={() => {
+              const point = center()
+              zoomAt(viewRef.current.scale / 1.35, point.x, point.y, true)
+            }}
+          >
+            −
+          </button>
+          <button
+            type="button"
+            className="grid h-full min-w-[58px] cursor-pointer place-items-center border-x border-y-0 border-[#cdeef3]/35 bg-transparent text-[11px] font-bold tracking-[.06em] text-[#eefeff] uppercase hover:bg-[#087fab] focus-visible:bg-[#087fab] focus-visible:outline-none"
+            title="Fit the active region"
+            onClick={animateFit}
+          >
+            Fit
+          </button>
+          <button
+            type="button"
+            className="grid h-full min-w-11 cursor-pointer place-items-center border-0 bg-transparent text-lg text-[#eefeff] hover:bg-[#087fab] focus-visible:bg-[#087fab] focus-visible:outline-none"
+            aria-label="Zoom in"
+            onClick={() => {
+              const point = center()
+              zoomAt(viewRef.current.scale * 1.35, point.x, point.y, true)
+            }}
+          >
+            +
+          </button>
+        </fieldset>
       </div>
     </section>
   )

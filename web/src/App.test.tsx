@@ -67,6 +67,7 @@ function mockAPI(resolve: (path: string) => unknown = (path) => responses[path])
 
 afterEach(() => {
   cleanup()
+  window.localStorage.clear()
   vi.restoreAllMocks()
   vi.unstubAllGlobals()
 })
@@ -97,6 +98,10 @@ describe('App', () => {
     expect(screen.getByText('16.7 ms')).toBeVisible()
     expect(screen.getByText('Uptime')).toBeVisible()
     expect(screen.getByText('Bases')).toBeVisible()
+    expect(screen.getByText('Server FPS').closest('[data-tooltip]')).toHaveAttribute(
+      'data-tooltip',
+      "The server's current frames per second, as reported by Palworld."
+    )
     expect(screen.getByRole('link', { name: 'Palworld Live Map on GitHub' })).toHaveAttribute(
       'href',
       'https://github.com/LukeHollandDev/palworld-live-map'
@@ -109,10 +114,11 @@ describe('App', () => {
     const explorer = screen.getByRole('complementary', { name: 'Map filters' })
     await user.click(within(explorer).getByRole('button', { name: 'View Luke · Lv 55' }))
     expect(await screen.findByRole('dialog')).toBeInTheDocument()
+    expect(screen.getByText('PLAYER DETAILS')).toBeVisible()
     const detailsTitle = screen.getByRole('heading', { name: 'Luke' })
     expect(detailsTitle).toBeInTheDocument()
     await waitFor(() => expect(detailsTitle).toHaveFocus())
-    expect(screen.getByText('X 10 · Y 20')).toBeInTheDocument()
+    expect(screen.getByText(/X 10\s+Y 20/)).toBeInTheDocument()
     expect(screen.getByText('No guild membership is known for this player.')).toBeVisible()
   })
 
@@ -424,6 +430,34 @@ describe('App', () => {
     await waitFor(() => expect(screen.getByRole('searchbox')).toHaveFocus())
   })
 
+  it('restores saved filter categories and the active map layer', async () => {
+    mockAPI((path) =>
+      path === '/api/config'
+        ? {
+            ...(responses[path] as Record<string, unknown>),
+            layers: [
+              { id: 'palpagos', name: 'Palpagos Islands', bounds: [100, 100, -100, -100] },
+              { id: 'world-tree', name: 'World Tree', bounds: [100, 100, -100, -100] }
+            ]
+          }
+        : responses[path]
+    )
+    const user = userEvent.setup()
+    const firstRender = render(<App />)
+    await screen.findByRole('heading', { name: 'Test Realm' })
+
+    const explorer = screen.getByRole('complementary', { name: 'Map filters' })
+    await user.click(within(explorer).getByRole('checkbox', { name: 'Show Players' }))
+    await user.click(within(explorer).getByRole('button', { name: 'World Tree' }))
+    firstRender.unmount()
+
+    render(<App />)
+    await screen.findByRole('heading', { name: 'Test Realm' })
+    const restoredExplorer = screen.getByRole('complementary', { name: 'Map filters' })
+    expect(within(restoredExplorer).getByRole('button', { name: 'World Tree' })).toHaveAttribute('aria-pressed', 'true')
+    expect(within(restoredExplorer).getByRole('checkbox', { name: 'Show Players' })).not.toBeChecked()
+  })
+
   it('finds online players by guild name in the explorer and on the map', async () => {
     mockAPI((path) => {
       if (path !== '/api/players') return responses[path]
@@ -613,12 +647,12 @@ describe('App', () => {
     render(<App />)
     await screen.findByRole('heading', { name: 'Test Realm' })
     await user.click(screen.getByRole('button', { name: 'View Luke · Lv 55' }))
-    expect(screen.getByText('X 10 · Y 20')).toBeInTheDocument()
+    expect(screen.getByText(/X 10\s+Y 20/)).toBeInTheDocument()
 
     const pollsBeforeMove = playerPolls
     moved = true
     await waitFor(() => expect(playerPolls).toBeGreaterThan(pollsBeforeMove))
-    expect(await screen.findByText('X 80 · Y 70')).toBeInTheDocument()
+    expect(await screen.findByText(/X 80\s+Y 70/)).toBeInTheDocument()
   })
 
   it('keeps a hidden player hidden after their coordinates change', async () => {

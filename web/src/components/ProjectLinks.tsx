@@ -5,7 +5,7 @@ interface ProjectLinksProps {
 export function ProjectLinks({ hidden }: ProjectLinksProps) {
   return (
     <nav
-      className={`absolute right-[172px] bottom-[18px] z-[18] flex h-11 items-center overflow-hidden border border-[#d3eff2]/45 bg-[#070f14]/85 shadow-[0_9px_22px_rgb(0_0_0/28%)] backdrop-blur-sm transition-[opacity,transform] max-sm:right-3.5 max-sm:bottom-[68px] ${
+      className={`absolute right-[354px] bottom-[18px] z-[18] flex h-11 items-center overflow-hidden border border-[#d3eff2]/45 bg-[#070f14]/85 shadow-[0_9px_22px_rgb(0_0_0/28%)] backdrop-blur-sm transition-[opacity,transform] max-sm:right-3.5 max-sm:bottom-[68px] ${
         hidden ? 'pointer-events-none translate-y-2 opacity-0' : ''
       }`}
       aria-label="Project links"

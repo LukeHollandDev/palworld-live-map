@@ -71,7 +71,7 @@ export function DetailsDialog({
   const guild = detail.kind === 'guild' ? buildGuildDetails(detail.guildId, items) : undefined
   if (detail.kind === 'item' && !item) return null
   const title = item?.name || guild?.name || 'Unnamed guild'
-  const eyebrow = item ? `${kindLabel(item.kind)} DETAILS` : 'GUILD DETAILS'
+  const eyebrow = (item ? `${kindLabel(item.kind)} DETAILS` : 'GUILD DETAILS').toUpperCase()
 
   const close = () => {
     onClose()
@@ -80,7 +80,7 @@ export function DetailsDialog({
 
   return (
     <aside
-      className="absolute top-4 right-4 bottom-4 z-[24] flex w-[370px] flex-col overflow-hidden border border-[#cbe9ee]/30 bg-[#091115]/96 text-[#e5f0f2] shadow-[-10px_12px_30px_rgb(0_0_0/30%)] backdrop-blur-sm [animation:inspector-in_220ms_cubic-bezier(0.22,1,0.36,1)_both] max-sm:top-auto max-sm:right-0 max-sm:bottom-0 max-sm:left-0 max-sm:max-h-[49dvh] max-sm:w-auto max-sm:border-x-0 max-sm:border-b-0 max-sm:[animation-name:inspector-up]"
+      className="surface-enter-motion absolute top-4 right-4 bottom-4 z-[24] flex w-[370px] flex-col overflow-hidden border border-[#cbe9ee]/30 bg-[#091115]/96 text-[#e5f0f2] shadow-[-10px_12px_30px_rgb(0_0_0/30%)] backdrop-blur-sm max-sm:top-auto max-sm:right-0 max-sm:bottom-0 max-sm:left-0 max-sm:max-h-[49dvh] max-sm:w-auto max-sm:border-x-0 max-sm:border-b-0"
       role="dialog"
       aria-modal="false"
       aria-labelledby="details-title"
@@ -222,7 +222,7 @@ function levelLabel(item: MapItem) {
 }
 
 function coordinates(item: MapItem) {
-  return `X ${Math.round(item.x)} · Y ${Math.round(item.y)}`
+  return `X ${Math.round(item.x)}\u00a0\u00a0Y ${Math.round(item.y)}`
 }
 
 function baseLabel(base: MapItem, guildBases: MapItem[]) {

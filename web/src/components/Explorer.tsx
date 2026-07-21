@@ -230,7 +230,7 @@ export function Explorer(props: ExplorerProps) {
       <button
         ref={reopenRef}
         type="button"
-        className={`filter-trigger-motion absolute top-4 left-4 z-30 grid h-11 w-[124px] cursor-pointer grid-cols-[16px_auto] items-center justify-center gap-2 border border-[#cceaef]/40 bg-[#081115]/95 px-3 text-xs leading-none text-[#dceef0] shadow-[0_8px_22px_rgb(0_0_0/24%)] hover:border-[#64d7e7] hover:bg-[#17343d] max-sm:top-3 max-sm:left-3 ${
+        className={`filter-trigger-motion absolute top-4 left-4 z-30 grid h-11 w-[124px] cursor-pointer grid-cols-[16px_auto] items-center justify-center gap-2 border border-[#cceaef]/40 bg-[#081115]/95 px-3 text-xs leading-none text-[#dceef0] shadow-[0_8px_22px_rgb(0_0_0/24%)] hover:border-[#64d7e7] hover:bg-[#17343d] max-sm:top-3 max-sm:left-3 max-sm:w-24 max-sm:px-2 ${
           props.open ? 'is-panel-open pointer-events-none' : 'is-panel-closed'
         }`}
         aria-label="Open map filters"
@@ -253,21 +253,22 @@ export function Explorer(props: ExplorerProps) {
         >
           <path d="m7 4 6 6-6 6" />
         </svg>
-        <span>Map filter</span>
+        <span className="max-sm:hidden">Map filter</span>
+        <span className="sm:hidden">Filters</span>
       </button>
       <aside
         id="map-filter-panel"
-        className={`absolute inset-y-4 left-4 z-[24] flex w-[350px] min-h-0 shrink-0 flex-col max-sm:inset-y-3 max-sm:left-3 max-sm:z-[34] max-sm:w-[min(350px,calc(100vw-24px))] ${props.open ? '' : 'pointer-events-none'}`}
+        className={`filter-panel-motion absolute inset-y-4 left-4 z-[24] flex w-[350px] min-h-0 shrink-0 flex-col max-sm:top-auto max-sm:right-3 max-sm:bottom-3 max-sm:left-3 max-sm:z-[34] max-sm:h-[min(52dvh,480px)] max-sm:w-auto ${props.open ? 'is-panel-open' : 'is-panel-closed pointer-events-none'}`}
         aria-label="Map filters"
         aria-hidden={!props.open}
         inert={!props.open}
       >
         <div
-          className={`filter-panel-header-motion relative z-[1] flex min-h-[70px] shrink-0 items-center justify-between border border-[#c4e4e9]/25 bg-[linear-gradient(90deg,#24b8dd_0_4px,rgb(25_40_47/95%)_4px_100%)] pr-3.5 pl-[18px] ${props.open ? 'is-panel-open' : 'is-panel-closed'}`}
+          className={`filter-panel-header-motion relative z-[1] flex min-h-[70px] shrink-0 items-center justify-between border border-[#c4e4e9]/25 bg-[linear-gradient(90deg,#24b8dd_0_4px,rgb(25_40_47/95%)_4px_100%)] pr-3.5 pl-[18px] max-sm:min-h-14 ${props.open ? 'is-panel-open' : 'is-panel-closed'}`}
         >
           <div>
             <span className="mb-[3px] block text-[10px] font-semibold tracking-[.14em] text-[#79bfca]">MAP FILTER</span>
-            <strong className="text-[21px] font-normal tracking-[.035em]">Map</strong>
+            <strong className="text-[21px] font-normal tracking-[.035em] max-sm:text-lg">Map</strong>
           </div>
           <button
             ref={closeRef}
