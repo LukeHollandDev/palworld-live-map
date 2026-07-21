@@ -12,12 +12,15 @@ export interface View extends Point {
   scale: number
 }
 
-export function sceneSize(pixelRatio = window.devicePixelRatio || 1): number {
-  return MAP_PIXEL_SIZE / Math.max(1, pixelRatio)
+export interface SceneBounds {
+  left: number
+  right: number
+  top: number
+  bottom: number
 }
 
-export function itemKey(item: MapItem): string {
-  return JSON.stringify([item.kind, item.map, item.name, item.detail ?? '', item.x, item.y])
+export function sceneSize(pixelRatio = window.devicePixelRatio || 1): number {
+  return MAP_PIXEL_SIZE / Math.max(1, pixelRatio)
 }
 
 export function toScene(item: Pick<MapItem, 'x' | 'y'>, layer: MapLayer, size: number): Point | null {
@@ -37,17 +40,8 @@ export function toWorld(point: Point, layer: MapLayer, size: number): Point {
   }
 }
 
-export function fitScale(width: number, height: number, size: number): number {
-  return Math.max(0.01, Math.min(width / size, height / size))
-}
-
 export function coverScale(width: number, height: number, size: number): number {
   return Math.max(0.01, Math.max(width / size, height / size))
-}
-
-export function fitView(width: number, height: number, size: number): View {
-  const scale = fitScale(width, height, size)
-  return { scale, x: (width - size * scale) / 2, y: (height - size * scale) / 2 }
 }
 
 export function coverView(width: number, height: number, size: number): View {
@@ -62,6 +56,19 @@ export function clampView(view: View, width: number, height: number, size: numbe
     x: scaledSize <= width ? (width - scaledSize) / 2 : Math.min(0, Math.max(width - scaledSize, view.x)),
     y: scaledSize <= height ? (height - scaledSize) / 2 : Math.min(0, Math.max(height - scaledSize, view.y))
   }
+}
+
+export function sceneViewportBounds(view: View, width: number, height: number, overscan = 80): SceneBounds {
+  return {
+    left: (-view.x - overscan) / view.scale,
+    right: (width - view.x + overscan) / view.scale,
+    top: (-view.y - overscan) / view.scale,
+    bottom: (height - view.y + overscan) / view.scale
+  }
+}
+
+export function isScenePointVisible(point: Point, bounds: SceneBounds): boolean {
+  return point.x >= bounds.left && point.x <= bounds.right && point.y >= bounds.top && point.y <= bounds.bottom
 }
 
 export function formatUptime(seconds: number): string {

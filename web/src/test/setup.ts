@@ -7,12 +7,3 @@ class ResizeObserverStub implements ResizeObserver {
 }
 
 globalThis.ResizeObserver = ResizeObserverStub
-
-HTMLDialogElement.prototype.showModal = function showModal() {
-  this.open = true
-}
-
-HTMLDialogElement.prototype.close = function close() {
-  this.open = false
-  this.dispatchEvent(new Event('close'))
-}

@@ -1,8 +1,12 @@
 .DS_Store
-.env
+.env*
+!.env.example
+.local/
 bin/
-coverage.out
+obj/
 build/
 node_modules/
-web/coverage/
+coverage/
+coverage.out
+*.coverprofile
 web/dist/

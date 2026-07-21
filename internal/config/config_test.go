@@ -78,3 +78,17 @@ func TestLoadRejectsInvalidConfiguration(t *testing.T) {
 		})
 	}
 }
+
+func TestLoadDoesNotValidateUnusedWorldTimingWhenWorldDataIsDisabled(t *testing.T) {
+	validEnvironment(t)
+	t.Setenv("WORLD_DATA_ENABLED", "false")
+	t.Setenv("WORLD_POLL_INTERVAL", "1s")
+	t.Setenv("WORLD_TIMEOUT", "20s")
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+	if cfg.WorldDataEnabled {
+		t.Fatal("WorldDataEnabled = true")
+	}
+}

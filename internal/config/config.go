@@ -77,11 +77,13 @@ func Load() (Config, error) {
 	if cfg.UpstreamTimeout <= 0 || cfg.UpstreamTimeout >= cfg.PollInterval {
 		return Config{}, errors.New("UPSTREAM_TIMEOUT must be positive and shorter than POLL_INTERVAL")
 	}
-	if cfg.WorldPollInterval < 5*time.Second {
-		return Config{}, errors.New("WORLD_POLL_INTERVAL must be at least 5s")
-	}
-	if cfg.WorldTimeout <= 0 || cfg.WorldTimeout >= cfg.WorldPollInterval {
-		return Config{}, errors.New("WORLD_TIMEOUT must be positive and shorter than WORLD_POLL_INTERVAL")
+	if cfg.WorldDataEnabled {
+		if cfg.WorldPollInterval < 5*time.Second {
+			return Config{}, errors.New("WORLD_POLL_INTERVAL must be at least 5s")
+		}
+		if cfg.WorldTimeout <= 0 || cfg.WorldTimeout >= cfg.WorldPollInterval {
+			return Config{}, errors.New("WORLD_TIMEOUT must be positive and shorter than WORLD_POLL_INTERVAL")
+		}
 	}
 	return cfg, nil
 }

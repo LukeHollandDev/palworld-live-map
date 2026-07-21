@@ -22,6 +22,8 @@ Before starting, install or provide:
 
 You do not need to install .NET or C# tooling. Docker builds and runs the exporter for you.
 
+When changing the exporter itself, run `make exporter-check` from the repository root. CI performs the same compile before the production container can be published.
+
 ## Quick Start on macOS with CrossOver
 
 The script knows the default Palworld location in a CrossOver Steam bottle. From the repository root, run:

@@ -17,12 +17,39 @@ type Snapshot struct {
 	Players            []Player      `json:"players"`
 	Metrics            ServerMetrics `json:"metrics"`
 	MetricsAvailable   bool          `json:"metricsAvailable"`
+	MetricsStale       bool          `json:"metricsStale"`
 	MetricsUpdatedAt   time.Time     `json:"metricsUpdatedAt,omitzero"`
 	ObjectsAvailable   bool          `json:"objectsAvailable"`
 	ObjectsStale       bool          `json:"objectsStale"`
 	ObjectsUnsupported bool          `json:"objectsUnsupported"`
+	ObjectsTruncated   bool          `json:"objectsTruncated"`
+	ObjectsTotal       int           `json:"objectsTotal"`
+	ObjectsLastError   string        `json:"objectsLastError,omitempty"`
 	ObjectsUpdatedAt   time.Time     `json:"objectsUpdatedAt,omitzero"`
 	Objects            []WorldObject `json:"objects"`
+}
+
+type PlayerSnapshot struct {
+	Server           ServerInfo    `json:"server"`
+	Connected        bool          `json:"connected"`
+	Stale            bool          `json:"stale"`
+	LastSuccessAt    time.Time     `json:"lastSuccessAt,omitzero"`
+	Players          []Player      `json:"players"`
+	Metrics          ServerMetrics `json:"metrics"`
+	MetricsAvailable bool          `json:"metricsAvailable"`
+	MetricsStale     bool          `json:"metricsStale"`
+	MetricsUpdatedAt time.Time     `json:"metricsUpdatedAt,omitzero"`
+}
+
+type ObjectSnapshot struct {
+	Available   bool          `json:"available"`
+	Stale       bool          `json:"stale"`
+	Unsupported bool          `json:"unsupported"`
+	Truncated   bool          `json:"truncated"`
+	Total       int           `json:"total"`
+	LastError   string        `json:"lastError,omitempty"`
+	UpdatedAt   time.Time     `json:"updatedAt,omitzero"`
+	Objects     []WorldObject `json:"objects"`
 }
 
 type Source interface {
@@ -78,57 +105,31 @@ func (p *Poller) Run(ctx context.Context) {
 }
 
 func (p *Poller) runInfo(ctx context.Context) {
-	p.refreshInfo(ctx)
-	ticker := time.NewTicker(time.Minute)
-	defer ticker.Stop()
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case <-ticker.C:
-			p.refreshInfo(ctx)
-		}
-	}
+	runEvery(ctx, time.Minute, p.refreshInfo)
 }
 
 func (p *Poller) runPlayers(ctx context.Context) {
-	p.refreshPlayers(ctx)
-	ticker := time.NewTicker(p.playerEvery)
-	defer ticker.Stop()
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case <-ticker.C:
-			p.refreshPlayers(ctx)
-		}
-	}
+	runEvery(ctx, p.playerEvery, p.refreshPlayers)
 }
 
 func (p *Poller) runMetrics(ctx context.Context) {
-	p.refreshMetrics(ctx)
-	ticker := time.NewTicker(p.playerEvery)
-	defer ticker.Stop()
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case <-ticker.C:
-			p.refreshMetrics(ctx)
-		}
-	}
+	runEvery(ctx, p.playerEvery, p.refreshMetrics)
 }
 
 func (p *Poller) runWorld(ctx context.Context) {
-	p.refreshWorld(ctx)
-	ticker := time.NewTicker(p.worldEvery)
+	runEvery(ctx, p.worldEvery, p.refreshWorld)
+}
+
+func runEvery(ctx context.Context, interval time.Duration, refresh func(context.Context)) {
+	refresh(ctx)
+	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 	for {
 		select {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			p.refreshWorld(ctx)
+			refresh(ctx)
 		}
 	}
 }
@@ -137,9 +138,34 @@ func (p *Poller) Snapshot() Snapshot {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
 	result := p.snapshot
-	result.Players = append([]Player(nil), p.snapshot.Players...)
-	result.Objects = append([]WorldObject(nil), p.snapshot.Objects...)
+	result.Players = clonePlayers(p.snapshot.Players)
+	result.Objects = cloneWorldObjects(p.snapshot.Objects)
 	return result
+}
+
+// PlayerSnapshot avoids copying the potentially large world-object slice for
+// the frequently-polled player endpoint.
+func (p *Poller) PlayerSnapshot() PlayerSnapshot {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+	return PlayerSnapshot{
+		Server: p.snapshot.Server, Connected: p.snapshot.Connected, Stale: p.snapshot.Stale,
+		LastSuccessAt: p.snapshot.LastSuccessAt, Players: clonePlayers(p.snapshot.Players),
+		Metrics: p.snapshot.Metrics, MetricsAvailable: p.snapshot.MetricsAvailable,
+		MetricsStale: p.snapshot.MetricsStale, MetricsUpdatedAt: p.snapshot.MetricsUpdatedAt,
+	}
+}
+
+// ObjectSnapshot avoids copying player state for the slower world-data endpoint.
+func (p *Poller) ObjectSnapshot() ObjectSnapshot {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+	return ObjectSnapshot{
+		Available: p.snapshot.ObjectsAvailable, Stale: p.snapshot.ObjectsStale,
+		Unsupported: p.snapshot.ObjectsUnsupported, Truncated: p.snapshot.ObjectsTruncated,
+		Total: p.snapshot.ObjectsTotal, LastError: p.snapshot.ObjectsLastError,
+		UpdatedAt: p.snapshot.ObjectsUpdatedAt, Objects: cloneWorldObjects(p.snapshot.Objects),
+	}
 }
 
 func (p *Poller) refreshInfo(ctx context.Context) {
@@ -167,19 +193,23 @@ func (p *Poller) refreshPlayers(ctx context.Context) {
 	p.snapshot.Connected = true
 	p.snapshot.Stale = false
 	p.snapshot.LastSuccessAt = time.Now().UTC()
-	p.snapshot.Players = append([]Player(nil), players...)
+	p.snapshot.Players = clonePlayers(players)
 	p.mu.Unlock()
 }
 
 func (p *Poller) refreshMetrics(ctx context.Context) {
 	metrics, err := p.source.Metrics(ctx)
 	if err != nil {
+		p.mu.Lock()
+		p.snapshot.MetricsStale = p.snapshot.MetricsAvailable
+		p.mu.Unlock()
 		p.logger.Warn("Palworld server-metrics refresh failed", "error", err)
 		return
 	}
 	p.mu.Lock()
 	p.snapshot.Metrics = metrics
 	p.snapshot.MetricsAvailable = true
+	p.snapshot.MetricsStale = false
 	p.snapshot.MetricsUpdatedAt = time.Now().UTC()
 	p.mu.Unlock()
 }
@@ -187,13 +217,36 @@ func (p *Poller) refreshMetrics(ctx context.Context) {
 func (p *Poller) refreshWorld(ctx context.Context) {
 	objects, err := p.source.WorldObjects(ctx)
 	if err != nil {
+		var limitError *WorldObjectLimitError
+		if errors.As(err, &limitError) && len(objects) > 0 {
+			p.unsupportedLog = false
+			p.mu.Lock()
+			p.snapshot.ObjectsAvailable = true
+			p.snapshot.ObjectsStale = false
+			p.snapshot.ObjectsUnsupported = false
+			p.snapshot.ObjectsTruncated = true
+			p.snapshot.ObjectsTotal = limitError.Total
+			p.snapshot.ObjectsLastError = "object-limit"
+			p.snapshot.ObjectsUpdatedAt = time.Now().UTC()
+			p.snapshot.Objects = cloneWorldObjects(objects)
+			p.mu.Unlock()
+			p.logger.Warn("Palworld world-object result was truncated", "objects", limitError.Total, "limit", limitError.Limit)
+			return
+		}
 		var statusError *HTTPStatusError
 		unsupported := errors.As(err, &statusError) && statusError.Status == http.StatusNotFound
+		lastError := "refresh-failed"
+		var sizeError *ResponseSizeError
+		if errors.As(err, &sizeError) {
+			lastError = "response-too-large"
+		}
 		p.mu.Lock()
 		p.snapshot.ObjectsStale = p.snapshot.ObjectsAvailable
-		if unsupported && !p.snapshot.ObjectsAvailable {
-			p.snapshot.ObjectsUnsupported = true
+		p.snapshot.ObjectsUnsupported = unsupported
+		if unsupported {
+			lastError = "unsupported"
 		}
+		p.snapshot.ObjectsLastError = lastError
 		p.mu.Unlock()
 		if unsupported {
 			if !p.unsupportedLog {
@@ -210,7 +263,22 @@ func (p *Poller) refreshWorld(ctx context.Context) {
 	p.snapshot.ObjectsAvailable = true
 	p.snapshot.ObjectsStale = false
 	p.snapshot.ObjectsUnsupported = false
+	p.snapshot.ObjectsTruncated = false
+	p.snapshot.ObjectsTotal = len(objects)
+	p.snapshot.ObjectsLastError = ""
 	p.snapshot.ObjectsUpdatedAt = time.Now().UTC()
-	p.snapshot.Objects = append([]WorldObject(nil), objects...)
+	p.snapshot.Objects = cloneWorldObjects(objects)
 	p.mu.Unlock()
+}
+
+func clonePlayers(players []Player) []Player {
+	result := make([]Player, len(players))
+	copy(result, players)
+	return result
+}
+
+func cloneWorldObjects(objects []WorldObject) []WorldObject {
+	result := make([]WorldObject, len(objects))
+	copy(result, objects)
+	return result
 }

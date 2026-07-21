@@ -1,31 +1,47 @@
-.PHONY: ci build check test web-install web-build web-check image run demo maps
+override PROJECT_ROOT := $(abspath $(dir $(lastword $(MAKEFILE_LIST))))
+WEB_NPM := npm --prefix "$(PROJECT_ROOT)/web"
+BINARY := $(PROJECT_ROOT)/bin/palworld-live-map
 
-ci: check build image
+.PHONY: ci build check test web-install web-lint web-typecheck web-test web-assets web-build web-check exporter-check image run demo maps clean distclean
+
+ci: check exporter-check
 
 build: web-build
-	go build -o bin/palworld-live-map ./cmd/palworld-live-map
+	mkdir -p "$(dir $(BINARY))"
+	go build -o "$(BINARY)" ./cmd/palworld-live-map
 
-check: web-check
+check: web-check web-assets
 	test -z "$$(gofmt -l .)"
 	go vet ./...
 	go test -race ./...
 
-test: web-build
+test: web-test web-assets
 	go test ./...
 
 web-install:
-	npm --prefix web ci
+	$(WEB_NPM) ci
 
-web-build: web-install
-	npm --prefix web run build
+web-lint: web-install
+	$(WEB_NPM) run lint
 
-web-check: web-install
-	npm --prefix web run check
-	npm --prefix web test
-	npm --prefix web run build
+web-typecheck: web-install
+	$(WEB_NPM) run typecheck
+
+web-test: web-install
+	$(WEB_NPM) test
+
+web-assets: web-install
+	$(WEB_NPM) run build:assets
+
+web-build: web-typecheck web-assets
+
+web-check: web-lint web-typecheck web-test
+
+exporter-check:
+	docker build -t palworld-live-map/map-exporter:check "$(PROJECT_ROOT)/tools/map-exporter"
 
 image:
-	docker build -t palworld-live-map:dev .
+	docker build -t palworld-live-map:dev "$(PROJECT_ROOT)"
 
 run: web-build
 	set -a; . ./.env; set +a; go run ./cmd/palworld-live-map
@@ -34,4 +50,13 @@ demo: web-build
 	DEMO_MODE=true go run ./cmd/palworld-live-map
 
 maps:
-	./tools/map-exporter/export.sh
+	"$(PROJECT_ROOT)/tools/map-exporter/export.sh"
+
+clean:
+	@test -n "$(PROJECT_ROOT)"
+	@test "$(PROJECT_ROOT)" != "/"
+	@test -f "$(PROJECT_ROOT)/go.mod"
+	rm -rf -- "$(PROJECT_ROOT)/bin" "$(PROJECT_ROOT)/coverage.out" "$(PROJECT_ROOT)/web/coverage" "$(PROJECT_ROOT)/web/dist" "$(PROJECT_ROOT)/tools/map-exporter/bin" "$(PROJECT_ROOT)/tools/map-exporter/obj"
+
+distclean: clean
+	rm -rf -- "$(PROJECT_ROOT)/build" "$(PROJECT_ROOT)/web/node_modules"

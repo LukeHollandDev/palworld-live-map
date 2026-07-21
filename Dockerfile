@@ -2,14 +2,15 @@ ARG GO_VERSION=1.26.5
 ARG NODE_VERSION=24
 
 # Compile the React application into static assets for the Go embed package.
-FROM node:${NODE_VERSION}-alpine AS web
+FROM --platform=$BUILDPLATFORM node:${NODE_VERSION}-alpine AS web
 
 WORKDIR /src/web
 
 COPY web/package.json web/package-lock.json ./
 RUN npm ci
 
-COPY web/ ./
+COPY web/index.html web/tsconfig.json web/vite.config.ts ./
+COPY web/src ./src
 RUN npm run build
 
 # Build a static binary for the requested target platform.
@@ -24,7 +25,11 @@ WORKDIR /src
 COPY go.mod ./
 RUN go mod download
 
-COPY . .
+COPY assets/embed.go ./assets/
+COPY assets/map/manifest.json assets/map/*.jpg ./assets/map/
+COPY cmd ./cmd
+COPY internal ./internal
+COPY web/embed.go ./web/
 COPY --from=web /src/web/dist ./web/dist
 RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH \
     go build -trimpath -ldflags="-s -w" -o /out/palworld-live-map ./cmd/palworld-live-map

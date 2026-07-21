@@ -6,7 +6,7 @@ Thanks for helping improve Palworld Live Map. Keep changes focused, easy to revi
 
 1. Create a branch from `main`.
 2. Make one cohesive change per pull request.
-3. Run `make check`; run `make image` too when changing the container build.
+3. Run `make check`; run `make image` when changing the production container and `make exporter-check` when changing the map exporter.
 4. Update documentation, examples, and tests with behavior or configuration changes.
 5. Open a pull request that explains the problem, the chosen approach, and how it was verified. Include screenshots for visible UI changes.
 
@@ -39,6 +39,6 @@ A pull request should:
 - describe user-visible and operational impact;
 - call out security, privacy, compatibility, or deployment considerations;
 - include or update tests for changed behavior; and
-- pass formatting, vet, tests, and the container build in CI.
+- pass frontend and Go checks, the map-exporter compile, and the gated container build in CI.
 
 Reviewers may ask for a PR to be split when it mixes unrelated concerns. Draft pull requests are welcome for early design or compatibility feedback.

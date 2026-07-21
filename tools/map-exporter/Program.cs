@@ -1,3 +1,4 @@
+using System.Reflection;
 using System.Security.Cryptography;
 using System.Text.Json;
 using CUE4Parse.FileProvider;
@@ -82,11 +83,12 @@ var pakManifest = pakFiles
     .OrderBy(Path.GetFileName, StringComparer.Ordinal)
     .Select(path => new SourceFile(Path.GetFileName(path), new FileInfo(path).Length, HashFile(path)))
     .ToArray();
+var cue4ParseVersion = GetAssemblyMetadata("CUE4ParseVersion");
 var manifest = new MapManifest(
     1,
     options.GameVersion,
     $"palworld-map-exporter/{GeneratorVersion}",
-    "CUE4Parse/1.2.2.202607",
+    $"CUE4Parse/{cue4ParseVersion}",
     new SourceFile(Path.GetFileName(options.MappingsFile), new FileInfo(options.MappingsFile).Length, HashFile(options.MappingsFile)),
     pakManifest,
     exported);
@@ -137,6 +139,17 @@ static string HashFile(string path)
 {
     using var stream = File.OpenRead(path);
     return Convert.ToHexString(SHA256.HashData(stream)).ToLowerInvariant();
+}
+
+static string GetAssemblyMetadata(string key)
+{
+    var value = Assembly.GetExecutingAssembly()
+        .GetCustomAttributes<AssemblyMetadataAttribute>()
+        .SingleOrDefault(attribute => attribute.Key == key)
+        ?.Value;
+    return string.IsNullOrWhiteSpace(value)
+        ? throw new InvalidOperationException($"Missing assembly metadata: {key}")
+        : value;
 }
 
 static string ResolveObjectPath(DefaultFileProvider provider, string documentedObjectPath)

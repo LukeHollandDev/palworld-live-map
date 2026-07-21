@@ -6,9 +6,12 @@ import (
 	"flag"
 	"fmt"
 	"log/slog"
+	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -93,7 +96,11 @@ func main() {
 func checkHealth() error {
 	endpoint := os.Getenv("HEALTHCHECK_URL")
 	if endpoint == "" {
-		endpoint = "http://127.0.0.1:8080/-/health"
+		var err error
+		endpoint, err = healthcheckEndpoint(os.Getenv("ADDR"))
+		if err != nil {
+			return err
+		}
 	}
 	client := &http.Client{Timeout: 2 * time.Second}
 	resp, err := client.Get(endpoint)
@@ -105,4 +112,19 @@ func checkHealth() error {
 		return fmt.Errorf("healthcheck returned %s", resp.Status)
 	}
 	return nil
+}
+
+func healthcheckEndpoint(addr string) (string, error) {
+	addr = strings.TrimSpace(addr)
+	if addr == "" {
+		addr = ":8080"
+	}
+	host, port, err := net.SplitHostPort(addr)
+	if err != nil || port == "" {
+		return "", fmt.Errorf("derive healthcheck URL from ADDR %q: expected host:port", addr)
+	}
+	if host == "" || host == "0.0.0.0" || host == "::" {
+		host = "127.0.0.1"
+	}
+	return (&url.URL{Scheme: "http", Host: net.JoinHostPort(host, port), Path: "/-/health"}).String(), nil
 }

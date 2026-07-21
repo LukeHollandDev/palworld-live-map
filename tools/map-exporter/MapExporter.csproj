@@ -4,10 +4,12 @@
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <Cue4ParseVersion>1.2.2.202607</Cue4ParseVersion>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="CUE4Parse" Version="1.2.2.202607" />
-    <PackageReference Include="CUE4Parse-Conversion" Version="1.2.2.202607" />
+    <AssemblyMetadata Include="CUE4ParseVersion" Value="$(Cue4ParseVersion)" />
+    <PackageReference Include="CUE4Parse" Version="$(Cue4ParseVersion)" />
+    <PackageReference Include="CUE4Parse-Conversion" Version="$(Cue4ParseVersion)" />
     <PackageReference Include="Microsoft.Bcl.Memory" Version="10.0.10" />
     <PackageReference Include="SixLabors.ImageSharp" Version="3.1.12" />
     <PackageReference Include="SkiaSharp.NativeAssets.Linux.NoDependencies" Version="2.88.9" />

@@ -8,7 +8,6 @@ export interface MapLayer {
 }
 
 export interface PublicConfig {
-  demoMode: boolean
   pollIntervalMs: number
   worldPollIntervalMs: number
   worldDataEnabled: boolean
@@ -25,7 +24,6 @@ export interface ServerMetrics {
   currentPlayers: number
   maxPlayers: number
   serverFps: number
-  averageFps: number
   serverFrameTime: number
   uptimeSeconds: number
   baseCount: number
@@ -33,19 +31,24 @@ export interface ServerMetrics {
 }
 
 export interface Player {
+  id: string
   name: string
   level: number
+  guildKey?: string
+  guildName?: string
   x: number
   y: number
   map: string
 }
 
 export interface WorldObject {
+  id: string
   kind: Exclude<ItemKind, 'players'>
   name: string
   detail?: string
   baseId?: string
   guildKey?: string
+  ownerId?: string
   level?: number
   x: number
   y: number
@@ -53,11 +56,14 @@ export interface WorldObject {
 }
 
 export interface MapItem {
+  id: string
   kind: ItemKind
   name: string
   detail?: string
   baseId?: string
   guildKey?: string
+  guildName?: string
+  ownerId?: string
   level?: number
   x: number
   y: number
@@ -68,6 +74,7 @@ export interface PlayerState {
   server: ServerInfo
   metrics: ServerMetrics
   metricsAvailable: boolean
+  metricsStale: boolean
   metricsUpdatedAt?: string
   connected: boolean
   stale: boolean
@@ -80,7 +87,10 @@ export interface ObjectState {
   available: boolean
   stale: boolean
   unsupported: boolean
+  truncated: boolean
+  total: number
   updatedAt?: string
+  lastError?: string
   objects: WorldObject[]
 }
 
@@ -91,5 +101,7 @@ export const EMPTY_OBJECT_STATE: ObjectState = {
   available: false,
   stale: false,
   unsupported: false,
+  truncated: false,
+  total: 0,
   objects: []
 }
