@@ -16,7 +16,7 @@
     <PackageReference Include="CUE4Parse-Conversion" Version="$(Cue4ParseVersion)" />
     <PackageReference Include="Microsoft.Bcl.Memory" Version="10.0.10" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
-    <PackageReference Include="SixLabors.ImageSharp" Version="3.1.12" />
+    <PackageReference Include="SixLabors.ImageSharp" Version="4.0.0" />
     <PackageReference Include="SkiaSharp.NativeAssets.Linux.NoDependencies" Version="2.88.9" />
   </ItemGroup>
 </Project>
