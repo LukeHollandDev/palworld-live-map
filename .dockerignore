@@ -22,7 +22,6 @@ Dockerfile*
 compose.yml
 CONTRIBUTING.md
 DEVELOPMENT.md
-LICENSE
 Makefile
 README.md
 SECURITY.md

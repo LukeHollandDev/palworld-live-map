@@ -56,7 +56,16 @@ describe('map display helpers', () => {
   })
 
   it('stacks important markers above related and ambient markers', () => {
-    const ascendingKinds = ['wild-pals', 'npcs', 'workers', 'companions', 'bases', 'players'] as const
+    const ascendingKinds = [
+      'wild-pals',
+      'npcs',
+      'workers',
+      'companions',
+      'alpha-pals',
+      'bosses',
+      'bases',
+      'players'
+    ] as const
     const stack = ascendingKinds.map(markerStackOrder)
 
     expect(stack).toEqual([...stack].sort((left, right) => left - right))

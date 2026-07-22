@@ -1,8 +1,26 @@
-import { type ReactNode, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { type ReactNode, type RefObject, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { guildIdForBase } from '../lib/guilds'
-import { markerText } from '../lib/map'
-import type { ItemKind, MapItem, MapLayer } from '../types'
+import { itemSearchText, markerText } from '../lib/map'
+import type { ItemKind, MapItem, MapLayer, PlayerStatus } from '../types'
 import { MarkerGlyph } from './MarkerGlyph'
+
+// Funnel icon from Heroicons (MIT): https://heroicons.com/
+function FilterIcon() {
+  return (
+    <svg
+      className="size-6"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M12 3c2.755 0 5.455.232 8.083.678A1.112 1.112 0 0 1 21 4.774v1.044c0 .597-.237 1.169-.659 1.591l-5.432 5.432a2.25 2.25 0 0 0-.659 1.591v2.927c0 .853-.482 1.632-1.244 2.013L9.75 21v-6.568c0-.597-.237-1.169-.659-1.591L3.659 7.409A2.25 2.25 0 0 1 3 5.818V4.774c0-.54.384-1.006.917-1.096A48.5 48.5 0 0 1 12 3Z" />
+    </svg>
+  )
+}
 
 interface ExplorerProps {
   open: boolean
@@ -10,15 +28,17 @@ interface ExplorerProps {
   layers: MapLayer[]
   items: MapItem[]
   search: string
+  searchInputRef: RefObject<HTMLInputElement | null>
   enabledKinds: Set<ItemKind>
+  enabledPlayerStatuses: Set<PlayerStatus>
   hiddenIds: Set<string>
-  expandedPlayers: Set<string>
   expandedGuilds: Set<string>
   expandedBases: Set<string>
   objectNotice: string | null
+  onSearchChange: (value: string) => void
   onToggleKinds: (kinds: ItemKind[], visible: boolean) => void
+  onTogglePlayerStatus: (status: PlayerStatus, visible: boolean) => void
   onToggleItems: (ids: string[], visible: boolean) => void
-  onTogglePlayer: (id: string) => void
   onToggleGuild: (id: string) => void
   onToggleBase: (id: string) => void
   onFocusItem: (item: MapItem, returnFocus: HTMLElement) => void
@@ -63,23 +83,43 @@ function Checkbox({
   )
 }
 
-type CategoryGroup = Exclude<ItemKind, 'workers' | 'companions'>
+type PlayerCategoryGroup = 'online-players' | 'offline-players'
+type CategoryGroup = PlayerCategoryGroup | Exclude<ItemKind, 'players' | 'workers'>
+type NonPlayerCategoryGroup = Exclude<CategoryGroup, PlayerCategoryGroup>
 
-const GROUP_KINDS: Record<CategoryGroup, ItemKind[]> = {
-  players: ['players', 'companions'],
+const GROUP_KINDS: Record<NonPlayerCategoryGroup, ItemKind[]> = {
   bases: ['bases', 'workers'],
+  companions: ['companions'],
   'wild-pals': ['wild-pals'],
+  'alpha-pals': ['alpha-pals'],
+  bosses: ['bosses'],
   npcs: ['npcs']
 }
 
+const DEFAULT_COLLAPSED_GROUPS: CategoryGroup[] = ['companions', 'wild-pals', 'alpha-pals', 'bosses', 'npcs']
+
 const INITIAL_CATEGORY_ITEMS = 250
 
-function visibilityState(items: MapItem[], enabledKinds: Set<ItemKind>, hiddenIds: Set<string>): CheckState {
-  const visible = items.filter((item) => enabledKinds.has(item.kind) && !hiddenIds.has(item.id)).length
+function playerStatusForGroup(group: CategoryGroup): PlayerStatus | undefined {
+  if (group === 'online-players') return 'online'
+  if (group === 'offline-players') return 'offline'
+  return undefined
+}
+
+function visibilityState(
+  items: MapItem[],
+  enabledKinds: Set<ItemKind>,
+  enabledPlayerStatuses: Set<PlayerStatus>,
+  hiddenIds: Set<string>
+): CheckState {
+  const enabled = (item: MapItem) =>
+    enabledKinds.has(item.kind) &&
+    (item.kind !== 'players' || enabledPlayerStatuses.has(item.online === false ? 'offline' : 'online'))
+  const visible = items.filter((item) => enabled(item) && !hiddenIds.has(item.id)).length
   return {
     checked: items.length > 0 && visible === items.length,
     indeterminate: visible > 0 && visible < items.length,
-    disabled: items.length === 0 || !items.some((item) => enabledKinds.has(item.kind))
+    disabled: items.length === 0 || !items.some(enabled)
   }
 }
 
@@ -97,12 +137,12 @@ function ItemButton({
   return (
     <button
       type="button"
-      className="grid min-h-7 w-full min-w-0 flex-1 cursor-pointer grid-cols-[20px_minmax(0,1fr)_auto] items-center gap-1.5 border border-transparent bg-transparent px-1.5 py-1 text-left text-xs text-[#e3edef] transition-colors hover:border-[#c5edf3]/35 hover:bg-[#216d82]/35 hover:text-white focus-visible:border-[#c5edf3]/35 focus-visible:bg-[#216d82]/35 focus-visible:text-white focus-visible:outline-none"
+      className="pal-interactive grid min-h-7 w-full min-w-0 flex-1 cursor-pointer grid-cols-[20px_minmax(0,1fr)_auto] items-center gap-1.5 border border-transparent bg-transparent px-1.5 py-1 text-left text-xs text-[#e3edef] focus-visible:outline-none"
       aria-label={`View ${markerText(item)}`}
       title={item.detail}
       onClick={(event) => onFocus(item, event.currentTarget)}
     >
-      <MarkerGlyph kind={item.kind} />
+      <MarkerGlyph kind={item.kind} online={item.online} />
       <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">{label || item.name}</span>
       {meta && <span className="ml-auto shrink-0 text-[11px] text-[#899398]">{meta}</span>}
     </button>
@@ -123,7 +163,7 @@ function GuildButton({
   return (
     <button
       type="button"
-      className="grid min-h-7 min-w-0 flex-1 cursor-pointer grid-cols-[20px_minmax(0,1fr)_auto] items-center gap-1.5 border border-transparent bg-transparent px-1.5 py-1 text-left text-xs text-[#e3edef] transition-colors hover:border-[#c5edf3]/35 hover:bg-[#216d82]/35 hover:text-white focus-visible:border-[#c5edf3]/35 focus-visible:bg-[#216d82]/35 focus-visible:text-white focus-visible:outline-none"
+      className="pal-interactive grid min-h-7 min-w-0 flex-1 cursor-pointer grid-cols-[20px_minmax(0,1fr)_auto] items-center gap-1.5 border border-transparent bg-transparent px-1.5 py-1 text-left text-xs text-[#e3edef] focus-visible:outline-none"
       aria-label={`View guild ${name}`}
       onClick={(event) => onFocus(guildId, event.currentTarget)}
     >
@@ -139,11 +179,12 @@ function ObjectRow({
   meta,
   label,
   enabledKinds,
+  enabledPlayerStatuses,
   hiddenIds,
   onToggleItems,
   onFocusItem,
   className = ''
-}: Pick<ExplorerProps, 'enabledKinds' | 'hiddenIds' | 'onToggleItems' | 'onFocusItem'> & {
+}: Pick<ExplorerProps, 'enabledKinds' | 'enabledPlayerStatuses' | 'hiddenIds' | 'onToggleItems' | 'onFocusItem'> & {
   item: MapItem
   meta?: string
   label?: string
@@ -153,7 +194,7 @@ function ObjectRow({
     <div className={`flex min-w-0 items-center gap-0.5 ${className}`}>
       <span className="grid size-8 shrink-0 place-items-center">
         <Checkbox
-          state={visibilityState([item], enabledKinds, hiddenIds)}
+          state={visibilityState([item], enabledKinds, enabledPlayerStatuses, hiddenIds)}
           label={`Show ${markerText(item)}`}
           onChange={(checked) => onToggleItems([item.id], checked)}
         />
@@ -167,18 +208,13 @@ export function Explorer(props: ExplorerProps) {
   const reopenRef = useRef<HTMLButtonElement>(null)
   const closeRef = useRef<HTMLButtonElement>(null)
   const wasOpen = useRef(props.open)
-  const [collapsedGroups, setCollapsedGroups] = useState<Set<CategoryGroup>>(() => new Set())
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<CategoryGroup>>(() => new Set(DEFAULT_COLLAPSED_GROUPS))
 
   useLayoutEffect(() => {
     if (wasOpen.current === props.open) return
     wasOpen.current = props.open
     ;(props.open ? closeRef.current : reopenRef.current)?.focus({ preventScroll: true })
   }, [props.open])
-
-  useEffect(() => {
-    if (!props.search.trim()) return
-    setCollapsedGroups((current) => (current.size === 0 ? current : new Set()))
-  }, [props.search])
 
   const toggleCategory = (group: CategoryGroup) => {
     setCollapsedGroups((current) => {
@@ -196,6 +232,8 @@ export function Explorer(props: ExplorerProps) {
       workers: [],
       companions: [],
       'wild-pals': [],
+      'alpha-pals': [],
+      bosses: [],
       npcs: []
     }
     const baseById = new Map<string, MapItem>()
@@ -218,23 +256,26 @@ export function Explorer(props: ExplorerProps) {
   }, [props.activeLayer.id, props.items])
 
   const query = props.search.trim().toLowerCase()
+  const searching = Boolean(query)
   const matches = (item: MapItem) => {
     if (!query) return true
     const baseName = item.kind === 'workers' && item.baseId ? index.baseById.get(item.baseId)?.name || '' : ''
-    return `${item.name} ${item.detail || ''} ${item.level || ''} ${item.guildName || ''} ${baseName}`
-      .toLowerCase()
-      .includes(query)
+    return itemSearchText(item, baseName).includes(query)
   }
+  const onlinePlayers = index.byKind.players.filter((player) => player.online !== false)
+  const offlinePlayers = index.byKind.players.filter((player) => player.online === false)
 
   return (
     <>
       <button
         ref={reopenRef}
         type="button"
-        className={`filter-trigger-motion absolute top-4 left-4 z-30 grid h-11 w-[124px] cursor-pointer grid-cols-[16px_auto] items-center justify-center gap-2 border border-[#cceaef]/40 bg-[#081115]/95 px-3 text-xs leading-none text-[#dceef0] shadow-[0_8px_22px_rgb(0_0_0/24%)] hover:border-[#64d7e7] hover:bg-[#17343d] max-sm:top-3 max-sm:left-3 max-sm:w-24 max-sm:px-2 ${
+        className={`pal-glass-control filter-trigger-motion absolute top-[78px] left-4 z-30 grid size-12 cursor-pointer place-items-center text-[#dceef0] max-sm:top-[88px] max-sm:left-3 max-sm:size-11 ${
           props.open ? 'is-panel-open pointer-events-none' : 'is-panel-closed'
         }`}
-        aria-label="Open map filters"
+        aria-label={
+          props.search.trim() ? `Open map filters, current search: ${props.search.trim()}` : 'Open map filters'
+        }
         aria-controls="map-filter-panel"
         aria-expanded="false"
         aria-hidden={props.open}
@@ -242,39 +283,32 @@ export function Explorer(props: ExplorerProps) {
         tabIndex={props.open ? -1 : 0}
         onClick={props.onOpen}
       >
-        <svg
-          className="block size-4"
-          viewBox="0 0 20 20"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="1.6"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          aria-hidden="true"
-        >
-          <path d="m7 4 6 6-6 6" />
-        </svg>
-        <span className="max-sm:hidden">Map filter</span>
-        <span className="sm:hidden">Filters</span>
+        <FilterIcon />
+        {props.search.trim() ? (
+          <span
+            className="absolute top-1.5 right-1.5 size-1.5 rounded-full bg-[#55d4e7] shadow-[0_0_5px_rgb(85_212_231/65%)]"
+            aria-hidden="true"
+          />
+        ) : null}
       </button>
       <aside
         id="map-filter-panel"
-        className={`filter-panel-motion absolute inset-y-4 left-4 z-[24] flex w-[350px] min-h-0 shrink-0 flex-col max-sm:top-auto max-sm:right-3 max-sm:bottom-3 max-sm:left-3 max-sm:z-[34] max-sm:h-[min(52dvh,480px)] max-sm:w-auto ${props.open ? 'is-panel-open' : 'is-panel-closed pointer-events-none'}`}
+        className={`filter-panel-motion absolute top-[78px] bottom-4 left-4 z-[24] flex w-[350px] min-h-0 shrink-0 flex-col max-sm:top-auto max-sm:right-3 max-sm:bottom-3 max-sm:left-3 max-sm:z-[34] max-sm:h-[min(52dvh,480px)] max-sm:w-auto ${props.open ? 'is-panel-open' : 'is-panel-closed pointer-events-none'}`}
         aria-label="Map filters"
         aria-hidden={!props.open}
         inert={!props.open}
       >
         <div
-          className={`filter-panel-header-motion relative z-[1] flex min-h-[70px] shrink-0 items-center justify-between border border-[#c4e4e9]/25 bg-[linear-gradient(90deg,#24b8dd_0_4px,rgb(25_40_47/95%)_4px_100%)] pr-3.5 pl-[18px] max-sm:min-h-14 ${props.open ? 'is-panel-open' : 'is-panel-closed'}`}
+          className={`pal-panel-header filter-panel-header-motion relative z-[1] flex min-h-[78px] shrink-0 items-center justify-between gap-3.5 border pr-3.5 pl-5 [--pal-panel-accent:#72d7e5] ${props.open ? 'is-panel-open' : 'is-panel-closed'}`}
         >
           <div>
-            <span className="mb-[3px] block text-[10px] font-semibold tracking-[.14em] text-[#79bfca]">MAP FILTER</span>
-            <strong className="text-[21px] font-normal tracking-[.035em] max-sm:text-lg">Map</strong>
+            <p className="m-0 mb-1 text-[10px] font-normal tracking-[.14em] text-[#b6f5fc]">MAP FILTER</p>
+            <h2 className="m-0 text-[22px] font-normal text-[#f3fbfc]">Map</h2>
           </div>
           <button
             ref={closeRef}
             type="button"
-            className="grid size-11 cursor-pointer place-items-center border-0 bg-transparent text-xl text-[#d7eef1] hover:bg-black/25 hover:text-white"
+            className="pal-interactive grid size-11 cursor-pointer place-items-center border-0 bg-transparent text-xl text-[#d7eef1]"
             aria-label="Collapse map filter"
             aria-controls="map-filter-panel"
             aria-expanded="true"
@@ -289,10 +323,64 @@ export function Explorer(props: ExplorerProps) {
           className={`filter-panel-body-motion relative flex min-h-0 flex-1 flex-col overflow-hidden ${props.open ? 'is-panel-open' : 'is-panel-closed'}`}
         >
           <div className="filter-panel-body-content relative z-[1] flex min-h-0 flex-1 flex-col overflow-hidden">
-            <fieldset
-              className="mx-3.5 mt-3 mb-2 flex border border-[#c6e5ea]/20 bg-[#040b0e]/35"
-              aria-label="World region"
+            <search
+              id="map-search-control"
+              aria-label="Map search"
+              className="pal-glass-inset relative mx-3.5 mt-3 flex h-11 shrink-0 items-center text-[#dceef0] transition-[border-color,box-shadow] focus-within:border-[#62d6e7] focus-within:shadow-[inset_0_-2px_#22c7e8]"
             >
+              <span className="grid size-10 shrink-0 place-items-center text-[#65bbc7]" aria-hidden="true">
+                <svg
+                  className="size-[18px]"
+                  viewBox="0 0 20 20"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.7"
+                  strokeLinecap="round"
+                  aria-hidden="true"
+                >
+                  <circle cx="8.5" cy="8.5" r="4.75" />
+                  <path d="m12 12 4 4" />
+                </svg>
+              </span>
+              <label className="sr-only" htmlFor="map-search">
+                Search players, bases, Pals and bosses
+              </label>
+              <input
+                id="map-search"
+                ref={props.searchInputRef}
+                type="search"
+                aria-label="Search players, bases, Pals and bosses"
+                aria-keyshortcuts="/"
+                placeholder="Filter map results…"
+                autoComplete="off"
+                enterKeyHint="search"
+                spellCheck="false"
+                value={props.search}
+                className="h-full min-w-0 flex-1 appearance-none border-0 bg-transparent pr-2 text-sm tracking-[.02em] text-[#e7f6f8] outline-0 placeholder:text-[#60767d] [&::-webkit-search-cancel-button]:hidden [&::-webkit-search-decoration]:hidden"
+                onChange={(event) => props.onSearchChange(event.currentTarget.value)}
+                onKeyDown={(event) => {
+                  if (event.key !== 'Escape') return
+                  event.preventDefault()
+                  event.stopPropagation()
+                  if (props.search) props.onSearchChange('')
+                  else props.onClose()
+                }}
+              />
+              {props.search ? (
+                <button
+                  type="button"
+                  className="pal-interactive grid size-10 shrink-0 cursor-pointer place-items-center border-0 bg-transparent text-lg text-[#739097]"
+                  aria-label="Clear search"
+                  onClick={() => {
+                    props.onSearchChange('')
+                    props.searchInputRef.current?.focus()
+                  }}
+                >
+                  ×
+                </button>
+              ) : null}
+            </search>
+            <fieldset className="pal-glass-inset mx-3.5 mt-2 mb-2 flex" aria-label="World region">
               {props.layers.map((layer) => {
                 const active = layer.id === props.activeLayer.id
                 return (
@@ -301,8 +389,8 @@ export function Explorer(props: ExplorerProps) {
                     type="button"
                     className={`min-h-10 min-w-0 flex-1 cursor-pointer overflow-hidden border-0 px-1 text-xs font-normal tracking-[.04em] text-ellipsis whitespace-nowrap uppercase transition-colors ${
                       active
-                        ? 'bg-[#304952]/65 text-[#e8f7f8] shadow-[inset_0_-2px_#20c7ea]'
-                        : 'bg-transparent text-[#a9b5b9] hover:bg-white/5 hover:text-white'
+                        ? 'bg-[#34444a]/80 text-[#e8f7f8] shadow-[inset_0_-2px_#20c7ea]'
+                        : 'bg-transparent text-[#a9b5b9] hover:bg-[#34444a]/55 hover:text-white'
                     }`}
                     aria-pressed={active}
                     onClick={() => props.onLayerChange(layer)}
@@ -322,13 +410,25 @@ export function Explorer(props: ExplorerProps) {
                   Results for <strong className="font-medium text-[#9ec1c7]">“{props.search}”</strong>
                 </p>
               )}
-              <PlayerCategory
+              <SimpleCategory
                 {...props}
-                players={index.byKind.players}
-                companions={index.byKind.companions}
+                group="online-players"
+                title="Online Players"
+                items={onlinePlayers}
                 matches={matches}
-                expanded={!collapsedGroups.has('players')}
-                onToggleExpanded={() => toggleCategory('players')}
+                empty="No players are currently online in this region."
+                expanded={searching || !collapsedGroups.has('online-players')}
+                onToggleExpanded={() => toggleCategory('online-players')}
+              />
+              <SimpleCategory
+                {...props}
+                group="offline-players"
+                title="Offline Players"
+                items={offlinePlayers}
+                matches={matches}
+                empty="No saved offline players are loaded for this region."
+                expanded={searching || !collapsedGroups.has('offline-players')}
+                onToggleExpanded={() => toggleCategory('offline-players')}
               />
               <GuildCategory
                 {...props}
@@ -336,8 +436,18 @@ export function Explorer(props: ExplorerProps) {
                 workers={index.byKind.workers}
                 workersByBaseId={index.workersByBaseId}
                 matches={matches}
-                expanded={!collapsedGroups.has('bases')}
+                expanded={searching || !collapsedGroups.has('bases')}
                 onToggleExpanded={() => toggleCategory('bases')}
+              />
+              <SimpleCategory
+                {...props}
+                group="companions"
+                title="Companion Pals"
+                items={index.byKind.companions}
+                matches={matches}
+                empty="No companion Pals are currently loaded."
+                expanded={searching || !collapsedGroups.has('companions')}
+                onToggleExpanded={() => toggleCategory('companions')}
               />
               <SimpleCategory
                 {...props}
@@ -346,8 +456,28 @@ export function Explorer(props: ExplorerProps) {
                 items={index.byKind['wild-pals']}
                 matches={matches}
                 empty="No wild Pals are currently loaded."
-                expanded={!collapsedGroups.has('wild-pals')}
+                expanded={searching || !collapsedGroups.has('wild-pals')}
                 onToggleExpanded={() => toggleCategory('wild-pals')}
+              />
+              <SimpleCategory
+                {...props}
+                group="alpha-pals"
+                title="Alpha Pals"
+                items={index.byKind['alpha-pals']}
+                matches={matches}
+                empty="No Alpha Pal landmarks are loaded for this region."
+                expanded={searching || !collapsedGroups.has('alpha-pals')}
+                onToggleExpanded={() => toggleCategory('alpha-pals')}
+              />
+              <SimpleCategory
+                {...props}
+                group="bosses"
+                title="Tower Bosses"
+                items={index.byKind.bosses}
+                matches={matches}
+                empty="No Tower Boss landmarks are loaded for this region."
+                expanded={searching || !collapsedGroups.has('bosses')}
+                onToggleExpanded={() => toggleCategory('bosses')}
               />
               <SimpleCategory
                 {...props}
@@ -356,7 +486,7 @@ export function Explorer(props: ExplorerProps) {
                 items={index.byKind.npcs}
                 matches={matches}
                 empty="No NPCs are currently loaded."
-                expanded={!collapsedGroups.has('npcs')}
+                expanded={searching || !collapsedGroups.has('npcs')}
                 onToggleExpanded={() => toggleCategory('npcs')}
               />
             </div>
@@ -389,35 +519,53 @@ function CategoryHeader({
   expanded,
   controls,
   enabledKinds,
+  enabledPlayerStatuses,
   hiddenIds,
   onToggleKinds,
+  onTogglePlayerStatus,
   onToggleExpanded,
   count
 }: Pick<
   CategoryProps,
-  'group' | 'title' | 'expanded' | 'enabledKinds' | 'hiddenIds' | 'onToggleKinds' | 'onToggleExpanded'
+  | 'group'
+  | 'title'
+  | 'expanded'
+  | 'enabledKinds'
+  | 'enabledPlayerStatuses'
+  | 'hiddenIds'
+  | 'onToggleKinds'
+  | 'onTogglePlayerStatus'
+  | 'onToggleExpanded'
 > & {
   items: MapItem[]
   controls: string
   count?: number
 }) {
-  const kinds = GROUP_KINDS[group]
-  const state = visibilityState(items, enabledKinds, hiddenIds)
-  const checked = items.length > 0 && kinds.every((kind) => enabledKinds.has(kind)) && state.checked
-  const itemCount =
-    count ??
-    (group === 'bases' || group === 'players' ? items.filter((item) => item.kind === group).length : items.length)
+  const playerStatus = playerStatusForGroup(group)
+  const kinds = playerStatus ? (['players'] as ItemKind[]) : GROUP_KINDS[group as NonPlayerCategoryGroup]
+  const state = visibilityState(items, enabledKinds, enabledPlayerStatuses, hiddenIds)
+  const categoryEnabled = playerStatus
+    ? enabledPlayerStatuses.has(playerStatus) && enabledKinds.has('players')
+    : kinds.every((kind) => enabledKinds.has(kind))
+  const checked = items.length > 0 && categoryEnabled && state.checked
+  const itemCount = count ?? (group === 'bases' ? items.filter((item) => item.kind === group).length : items.length)
   return (
     <div className="flex min-h-8 items-center gap-0.5">
       <span className="grid size-8 shrink-0 place-items-center">
         <Checkbox
           state={{ checked, indeterminate: !checked && state.indeterminate, disabled: items.length === 0 }}
           label={`Show ${title}`}
-          onChange={(visible) => onToggleKinds(kinds, visible)}
+          onChange={(visible) => {
+            if (playerStatus) onTogglePlayerStatus(playerStatus, visible)
+            else onToggleKinds(kinds, visible)
+          }}
         />
       </span>
       <AccordionButton expanded={expanded} label={`${title} section`} controls={controls} onClick={onToggleExpanded}>
-        <MarkerGlyph kind={group} />
+        <MarkerGlyph
+          kind={playerStatus ? 'players' : (group as ItemKind)}
+          online={playerStatus ? playerStatus === 'online' : undefined}
+        />
         <strong className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-xs font-semibold">
           {title} ({itemCount})
         </strong>
@@ -426,13 +574,22 @@ function CategoryHeader({
   )
 }
 
-function SimpleCategory({ group, title, items, matches, empty, ...props }: CategoryProps & { items: MapItem[] }) {
+function SimpleCategory({
+  group,
+  title,
+  items,
+  controlItems = items,
+  count,
+  matches,
+  empty,
+  ...props
+}: CategoryProps & { items: MapItem[]; controlItems?: MapItem[]; count?: number }) {
   const visible = items.filter(matches).sort((left, right) => left.name.localeCompare(right.name))
   const rendered = visible.slice(0, INITIAL_CATEGORY_ITEMS)
   const contentId = useId()
   return (
     <section className="border-b border-white/7 py-0.5 last:border-b-0">
-      <CategoryHeader {...props} group={group} title={title} items={items} controls={contentId} />
+      <CategoryHeader {...props} group={group} title={title} items={controlItems} count={count} controls={contentId} />
       <div id={contentId} className="grid gap-px pl-1.5" hidden={!props.expanded}>
         {visible.length === 0 ? (
           <p className="my-1.5 pl-5 text-[11px] text-[#778187]">
@@ -470,215 +627,6 @@ function SimpleCategory({ group, title, items, matches, empty, ...props }: Categ
   )
 }
 
-interface PlayerCategoryProps extends ExplorerProps {
-  players: MapItem[]
-  companions: MapItem[]
-  matches: (item: MapItem) => boolean
-  expanded: boolean
-  onToggleExpanded: () => void
-}
-
-function PlayerCategory({ players, companions, matches, ...props }: PlayerCategoryProps) {
-  const playersById = new Map(players.map((player) => [player.id, player]))
-  const onlinePlayersById = new Map(
-    props.items.filter((item) => item.kind === 'players').map((player) => [player.id, player])
-  )
-  const companionsByOwnerId = new Map<string, MapItem[]>()
-  const otherMapCompanions: MapItem[] = []
-  const noOnlineOwnerCompanions: MapItem[] = []
-  for (const companion of companions) {
-    if (!companion.ownerId || !onlinePlayersById.has(companion.ownerId)) {
-      noOnlineOwnerCompanions.push(companion)
-      continue
-    }
-    if (!playersById.has(companion.ownerId)) {
-      otherMapCompanions.push(companion)
-      continue
-    }
-    const owned = companionsByOwnerId.get(companion.ownerId) || []
-    owned.push(companion)
-    companionsByOwnerId.set(companion.ownerId, owned)
-  }
-  for (const owned of companionsByOwnerId.values()) {
-    owned.sort((left, right) => left.name.localeCompare(right.name))
-  }
-  otherMapCompanions.sort((left, right) => left.name.localeCompare(right.name))
-  noOnlineOwnerCompanions.sort((left, right) => left.name.localeCompare(right.name))
-
-  const views = players
-    .slice()
-    .sort((left, right) => left.name.localeCompare(right.name))
-    .map((player) => {
-      const owned = companionsByOwnerId.get(player.id) || []
-      const playerMatches = matches(player)
-      const matchingCompanions = playerMatches ? owned : owned.filter(matches)
-      return { player, owned, playerMatches, matchingCompanions }
-    })
-    .filter(({ playerMatches, matchingCompanions }) => playerMatches || matchingCompanions.length > 0)
-  const renderedViews = views.slice(0, INITIAL_CATEGORY_ITEMS)
-  const searchQuery = props.search.trim().toLowerCase()
-  const requestedOtherMap = props.search.trim()
-    ? 'owner on another map companion pals'.includes(searchQuery)
-      ? otherMapCompanions
-      : otherMapCompanions.filter(matches)
-    : otherMapCompanions
-  const requestedNoOwner = props.search.trim()
-    ? 'no online owner companion pals'.includes(searchQuery)
-      ? noOnlineOwnerCompanions
-      : noOnlineOwnerCompanions.filter(matches)
-    : noOnlineOwnerCompanions
-  const contentId = useId()
-  let eligibleCompanions = 0
-  let renderedCompanions = 0
-  const renderFallbackGroup = (title: string, groupLabel: string, items: MapItem[], requested: MapItem[]) => {
-    if (requested.length === 0) return null
-    eligibleCompanions += requested.length
-    const remaining = Math.max(0, INITIAL_CATEGORY_ITEMS - renderedCompanions)
-    const displayed = requested.slice(0, remaining)
-    renderedCompanions += displayed.length
-    return (
-      <fieldset className="m-0 min-w-0 border-0 p-0">
-        <legend className="sr-only">{groupLabel}</legend>
-        <div className="flex min-h-8 items-center gap-0.5">
-          <span className="grid size-8 shrink-0 place-items-center">
-            <Checkbox
-              state={visibilityState(items, props.enabledKinds, props.hiddenIds)}
-              label={`Show ${groupLabel.toLowerCase()}`}
-              onChange={(visible) =>
-                props.onToggleItems(
-                  items.map((companion) => companion.id),
-                  visible
-                )
-              }
-            />
-          </span>
-          <div className="grid min-h-7 min-w-0 flex-1 grid-cols-[20px_minmax(0,1fr)_auto] items-center gap-1.5 px-1.5 py-1 text-xs text-[#cbd7d9]">
-            <MarkerGlyph kind="companions" />
-            <strong className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap font-medium">{title}</strong>
-            <span className="ml-auto shrink-0 text-[10px] text-[#7f898e]">
-              {items.length} Pal{items.length === 1 ? '' : 's'}
-            </span>
-          </div>
-        </div>
-        <div className="ml-3 grid gap-px border-l border-white/10 pl-2">
-          {displayed.map((companion) => (
-            <ObjectRow
-              key={companion.id}
-              item={companion}
-              meta={companion.level ? `Lv ${companion.level}` : undefined}
-              {...props}
-            />
-          ))}
-        </div>
-      </fieldset>
-    )
-  }
-
-  return (
-    <section className="border-b border-white/7 py-0.5">
-      <CategoryHeader
-        {...props}
-        group="players"
-        title="Players"
-        items={[...players, ...companions]}
-        count={players.length}
-        controls={contentId}
-      />
-      <div id={contentId} className="grid gap-px pl-1" hidden={!props.expanded}>
-        {renderedViews.map(({ player, owned, matchingCompanions }) => {
-          const expanded = props.expandedPlayers.has(player.id) || Boolean(props.search.trim() && owned.length > 0)
-          const playerContentId = `${contentId}-player-${player.id}`
-          const requestedCompanions = props.search.trim() ? matchingCompanions : owned
-          let displayedCompanions: MapItem[] = []
-          if (expanded) {
-            eligibleCompanions += requestedCompanions.length
-            const remaining = Math.max(0, INITIAL_CATEGORY_ITEMS - renderedCompanions)
-            displayedCompanions = requestedCompanions.slice(0, remaining)
-            renderedCompanions += displayedCompanions.length
-          }
-          const playerItems = [player, ...owned]
-          const meta = [player.level ? `Lv ${player.level}` : '', player.guildName || ''].filter(Boolean).join(' · ')
-          return (
-            <div key={player.id}>
-              <div className="flex min-h-8 min-w-0 items-center gap-0.5">
-                <span className="grid size-8 shrink-0 place-items-center">
-                  <Checkbox
-                    state={visibilityState(playerItems, props.enabledKinds, props.hiddenIds)}
-                    label={`Show ${markerText(player)}`}
-                    onChange={(visible) =>
-                      props.onToggleItems(
-                        playerItems.map((item) => item.id),
-                        visible
-                      )
-                    }
-                  />
-                </span>
-                <ItemButton item={player} meta={meta || undefined} onFocus={props.onFocusItem} />
-                {owned.length > 0 ? (
-                  <DisclosureToggle
-                    expanded={expanded}
-                    label={`companion Pals for ${player.name}`}
-                    controls={playerContentId}
-                    onClick={() => props.onTogglePlayer(player.id)}
-                  />
-                ) : (
-                  <span className="size-8 shrink-0" aria-hidden="true" />
-                )}
-              </div>
-              {owned.length > 0 ? (
-                <div id={playerContentId} className="ml-3 border-l border-white/10 pl-2" hidden={!expanded}>
-                  {expanded &&
-                    displayedCompanions.map((companion) => (
-                      <ObjectRow
-                        key={companion.id}
-                        item={companion}
-                        meta={companion.level ? `Lv ${companion.level}` : undefined}
-                        {...props}
-                      />
-                    ))}
-                </div>
-              ) : null}
-            </div>
-          )
-        })}
-        {renderFallbackGroup(
-          'Owner on another map',
-          'Companion Pals with an owner on another map',
-          otherMapCompanions,
-          requestedOtherMap
-        )}
-        {renderFallbackGroup(
-          'No online owner',
-          'Companion Pals with no online owner',
-          noOnlineOwnerCompanions,
-          requestedNoOwner
-        )}
-        {renderedViews.length < views.length ? (
-          <p className="my-1 ml-5 border-l-2 border-[#64d7e7]/40 px-2 py-1.5 text-[11px] text-[#9ec1c7]">
-            {props.search.trim()
-              ? `${views.length - renderedViews.length} more player matches. Refine your search to inspect them.`
-              : `Search to inspect ${views.length - renderedViews.length} more players.`}
-          </p>
-        ) : null}
-        {renderedCompanions < eligibleCompanions ? (
-          <p className="my-1 ml-5 border-l-2 border-[#64d7e7]/40 px-2 py-1.5 text-[11px] text-[#9ec1c7]">
-            {eligibleCompanions - renderedCompanions} more companion Pal
-            {eligibleCompanions - renderedCompanions === 1 ? '' : 's'} omitted. Refine your search or expand fewer
-            players to inspect them.
-          </p>
-        ) : null}
-        {views.length === 0 && requestedOtherMap.length === 0 && requestedNoOwner.length === 0 ? (
-          <p className="my-1.5 pl-5 text-[11px] text-[#778187]">
-            {props.search.trim() && (players.length > 0 || companions.length > 0)
-              ? `No players or companion Pals match “${props.search.trim()}”.`
-              : 'No players are currently online.'}
-          </p>
-        ) : null}
-      </div>
-    </section>
-  )
-}
-
 interface GuildCategoryProps extends ExplorerProps {
   bases: MapItem[]
   workers: MapItem[]
@@ -693,15 +641,27 @@ function GuildCategory({ bases, workers, workersByBaseId, matches, ...props }: G
     .slice()
     .sort((left, right) => left.name.localeCompare(right.name) || left.x - right.x || left.y - right.y)
   const guildNames = new Map<string, string>()
-  for (const item of props.items) {
+  for (const item of [...bases, ...workers]) {
     if (item.guildKey && item.guildName) guildNames.set(item.guildKey, item.guildName)
   }
-  const guildMap = new Map<string, { id: string; name: string; bases: MapItem[]; outsideWorkers: MapItem[] }>()
+  interface GuildBucket {
+    id: string
+    name: string
+    bases: MapItem[]
+    outsideWorkers: MapItem[]
+  }
+  const guildMap = new Map<string, GuildBucket>()
+  const newGuild = (id: string, name = guildNames.get(id) || 'Unnamed guild'): GuildBucket => ({
+    id,
+    name,
+    bases: [],
+    outsideWorkers: []
+  })
   for (const base of sortedBases) {
     const id = guildIdForBase(base)
     const inferredGuildName =
       guildNames.get(id) || (base.name.trim().toLowerCase() === 'palbox' ? 'Unnamed guild' : base.name)
-    const guild = guildMap.get(id) || { id, name: inferredGuildName, bases: [], outsideWorkers: [] }
+    const guild = guildMap.get(id) || newGuild(id, inferredGuildName)
     if (guild.name === 'Unnamed guild' && inferredGuildName !== 'Unnamed guild') guild.name = inferredGuildName
     guild.bases.push(base)
     guildMap.set(id, guild)
@@ -718,12 +678,7 @@ function GuildCategory({ bases, workers, workersByBaseId, matches, ...props }: G
       fallbackWorkers.push(worker)
       continue
     }
-    const guild = guildMap.get(worker.guildKey) || {
-      id: worker.guildKey,
-      name: guildNames.get(worker.guildKey) || 'Unnamed guild',
-      bases: [],
-      outsideWorkers: []
-    }
+    const guild = guildMap.get(worker.guildKey) || newGuild(worker.guildKey)
     guild.outsideWorkers.push(worker)
     guildMap.set(guild.id, guild)
   }
@@ -781,6 +736,7 @@ function GuildCategory({ bases, workers, workersByBaseId, matches, ...props }: G
             ]),
             ...guild.outsideWorkers
           ]
+          const workerCount = guildItems.filter((item) => item.kind === 'workers').length
           const expanded = props.expandedGuilds.has(guild.id) || Boolean(props.search.trim())
           const guildContentId = `${contentId}-guild-${rendered}`
           const requestedOutsideWorkers = props.search.trim() ? matchingOutsideWorkers : guild.outsideWorkers
@@ -796,7 +752,12 @@ function GuildCategory({ bases, workers, workersByBaseId, matches, ...props }: G
               <div className="flex min-h-8 items-center gap-0.5">
                 <span className="grid size-8 shrink-0 place-items-center">
                   <Checkbox
-                    state={visibilityState(guildItems, props.enabledKinds, props.hiddenIds)}
+                    state={visibilityState(
+                      guildItems,
+                      props.enabledKinds,
+                      props.enabledPlayerStatuses,
+                      props.hiddenIds
+                    )}
                     label={`Show guild ${displayName}`}
                     onChange={(visible) =>
                       props.onToggleItems(
@@ -809,7 +770,7 @@ function GuildCategory({ bases, workers, workersByBaseId, matches, ...props }: G
                 <GuildButton
                   guildId={guild.id}
                   name={displayName}
-                  meta={`${guild.bases.length} base${guild.bases.length === 1 ? '' : 's'}`}
+                  meta={`${guild.bases.length} base${guild.bases.length === 1 ? '' : 's'} · ${workerCount} Pal${workerCount === 1 ? '' : 's'}`}
                   onFocus={props.onFocusGuild}
                 />
                 <DisclosureToggle
@@ -839,7 +800,12 @@ function GuildCategory({ bases, workers, workersByBaseId, matches, ...props }: G
                         <div className="flex min-h-8 min-w-0 items-center gap-0.5">
                           <span className="grid size-8 shrink-0 place-items-center">
                             <Checkbox
-                              state={visibilityState(baseItems, props.enabledKinds, props.hiddenIds)}
+                              state={visibilityState(
+                                baseItems,
+                                props.enabledKinds,
+                                props.enabledPlayerStatuses,
+                                props.hiddenIds
+                              )}
                               label={`Show ${baseLabel} for ${displayName}`}
                               onChange={(visible) =>
                                 props.onToggleItems(
@@ -922,7 +888,12 @@ function GuildCategory({ bases, workers, workersByBaseId, matches, ...props }: G
               <div className="flex min-h-8 items-center gap-0.5">
                 <span className="grid size-8 shrink-0 place-items-center">
                   <Checkbox
-                    state={visibilityState(fallbackWorkers, props.enabledKinds, props.hiddenIds)}
+                    state={visibilityState(
+                      fallbackWorkers,
+                      props.enabledKinds,
+                      props.enabledPlayerStatuses,
+                      props.hiddenIds
+                    )}
                     label="Show Pals with no linked guild"
                     onChange={(visible) =>
                       props.onToggleItems(
@@ -996,7 +967,7 @@ function AccordionButton({
   return (
     <button
       type="button"
-      className="group flex min-h-8 min-w-0 flex-1 cursor-pointer items-center gap-1.5 rounded bg-transparent px-1 text-left text-[#e3edef] hover:bg-white/6 hover:text-white"
+      className="pal-interactive group flex min-h-8 min-w-0 flex-1 cursor-pointer items-center gap-1.5 rounded border border-transparent bg-transparent px-1 text-left text-[#e3edef]"
       aria-label={`${expanded ? 'Collapse' : 'Expand'} ${label}`}
       aria-expanded={expanded}
       aria-controls={controls}
@@ -1024,7 +995,7 @@ function DisclosureToggle({
   return (
     <button
       type="button"
-      className="grid size-8 shrink-0 cursor-pointer place-items-center rounded text-[#929da1] hover:bg-white/8 hover:text-white"
+      className="pal-interactive grid size-8 shrink-0 cursor-pointer place-items-center rounded border border-transparent bg-transparent text-[#929da1]"
       aria-label={`${expanded ? 'Collapse' : 'Expand'} ${label}`}
       aria-expanded={expanded}
       aria-controls={controls}

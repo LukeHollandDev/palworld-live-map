@@ -3,6 +3,7 @@ import {
   clampView,
   coverScale,
   isScenePointVisible,
+  itemSearchText,
   MAX_ZOOM_RATIO,
   markerStackOrder,
   markerText,
@@ -14,7 +15,7 @@ import {
   type View
 } from '../lib/map'
 import { loadZoomRatio, saveZoomRatio } from '../lib/preferences'
-import type { ItemKind, MapItem, MapLayer } from '../types'
+import type { ItemKind, MapItem, MapLayer, PlayerStatus } from '../types'
 import { MarkerGlyph } from './MarkerGlyph'
 
 export interface MapViewportHandle {
@@ -26,6 +27,7 @@ interface MapViewportProps {
   activeLayer: MapLayer
   items: MapItem[]
   enabledKinds: Set<ItemKind>
+  enabledPlayerStatuses: Set<PlayerStatus>
   hiddenIds: Set<string>
   search: string
   onShowItem: (item: MapItem, returnFocus: HTMLElement) => void
@@ -63,6 +65,7 @@ interface ImageResult {
 const MAX_INDIVIDUAL_MARKERS = 900
 const CLUSTER_SIZE_PX = 52
 const CONTROL_ZOOM_DURATION_MS = 220
+const ITEM_FOCUS_DURATION_MS = 420
 const RESIZE_RENDER_SYNC_DELAY_MS = 120
 const MAP_FIT_PADDING_PX = 64
 const ZOOM_SAVE_DELAY_MS = 120
@@ -101,7 +104,7 @@ function sampleImageBackground(
 }
 
 export const MapViewport = forwardRef<MapViewportHandle, MapViewportProps>(function MapViewport(
-  { activeLayer, items, enabledKinds, hiddenIds, search, onShowItem, inspectorOpen, children },
+  { activeLayer, items, enabledKinds, enabledPlayerStatuses, hiddenIds, search, onShowItem, inspectorOpen, children },
   ref
 ) {
   const viewportRef = useRef<HTMLElement>(null)
@@ -109,9 +112,8 @@ export const MapViewport = forwardRef<MapViewportHandle, MapViewportProps>(funct
   const coordinatesRef = useRef<HTMLSpanElement>(null)
   const size = useMemo(() => sceneSize(), [])
   const initialViewport = useMemo<RenderViewport>(() => {
-    const compactHeader = window.innerWidth < 768
     const width = Math.max(1, window.innerWidth)
-    const height = Math.max(1, window.innerHeight - (compactHeader ? 76 : 64))
+    const height = Math.max(1, window.innerHeight)
     return { view: fitView(width, height, size), width, height }
   }, [size])
   const viewRef = useRef<View>(initialViewport.view)
@@ -145,13 +147,13 @@ export const MapViewport = forwardRef<MapViewportHandle, MapViewportProps>(funct
     const query = search.trim().toLowerCase()
     return current.items.filter((item) => {
       if (!enabledKinds.has(item.kind) || hiddenIds.has(item.id)) return false
+      if (item.kind === 'players' && !enabledPlayerStatuses.has(item.online === false ? 'offline' : 'online'))
+        return false
       if (!query) return true
       const baseName = item.kind === 'workers' && item.baseId ? current.baseNames.get(item.baseId) || '' : ''
-      return `${item.name} ${item.detail || ''} ${item.level || ''} ${item.guildName || ''} ${baseName}`
-        .toLowerCase()
-        .includes(query)
+      return itemSearchText(item, baseName).includes(query)
     })
-  }, [current, enabledKinds, hiddenIds, search])
+  }, [current, enabledKinds, enabledPlayerStatuses, hiddenIds, search])
 
   const renderMarkers = useMemo<RenderMarker[]>(() => {
     const bounds = sceneViewportBounds(
@@ -266,7 +268,7 @@ export const MapViewport = forwardRef<MapViewportHandle, MapViewportProps>(funct
   }, [])
 
   const animateView = useCallback(
-    (target: View) => {
+    (target: View, durationMs = CONTROL_ZOOM_DURATION_MS) => {
       cancelViewAnimation()
       cancelResizeRenderSync()
       if (typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
@@ -278,7 +280,7 @@ export const MapViewport = forwardRef<MapViewportHandle, MapViewportProps>(funct
       const start = { ...viewRef.current }
       const startedAt = window.performance.now()
       const step = (now: number) => {
-        const progress = Math.min(1, Math.max(0, (now - startedAt) / CONTROL_ZOOM_DURATION_MS))
+        const progress = Math.min(1, Math.max(0, (now - startedAt) / durationMs))
         const eased = 1 - (1 - progress) ** 3
         applyView({
           scale: start.scale + (target.scale - start.scale) * eased,
@@ -384,25 +386,21 @@ export const MapViewport = forwardRef<MapViewportHandle, MapViewportProps>(funct
     const viewport = viewportRef.current
     const position = toScene(item, activeLayer, size)
     if (!viewport || !position) return
-    cancelViewAnimation()
-    cancelResizeRenderSync()
     const rect = viewport.getBoundingClientRect()
     const minimum = coverScale(rect.width, rect.height, size)
     const scale = Math.min(
       minimum * MAX_ZOOM_RATIO,
       Math.max(viewRef.current.scale, minimum * (item.kind === 'workers' ? 24 : 8))
     )
-    applyView(
-      clampView(
-        { scale, x: rect.width / 2 - position.x * scale, y: rect.height / 2 - position.y * scale },
-        rect.width,
-        rect.height,
-        size
-      )
+    const target = clampView(
+      { scale, x: rect.width / 2 - position.x * scale, y: rect.height / 2 - position.y * scale },
+      rect.width,
+      rect.height,
+      size
     )
     queueZoomPreference(Math.max(1, scale / fitScale(rect.width, rect.height, size)))
-    syncRenderViewport()
     setSelectedId(item.id)
+    animateView(target, ITEM_FOCUS_DURATION_MS)
     onShowItem(item, returnFocus)
   }
 
@@ -609,8 +607,6 @@ export const MapViewport = forwardRef<MapViewportHandle, MapViewportProps>(funct
                     event.stopPropagation()
                     const viewport = viewportRef.current
                     if (!viewport) return
-                    cancelViewAnimation()
-                    cancelResizeRenderSync()
                     const rect = viewport.getBoundingClientRect()
                     const minimum = coverScale(rect.width, rect.height, size)
                     const scale = Math.min(minimum * MAX_ZOOM_RATIO, viewRef.current.scale * 2.5)
@@ -624,9 +620,8 @@ export const MapViewport = forwardRef<MapViewportHandle, MapViewportProps>(funct
                       rect.height,
                       size
                     )
-                    applyView(target)
                     queueZoomPreference(Math.max(1, scale / fitScale(rect.width, rect.height, size)))
-                    syncRenderViewport()
+                    animateView(target, ITEM_FOCUS_DURATION_MS)
                   }}
                 >
                   <span>{count && count > 999 ? '999+' : count}</span>
@@ -655,7 +650,7 @@ export const MapViewport = forwardRef<MapViewportHandle, MapViewportProps>(funct
                   onShowItem(item, event.currentTarget)
                 }}
               >
-                <MarkerGlyph kind={item.kind} />
+                <MarkerGlyph kind={item.kind} online={item.online} />
                 <span className="marker-label">{markerText(item)}</span>
               </button>
             )
@@ -664,7 +659,7 @@ export const MapViewport = forwardRef<MapViewportHandle, MapViewportProps>(funct
       </div>
 
       {imageState === 'error' && (
-        <div className="pointer-events-none absolute left-1/2 top-3 -translate-x-1/2 rounded-md border border-[#665a3e] bg-[#302a20]/95 px-3 py-2 text-xs text-[#d5bd82]">
+        <div className="pointer-events-none absolute top-[78px] left-1/2 -translate-x-1/2 rounded-md border border-[#665a3e] bg-[#302a20]/95 px-3 py-2 text-xs text-[#d5bd82] max-sm:top-[88px]">
           Map artwork is not installed.
         </div>
       )}
@@ -672,7 +667,7 @@ export const MapViewport = forwardRef<MapViewportHandle, MapViewportProps>(funct
       {children}
 
       <div
-        className={`absolute right-[18px] bottom-[18px] z-[18] flex h-11 overflow-hidden border border-[#d3eff2]/50 bg-[#070f14]/80 shadow-[0_9px_22px_rgb(0_0_0/28%)] backdrop-blur-sm transition-[opacity,transform] max-sm:right-3 max-sm:bottom-3 ${
+        className={`pal-glass-surface absolute right-[18px] bottom-[18px] z-[18] flex h-11 overflow-hidden transition-[opacity,transform] max-sm:right-3 max-sm:bottom-3 ${
           inspectorOpen ? 'pointer-events-none translate-y-2 opacity-0' : ''
         }`}
         onPointerDown={(event) => event.stopPropagation()}
@@ -699,7 +694,7 @@ export const MapViewport = forwardRef<MapViewportHandle, MapViewportProps>(funct
         >
           <button
             type="button"
-            className="grid h-full min-w-11 cursor-pointer place-items-center border-0 bg-transparent text-lg text-[#eefeff] hover:bg-[#087fab] focus-visible:bg-[#087fab] focus-visible:outline-none"
+            className="pal-interactive grid h-full min-w-11 cursor-pointer place-items-center border-0 bg-transparent text-lg text-[#eefeff] focus-visible:outline-none"
             aria-label="Zoom out"
             onClick={() => {
               const point = center()
@@ -710,7 +705,7 @@ export const MapViewport = forwardRef<MapViewportHandle, MapViewportProps>(funct
           </button>
           <button
             type="button"
-            className="grid h-full min-w-[58px] cursor-pointer place-items-center border-x border-y-0 border-[#cdeef3]/35 bg-transparent text-[11px] font-bold tracking-[.06em] text-[#eefeff] uppercase hover:bg-[#087fab] focus-visible:bg-[#087fab] focus-visible:outline-none"
+            className="pal-interactive grid h-full min-w-[58px] cursor-pointer place-items-center border-x border-y-0 border-[#cdeef3]/35 bg-transparent text-[11px] font-bold tracking-[.06em] text-[#eefeff] uppercase focus-visible:outline-none"
             title="Fit the active region"
             onClick={animateFit}
           >
@@ -718,7 +713,7 @@ export const MapViewport = forwardRef<MapViewportHandle, MapViewportProps>(funct
           </button>
           <button
             type="button"
-            className="grid h-full min-w-11 cursor-pointer place-items-center border-0 bg-transparent text-lg text-[#eefeff] hover:bg-[#087fab] focus-visible:bg-[#087fab] focus-visible:outline-none"
+            className="pal-interactive grid h-full min-w-11 cursor-pointer place-items-center border-0 bg-transparent text-lg text-[#eefeff] focus-visible:outline-none"
             aria-label="Zoom in"
             onClick={() => {
               const point = center()

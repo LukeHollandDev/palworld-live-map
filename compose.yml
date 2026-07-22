@@ -10,3 +10,11 @@ services:
       - host.docker.internal:host-gateway
     ports:
       - "${HTTP_PORT:-8080}:8080"
+    # To enable save-backed offline rosters, mount only the SaveGames/0 tree:
+    # volumes:
+    #   - type: bind
+    #     source: /path/to/Pal/Saved/SaveGames/0
+    #     target: /data/palworld/saves
+    #     read_only: true
+    #     bind:
+    #       create_host_path: false

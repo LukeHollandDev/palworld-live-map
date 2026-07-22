@@ -1,0 +1,941 @@
+{
+  "schemaVersion": 2,
+  "gameVersion": "1.0.1.100619",
+  "generator": "palworld-map-exporter/2",
+  "decoder": "CUE4Parse/1.2.2.202607",
+  "mappings": {
+    "file": "mappings.usmap",
+    "bytes": 2321933,
+    "sha256": "241c45de9d5b55b246cd4b39d62b9209faf7758ce0637e1f7a545aa0f75f71f0"
+  },
+  "paks": [
+    {
+      "file": "Pal-Windows.pak",
+      "bytes": 40526106335,
+      "sha256": "fe2d7b8548d5be0649b6bb3e49aadc79529c2e7d138baaacece3a3563a864227"
+    }
+  ],
+  "sources": [
+    {
+      "object": "Pal/Config/DefaultGame.ini",
+      "purpose": "Palworld ProjectVersion used for catalogue compatibility"
+    },
+    {
+      "object": "Pal/Content/Pal/DataTable/UI/DT_BossSpawnerLoactionData.DT_BossSpawnerLoactionData",
+      "purpose": "Field Alpha spawner IDs, levels, and coordinates"
+    },
+    {
+      "object": "Pal/Content/Pal/DataTable/Character/DT_PalMonsterParameter.DT_PalMonsterParameter",
+      "purpose": "Alpha and tower Pal names and elements"
+    },
+    {
+      "object": "Pal/Content/L10N/en/Pal/DataTable/Text/DT_PalNameText_Common.DT_PalNameText_Common",
+      "purpose": "English encounter display names"
+    },
+    {
+      "object": "Pal/Content/L10N/en/Pal/DataTable/Text/DT_WorldMap_Common_Text_Common.DT_WorldMap_Common_Text_Common",
+      "purpose": "English tower display names"
+    },
+    {
+      "object": "Pal/Content/Pal/Blueprint/System/BP_PalBossBattleManager.Default__BP_PalBossBattleManager_C",
+      "purpose": "Tower BossType to normal-difficulty Pal and level"
+    },
+    {
+      "object": "Pal/Content/Pal/Maps/MainWorld_5/PL_MainWorld5.PL_MainWorld5",
+      "purpose": "Placed tower actors and root-component coordinates"
+    }
+  ],
+  "locations": [
+    {
+      "id": "alpha:1_10_plain_F_Boss_FairyDragon:-315583.53:237116.97",
+      "kind": "alpha-pals",
+      "name": "Chillet",
+      "detail": "Field Alpha \u00B7 Ice / Dragon",
+      "level": 11,
+      "x": -315583.53,
+      "y": 237116.97
+    },
+    {
+      "id": "alpha:5_2_island_iceblock_FBOSS_1:175142.77:221586.50",
+      "kind": "alpha-pals",
+      "name": "Neptilius",
+      "detail": "Field Alpha \u00B7 Water",
+      "level": 60,
+      "x": 175142.77,
+      "y": 221586.5
+    },
+    {
+      "id": "alpha:81_1_forest_FBOSS_1:-245458.90:149122.00",
+      "kind": "alpha-pals",
+      "name": "Vaelet",
+      "detail": "Field Alpha \u00B7 Grass",
+      "level": 27,
+      "x": -245458.9,
+      "y": 149122
+    },
+    {
+      "id": "alpha:81_1_forest_FBOSS_2:-226362.23:231993.33",
+      "kind": "alpha-pals",
+      "name": "Wixen",
+      "detail": "Field Alpha \u00B7 Fire",
+      "level": 28,
+      "x": -226362.23,
+      "y": 231993.33
+    },
+    {
+      "id": "alpha:81_1_forest_FBOSS_3:-119314.52:288958.40",
+      "kind": "alpha-pals",
+      "name": "Verdash",
+      "detail": "Field Alpha \u00B7 Grass",
+      "level": 35,
+      "x": -119314.516,
+      "y": 288958.4
+    },
+    {
+      "id": "alpha:81_1_forest_FBOSS_4:-147025.53:217379.17",
+      "kind": "alpha-pals",
+      "name": "Lunaris",
+      "detail": "Field Alpha \u00B7 Normal",
+      "level": 35,
+      "x": -147025.53,
+      "y": 217379.17
+    },
+    {
+      "id": "alpha:81_1_forest_FBOSS_5:-92059.77:273741.90",
+      "kind": "alpha-pals",
+      "name": "Sibelyx",
+      "detail": "Field Alpha \u00B7 Ice",
+      "level": 40,
+      "x": -92059.77,
+      "y": 273741.9
+    },
+    {
+      "id": "alpha:81_1_forest_FBOSS_6:-162481.34:233115.23",
+      "kind": "alpha-pals",
+      "name": "Elizabee",
+      "detail": "Field Alpha \u00B7 Grass",
+      "level": 39,
+      "x": -162481.34,
+      "y": 233115.23
+    },
+    {
+      "id": "alpha:81_1_forest_FBOSS_7:-254060.00:178050.00",
+      "kind": "alpha-pals",
+      "name": "Elphidran",
+      "detail": "Field Alpha \u00B7 Dragon",
+      "level": 30,
+      "x": -254060,
+      "y": 178050
+    },
+    {
+      "id": "alpha:81_1_grass_FBOSS_10:-183818.90:40647.84",
+      "kind": "alpha-pals",
+      "name": "Blazehowl",
+      "detail": "Field Alpha \u00B7 Fire",
+      "level": 30,
+      "x": -183818.9,
+      "y": 40647.84
+    },
+    {
+      "id": "alpha:81_1_grass_FBOSS_13:-162910.00:318720.00",
+      "kind": "alpha-pals",
+      "name": "Jormuntide",
+      "detail": "Field Alpha \u00B7 Dragon / Water",
+      "level": 55,
+      "x": -162910,
+      "y": 318720
+    },
+    {
+      "id": "alpha:81_1_grass_FBOSS_14:-167230.00:96430.00",
+      "kind": "alpha-pals",
+      "name": "Anubis",
+      "detail": "Field Alpha \u00B7 Ground",
+      "level": 55,
+      "x": -167230,
+      "y": 96430
+    },
+    {
+      "id": "alpha:81_1_grass_FBOSS_15:-149050.00:-30550.00",
+      "kind": "alpha-pals",
+      "name": "Foxparks Cryst",
+      "detail": "Field Alpha \u00B7 Ice",
+      "level": 15,
+      "x": -149050,
+      "y": -30550
+    },
+    {
+      "id": "alpha:81_1_grass_FBOSS_16:-333940.00:39610.00",
+      "kind": "alpha-pals",
+      "name": "Fenglope",
+      "detail": "Field Alpha \u00B7 Normal",
+      "level": 25,
+      "x": -333940,
+      "y": 39610
+    },
+    {
+      "id": "alpha:81_1_grass_FBOSS_18:-236727.10:321310.12",
+      "kind": "alpha-pals",
+      "name": "Grintale",
+      "detail": "Field Alpha \u00B7 Normal",
+      "level": 17,
+      "x": -236727.1,
+      "y": 321310.12
+    },
+    {
+      "id": "alpha:81_1_grass_FBOSS_1:-343155.00:244585.00",
+      "kind": "alpha-pals",
+      "name": "Mammorest",
+      "detail": "Field Alpha \u00B7 Grass / Ground",
+      "level": 38,
+      "x": -343155,
+      "y": 244585
+    },
+    {
+      "id": "alpha:81_1_grass_FBOSS_20:-276240.00:268990.00",
+      "kind": "alpha-pals",
+      "name": "Foxcicle",
+      "detail": "Field Alpha \u00B7 Ice",
+      "level": 15,
+      "x": -276240,
+      "y": 268990
+    },
+    {
+      "id": "alpha:81_1_grass_FBOSS_21:-396003.12:53772.16",
+      "kind": "alpha-pals",
+      "name": "Sweepa",
+      "detail": "Field Alpha \u00B7 Ice",
+      "level": 11,
+      "x": -396003.12,
+      "y": 53772.16
+    },
+    {
+      "id": "alpha:81_1_grass_FBOSS_22:-155950.00:31260.00",
+      "kind": "alpha-pals",
+      "name": "Nitewing",
+      "detail": "Field Alpha \u00B7 Normal",
+      "level": 18,
+      "x": -155950,
+      "y": 31260
+    },
+    {
+      "id": "alpha:81_1_grass_FBOSS_23:-372950.00:104400.00",
+      "kind": "alpha-pals",
+      "name": "Univolt",
+      "detail": "Field Alpha \u00B7 Electric",
+      "level": 31,
+      "x": -372950,
+      "y": 104400
+    },
+    {
+      "id": "alpha:81_1_grass_FBOSS_24:-431050.44:56140.59",
+      "kind": "alpha-pals",
+      "name": "Broncherry",
+      "detail": "Field Alpha \u00B7 Grass",
+      "level": 23,
+      "x": -431050.44,
+      "y": 56140.586
+    },
+    {
+      "id": "alpha:81_1_grass_FBOSS_25:-412259.28:106237.67",
+      "kind": "alpha-pals",
+      "name": "Gumoss",
+      "detail": "Field Alpha \u00B7 Grass / Ground",
+      "level": 11,
+      "x": -412259.28,
+      "y": 106237.67
+    },
+    {
+      "id": "alpha:81_1_grass_FBOSS_26:-206970.00:363810.00",
+      "kind": "alpha-pals",
+      "name": "Mossanda Lux",
+      "detail": "Field Alpha \u00B7 Electric",
+      "level": 31,
+      "x": -206970,
+      "y": 363810
+    },
+    {
+      "id": "alpha:81_1_grass_FBOSS_27:-122060.00:15810.00",
+      "kind": "alpha-pals",
+      "name": "Dumud",
+      "detail": "Field Alpha \u00B7 Ground / Water",
+      "level": 14,
+      "x": -122060,
+      "y": 15810
+    },
+    {
+      "id": "alpha:81_1_grass_FBOSS_28:-426590.00:90670.00",
+      "kind": "alpha-pals",
+      "name": "Caprity Noct",
+      "detail": "Field Alpha \u00B7 Dark",
+      "level": 23,
+      "x": -426590,
+      "y": 90670
+    },
+    {
+      "id": "alpha:81_1_grass_FBOSS_29:-147370.00:364010.00",
+      "kind": "alpha-pals",
+      "name": "Wumpo Botan",
+      "detail": "Field Alpha \u00B7 Grass",
+      "level": 38,
+      "x": -147370,
+      "y": 364010
+    },
+    {
+      "id": "alpha:81_1_grass_FBOSS_2:-335225.00:180735.00",
+      "kind": "alpha-pals",
+      "name": "Kingpaca",
+      "detail": "Field Alpha \u00B7 Normal",
+      "level": 23,
+      "x": -335225,
+      "y": 180735
+    },
+    {
+      "id": "alpha:81_1_grass_FBOSS_30:-239436.58:345.75",
+      "kind": "alpha-pals",
+      "name": "Tarantriss",
+      "detail": "Field Alpha \u00B7 Dark",
+      "level": 35,
+      "x": -239436.58,
+      "y": 345.74753
+    },
+    {
+      "id": "alpha:81_1_grass_FBOSS_31:-246100.00:77200.00",
+      "kind": "alpha-pals",
+      "name": "Azurobe",
+      "detail": "Field Alpha \u00B7 Water / Dragon",
+      "level": 40,
+      "x": -246100,
+      "y": 77200
+    },
+    {
+      "id": "alpha:81_1_grass_FBOSS_4:-113197.67:201490.47",
+      "kind": "alpha-pals",
+      "name": "Beakon",
+      "detail": "Field Alpha \u00B7 Electric",
+      "level": 37,
+      "x": -113197.67,
+      "y": 201490.47
+    },
+    {
+      "id": "alpha:81_1_grass_FBOSS_6:-282853.72:64952.20",
+      "kind": "alpha-pals",
+      "name": "Bushi",
+      "detail": "Field Alpha \u00B7 Fire",
+      "level": 25,
+      "x": -282853.72,
+      "y": 64952.2
+    },
+    {
+      "id": "alpha:81_1_grass_FBOSS_9:-285331.30:210162.69",
+      "kind": "alpha-pals",
+      "name": "Penking",
+      "detail": "Field Alpha \u00B7 Water / Ice",
+      "level": 15,
+      "x": -285331.3,
+      "y": 210162.69
+    },
+    {
+      "id": "alpha:81_1_grass_FBOSS_FlameBuffalo:-349072.88:104534.98",
+      "kind": "alpha-pals",
+      "name": "Arsox",
+      "detail": "Field Alpha \u00B7 Fire",
+      "level": 15,
+      "x": -349072.88,
+      "y": 104534.984
+    },
+    {
+      "id": "alpha:81_2_dessert_FBOSS_1:97716.31:307499.70",
+      "kind": "alpha-pals",
+      "name": "Suzaku",
+      "detail": "Field Alpha \u00B7 Fire",
+      "level": 45,
+      "x": 97716.31,
+      "y": 307499.7
+    },
+    {
+      "id": "alpha:81_2_dessert_FBOSS_2:187731.20:359897.25",
+      "kind": "alpha-pals",
+      "name": "Paladius",
+      "detail": "Field Alpha \u00B7 Normal",
+      "level": 60,
+      "x": 187731.2,
+      "y": 359897.25
+    },
+    {
+      "id": "alpha:81_2_dessert_FBOSS_3:122760.00:318710.00",
+      "kind": "alpha-pals",
+      "name": "Menasting",
+      "detail": "Field Alpha \u00B7 Dark / Ground",
+      "level": 44,
+      "x": 122760,
+      "y": 318710
+    },
+    {
+      "id": "alpha:81_2_dessert_FBOSS_5:50564.78:357757.47",
+      "kind": "alpha-pals",
+      "name": "Tetroise",
+      "detail": "Field Alpha \u00B7 Ground",
+      "level": 55,
+      "x": 50564.78,
+      "y": 357757.47
+    },
+    {
+      "id": "alpha:81_2_dessert_FBOSS_FlowerDinosaur_Electric:-46108.39:302547.80",
+      "kind": "alpha-pals",
+      "name": "Dinossom Lux",
+      "detail": "Field Alpha \u00B7 Electric / Dragon",
+      "level": 47,
+      "x": -46108.395,
+      "y": 302547.8
+    },
+    {
+      "id": "alpha:81_3_snow_FBOSS_1:109790.00:-5880.00",
+      "kind": "alpha-pals",
+      "name": "Frostallion",
+      "detail": "Field Alpha \u00B7 Ice",
+      "level": 60,
+      "x": 109790,
+      "y": -5880
+    },
+    {
+      "id": "alpha:81_3_volcano_FBOSS_2:-322819.97:-93429.84",
+      "kind": "alpha-pals",
+      "name": "Reptyro",
+      "detail": "Field Alpha \u00B7 Fire / Ground",
+      "level": 50,
+      "x": -322819.97,
+      "y": -93429.84
+    },
+    {
+      "id": "alpha:81_3_volcano_FBOSS_3:-276069.47:-180092.97",
+      "kind": "alpha-pals",
+      "name": "Blazamut",
+      "detail": "Field Alpha \u00B7 Fire",
+      "level": 52,
+      "x": -276069.47,
+      "y": -180092.97
+    },
+    {
+      "id": "alpha:81_4_Sakurajima_FBOSS_2:-238810.95:-110487.63",
+      "kind": "alpha-pals",
+      "name": "Knocklem",
+      "detail": "Field Alpha \u00B7 Ground",
+      "level": 55,
+      "x": -238810.95,
+      "y": -110487.63
+    },
+    {
+      "id": "alpha:81_5_Yamijima_FBOSS_11:-568029.20:-464143.12",
+      "kind": "alpha-pals",
+      "name": "Prunelia",
+      "detail": "Field Alpha \u00B7 Grass / Dark",
+      "level": 63,
+      "x": -568029.2,
+      "y": -464143.12
+    },
+    {
+      "id": "alpha:81_5_Yamijima_FBOSS_16:-729794.06:-338535.50",
+      "kind": "alpha-pals",
+      "name": "Tetroise Primo",
+      "detail": "Field Alpha \u00B7 Normal",
+      "level": 60,
+      "x": -729794.06,
+      "y": -338535.5
+    },
+    {
+      "id": "alpha:81_5_Yamijima_FBOSS_8:-797364.20:-245386.88",
+      "kind": "alpha-pals",
+      "name": "Smokie",
+      "detail": "Field Alpha \u00B7 Dark",
+      "level": 60,
+      "x": -797364.2,
+      "y": -245386.88
+    },
+    {
+      "id": "alpha:81_5_Yamijima_FBOSS_9:-589257.20:-265874.40",
+      "kind": "alpha-pals",
+      "name": "Nitemary",
+      "detail": "Field Alpha \u00B7 Dark",
+      "level": 60,
+      "x": -589257.2,
+      "y": -265874.4
+    },
+    {
+      "id": "alpha:81_6_Ocean_FBOSS_1:262730.00:75740.00",
+      "kind": "alpha-pals",
+      "name": "Whalaska",
+      "detail": "Field Alpha \u00B7 Ice / Water",
+      "level": 55,
+      "x": 262730,
+      "y": 75740
+    },
+    {
+      "id": "alpha:desertisland_1_FBOSS:-404768.20:-444910.75",
+      "kind": "alpha-pals",
+      "name": "Prixter Lux",
+      "detail": "Field Alpha \u00B7 Electric / Ground",
+      "level": 70,
+      "x": -404768.2,
+      "y": -444910.75
+    },
+    {
+      "id": "alpha:desertisland_2_FBOSS:-450359.53:356886.22",
+      "kind": "alpha-pals",
+      "name": "Needoll",
+      "detail": "Field Alpha \u00B7 Grass",
+      "level": 40,
+      "x": -450359.53,
+      "y": 356886.22
+    },
+    {
+      "id": "alpha:remainsIsland_1_GrassGolem_FBOSS:-169138.25:575683.10",
+      "kind": "alpha-pals",
+      "name": "Dualith",
+      "detail": "Field Alpha \u00B7 Ground / Grass",
+      "level": 55,
+      "x": -169138.25,
+      "y": 575683.1
+    },
+    {
+      "id": "alpha:remainsIsland_1_GrassGolem_FBOSS:517450.00:-626940.00",
+      "kind": "alpha-pals",
+      "name": "Dualith",
+      "detail": "Field Alpha \u00B7 Ground / Grass",
+      "level": 75,
+      "x": 517450,
+      "y": -626940
+    },
+    {
+      "id": "alpha:remainsIsland_2_GrassGolem_Dark_FBOSS:-558869.94:-619480.75",
+      "kind": "alpha-pals",
+      "name": "Dualith Noct",
+      "detail": "Field Alpha \u00B7 Ground / Dark",
+      "level": 70,
+      "x": -558869.94,
+      "y": -619480.75
+    },
+    {
+      "id": "alpha:sakura_purple_D_LilyQueen:14681.05:-132067.56",
+      "kind": "alpha-pals",
+      "name": "Lyleen",
+      "detail": "Field Alpha \u00B7 Grass",
+      "level": 58,
+      "x": 14681.052,
+      "y": -132067.56
+    },
+    {
+      "id": "alpha:sakura_purple_D_LilyQueen_Dark:15843.52:-130382.90",
+      "kind": "alpha-pals",
+      "name": "Lyleen Noct",
+      "detail": "Field Alpha \u00B7 Dark",
+      "level": 58,
+      "x": 15843.516,
+      "y": -130382.9
+    },
+    {
+      "id": "alpha:sakura_red_B_BOSS:21745.54:-109001.64",
+      "kind": "alpha-pals",
+      "name": "Menasting Terra",
+      "detail": "Field Alpha \u00B7 Ground",
+      "level": 55,
+      "x": 21745.545,
+      "y": -109001.64
+    },
+    {
+      "id": "alpha:sanctuary_1_forest_FBOSS:-443860.80:183689.42",
+      "kind": "alpha-pals",
+      "name": "Grizzbolt",
+      "detail": "Field Alpha \u00B7 Electric",
+      "level": 30,
+      "x": -443860.8,
+      "y": 183689.42
+    },
+    {
+      "id": "alpha:sanctuary_2_volcano_FBOSS:-174578.95:-158213.75",
+      "kind": "alpha-pals",
+      "name": "Astegon",
+      "detail": "Field Alpha \u00B7 Dragon / Dark",
+      "level": 55,
+      "x": -174578.95,
+      "y": -158213.75
+    },
+    {
+      "id": "alpha:sanctuary_3_dessert_FBOSS:173548.30:474295.44",
+      "kind": "alpha-pals",
+      "name": "Frostallion Noct",
+      "detail": "Field Alpha \u00B7 Dark",
+      "level": 65,
+      "x": 173548.3,
+      "y": 474295.44
+    },
+    {
+      "id": "alpha:skyisland_8_04_B_highland_FBOSS_1:-735438.40:-95932.93",
+      "kind": "alpha-pals",
+      "name": "Jetragon",
+      "detail": "Field Alpha \u00B7 Dragon",
+      "level": 70,
+      "x": -735438.4,
+      "y": -95932.93
+    },
+    {
+      "id": "alpha:skyisland_8_06_C_lotsulake_FBOSS_1:-802420.00:-112610.00",
+      "kind": "alpha-pals",
+      "name": "Ophydia",
+      "detail": "Field Alpha \u00B7 Grass / Water",
+      "level": 69,
+      "x": -802420,
+      "y": -112610
+    },
+    {
+      "id": "alpha:skyisland_8_07_G_mountain_FBOSS_1:-821552.10:46132.06",
+      "kind": "alpha-pals",
+      "name": "Flaracle",
+      "detail": "Field Alpha \u00B7 Fire",
+      "level": 68,
+      "x": -821552.1,
+      "y": 46132.06
+    },
+    {
+      "id": "alpha:skyisland_8_07_G_mountain_FBOSS_2:-822824.00:16747.00",
+      "kind": "alpha-pals",
+      "name": "Dynamoff",
+      "detail": "Field Alpha \u00B7 Electric",
+      "level": 67,
+      "x": -822824,
+      "y": 16747
+    },
+    {
+      "id": "alpha:skyisland_8_09_D_forest_FBOSS_2:-773523.90:51495.86",
+      "kind": "alpha-pals",
+      "name": "Wistella",
+      "detail": "Field Alpha \u00B7 Dark",
+      "level": 66,
+      "x": -773523.9,
+      "y": 51495.863
+    },
+    {
+      "id": "alpha:skyisland_8_10_D_swamp_FBOSS_1:-746847.06:-10678.01",
+      "kind": "alpha-pals",
+      "name": "Slowatt",
+      "detail": "Field Alpha \u00B7 Electric",
+      "level": 66,
+      "x": -746847.06,
+      "y": -10678.006
+    },
+    {
+      "id": "alpha:skyisland_8_11_E_meadow_FBOSS_1:-772844.00:-11173.00",
+      "kind": "alpha-pals",
+      "name": "Snock",
+      "detail": "Field Alpha \u00B7 Electric",
+      "level": 65,
+      "x": -772844,
+      "y": -11173
+    },
+    {
+      "id": "alpha:skyisland_8_15_1_lake_FBOSS_1:-822007.00:-66402.00",
+      "kind": "alpha-pals",
+      "name": "Eidrolon",
+      "detail": "Field Alpha \u00B7 Dragon / Dark",
+      "level": 69,
+      "x": -822007,
+      "y": -66402
+    },
+    {
+      "id": "alpha:snow_orange_I_BOSS:39324.88:-18772.69",
+      "kind": "alpha-pals",
+      "name": "Kingpaca Cryst",
+      "detail": "Field Alpha \u00B7 Ice",
+      "level": 46,
+      "x": 39324.883,
+      "y": -18772.695
+    },
+    {
+      "id": "alpha:volcanoiskand_1_FBOSS:-1033347.94:-358750.80",
+      "kind": "alpha-pals",
+      "name": "Moldron",
+      "detail": "Field Alpha \u00B7 Fire / Ground",
+      "level": 70,
+      "x": -1033347.94,
+      "y": -358750.8
+    },
+    {
+      "id": "alpha:volcanoiskand_2_FBOSS:90345.45:534007.80",
+      "kind": "alpha-pals",
+      "name": "Pierdon",
+      "detail": "Field Alpha \u00B7 Ground",
+      "level": 50,
+      "x": 90345.45,
+      "y": 534007.8
+    },
+    {
+      "id": "alpha:worldtree_9_02_B_FBOSS_1:526910.20:-581727.60",
+      "kind": "alpha-pals",
+      "name": "Whalaska Ignis",
+      "detail": "Field Alpha \u00B7 Ice / Fire",
+      "level": 74,
+      "x": 526910.2,
+      "y": -581727.6
+    },
+    {
+      "id": "alpha:worldtree_9_05_D_FBOSS_1:601096.75:-572063.06",
+      "kind": "alpha-pals",
+      "name": "Renjishi",
+      "detail": "Field Alpha \u00B7 Fire",
+      "level": 78,
+      "x": 601096.75,
+      "y": -572063.06
+    },
+    {
+      "id": "alpha:worldtree_9_07_I_FBOSS_1:571870.00:-733420.00",
+      "kind": "alpha-pals",
+      "name": "Moldron Cryst",
+      "detail": "Field Alpha \u00B7 Ice / Ground",
+      "level": 78,
+      "x": 571870,
+      "y": -733420
+    },
+    {
+      "id": "alpha:worldtree_9_10_L_FBOSS_1:458095.00:-694560.00",
+      "kind": "alpha-pals",
+      "name": "Mycora",
+      "detail": "Field Alpha \u00B7 Grass",
+      "level": 78,
+      "x": 458095,
+      "y": -694560
+    },
+    {
+      "id": "alpha:worldtree_9_11_N_FBOSS_1:520440.00:-727175.00",
+      "kind": "alpha-pals",
+      "name": "Celesdir Noct",
+      "detail": "Field Alpha \u00B7 Dark",
+      "level": 79,
+      "x": 520440,
+      "y": -727175
+    },
+    {
+      "id": "alpha:worldtree_9_13_M_FBOSS_1:491580.78:-725697.06",
+      "kind": "alpha-pals",
+      "name": "Aegidron",
+      "detail": "Field Alpha \u00B7 Dragon / Ground",
+      "level": 79,
+      "x": 491580.78,
+      "y": -725697.06
+    },
+    {
+      "id": "alpha:yamijima_IceLand_pink_A_BOSS:-773027.40:-368265.88",
+      "kind": "alpha-pals",
+      "name": "Loupmoon Cryst",
+      "detail": "Field Alpha \u00B7 Ice",
+      "level": 66,
+      "x": -773027.4,
+      "y": -368265.88
+    },
+    {
+      "id": "alpha:yamijima_IceLand_pink_D_BOSS:-867560.90:-441338.22",
+      "kind": "alpha-pals",
+      "name": "Faleris Aqua",
+      "detail": "Field Alpha \u00B7 Water",
+      "level": 66,
+      "x": -867560.9,
+      "y": -441338.22
+    },
+    {
+      "id": "alpha:yamijima_IceLand_pink_F_BOSS:-889441.30:-361294.30",
+      "kind": "alpha-pals",
+      "name": "Azurmane",
+      "detail": "Field Alpha \u00B7 Electric",
+      "level": 66,
+      "x": -889441.3,
+      "y": -361294.3
+    },
+    {
+      "id": "alpha:yamijima_beach_purple_BOSS:-516157.00:-393151.12",
+      "kind": "alpha-pals",
+      "name": "Dazzi Noct",
+      "detail": "Field Alpha \u00B7 Dark / Electric",
+      "level": 60,
+      "x": -516157,
+      "y": -393151.12
+    },
+    {
+      "id": "alpha:yamijima_forest_pink_D_WhiteDeer:-661871.90:-284991.84",
+      "kind": "alpha-pals",
+      "name": "Celesdir",
+      "detail": "Field Alpha \u00B7 Normal",
+      "level": 65,
+      "x": -661871.9,
+      "y": -284991.84
+    },
+    {
+      "id": "alpha:yamijima_forest_purple_A_BOSS:-772213.20:-273563.47",
+      "kind": "alpha-pals",
+      "name": "Gildane",
+      "detail": "Field Alpha \u00B7 Ground",
+      "level": 63,
+      "x": -772213.2,
+      "y": -273563.47
+    },
+    {
+      "id": "alpha:yamijima_forest_purple_A_BOSS_2:-717565.94:-251787.33",
+      "kind": "alpha-pals",
+      "name": "Starryon",
+      "detail": "Field Alpha \u00B7 Dark",
+      "level": 63,
+      "x": -717565.94,
+      "y": -251787.33
+    },
+    {
+      "id": "alpha:yamijima_forest_purple_C_BOSS:-691248.60:-309680.34",
+      "kind": "alpha-pals",
+      "name": "Warsect Terra",
+      "detail": "Field Alpha \u00B7 Ground",
+      "level": 64,
+      "x": -691248.6,
+      "y": -309680.34
+    },
+    {
+      "id": "alpha:yamijima_plateau_pink_F_BOSS:-723782.70:-230996.66",
+      "kind": "alpha-pals",
+      "name": "Kitsun Noct",
+      "detail": "Field Alpha \u00B7 Dark",
+      "level": 65,
+      "x": -723782.7,
+      "y": -230996.66
+    },
+    {
+      "id": "alpha:yamijima_plateau_pink_G_BOSS_2:-791868.20:-337175.94",
+      "kind": "alpha-pals",
+      "name": "Splatterina",
+      "detail": "Field Alpha \u00B7 Dark",
+      "level": 65,
+      "x": -791868.2,
+      "y": -337175.94
+    },
+    {
+      "id": "alpha:yamijima_plateau_purple_BOSS:-544943.30:-264111.88",
+      "kind": "alpha-pals",
+      "name": "Nyafia",
+      "detail": "Field Alpha \u00B7 Dark",
+      "level": 60,
+      "x": -544943.3,
+      "y": -264111.88
+    },
+    {
+      "id": "alpha:yamijima_plateau_purple_BOSS_2:-593253.10:-294034.56",
+      "kind": "alpha-pals",
+      "name": "Silvegis",
+      "detail": "Field Alpha \u00B7 Dragon",
+      "level": 62,
+      "x": -593253.1,
+      "y": -294034.56
+    },
+    {
+      "id": "alpha:yamijima_plateau_purple_C_BOSS:-649837.06:-235616.66",
+      "kind": "alpha-pals",
+      "name": "Fenglope Lux",
+      "detail": "Field Alpha \u00B7 Electric",
+      "level": 60,
+      "x": -649837.06,
+      "y": -235616.66
+    },
+    {
+      "id": "alpha:yamijima_rock_pink_E_BOSS:-721639.00:-432015.00",
+      "kind": "alpha-pals",
+      "name": "Cryolinx Terra",
+      "detail": "Field Alpha \u00B7 Ground",
+      "level": 62,
+      "x": -721639,
+      "y": -432015
+    },
+    {
+      "id": "alpha:yamijima_rock_purple_BOSS:-550552.06:-166886.31",
+      "kind": "alpha-pals",
+      "name": "Omascul",
+      "detail": "Field Alpha \u00B7 Dark",
+      "level": 60,
+      "x": -550552.06,
+      "y": -166886.31
+    },
+    {
+      "id": "tower:REGION_Darkisland_Boss",
+      "kind": "bosses",
+      "name": "Bjorn \u0026 Bastigor",
+      "detail": "Feybreak Tower \u00B7 Ice",
+      "level": 60,
+      "x": -889805.1875,
+      "y": -435828
+    },
+    {
+      "id": "tower:REGION_Desert_Boss",
+      "kind": "bosses",
+      "name": "Marcus \u0026 Faleris",
+      "detail": "PIDF Tower \u00B7 Fire",
+      "level": 40,
+      "x": 29975.275390625,
+      "y": 413325
+    },
+    {
+      "id": "tower:REGION_Forest_Boss",
+      "kind": "bosses",
+      "name": "Lily \u0026 Lyleen",
+      "detail": "Free Pal Alliance Tower \u00B7 Grass",
+      "level": 20,
+      "x": -266563.15625,
+      "y": 174506.296875
+    },
+    {
+      "id": "tower:REGION_Frost_Boss",
+      "kind": "bosses",
+      "name": "Victor \u0026 Shadowbeak",
+      "detail": "PAL Genetic Research Unit Tower \u00B7 Dark",
+      "level": 50,
+      "x": 81363,
+      "y": 90183
+    },
+    {
+      "id": "tower:REGION_Grass_Boss",
+      "kind": "bosses",
+      "name": "Zoe \u0026 Grizzbolt",
+      "detail": "Rayne Syndicate Tower \u00B7 Electric",
+      "level": 10,
+      "x": -321596.25,
+      "y": 209085
+    },
+    {
+      "id": "tower:REGION_Sakurajima_Boss",
+      "kind": "bosses",
+      "name": "Saya \u0026 Selyne",
+      "detail": "Moonflower Tower \u00B7 Dark / Normal",
+      "level": 55,
+      "x": -29427.572265625,
+      "y": -115900.0546875
+    },
+    {
+      "id": "tower:REGION_Skyisland_Boss",
+      "kind": "bosses",
+      "name": "Auri \u0026 Shaolong",
+      "detail": "Azure Covenant Tower \u00B7 Dragon / Water",
+      "level": 68,
+      "x": -778215.875,
+      "y": -36025.99609375
+    },
+    {
+      "id": "tower:REGION_Volcano_Boss",
+      "kind": "bosses",
+      "name": "Axel \u0026 Orserk",
+      "detail": "Brothers of the Eternal Pyre Tower \u00B7 Dragon / Electric",
+      "level": 30,
+      "x": -361695,
+      "y": -112009
+    },
+    {
+      "id": "tower:REGION_WorldTree_Boss",
+      "kind": "bosses",
+      "name": "Zenara \u0026 Astralym",
+      "detail": "Within the Seal",
+      "level": 80,
+      "x": 495634.25,
+      "y": -756824.375
+    }
+  ]
+}

@@ -1,0 +1,36 @@
+{
+  "placement": {
+    "actorName": "BP_PalBossTower_C_0",
+    "bossType": "EPalBossType::GrassBoss",
+    "x": -321596.25,
+    "y": 209085.0
+  },
+  "bossParameters": {
+    "GrassBoss": {
+      "palId": "GYM_ElecPanda",
+      "level": 10
+    }
+  },
+  "monsterRows": {
+    "GYM_ElecPanda": {
+      "IsTowerBoss": true,
+      "OverrideNameTextID": "PAL_NAME_GYM_ElecPanda",
+      "ElementType1": "EPalElementType::Electricity",
+      "ElementType2": "EPalElementType::None"
+    }
+  },
+  "palNameRows": {
+    "PAL_NAME_GYM_ElecPanda": {
+      "TextData": {
+        "LocalizedString": "Zoe & Grizzbolt"
+      }
+    }
+  },
+  "regionRows": {
+    "REGION_Grass_Boss": {
+      "TextData": {
+        "LocalizedString": "Rayne Syndicate Tower"
+      }
+    }
+  }
+}

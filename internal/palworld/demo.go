@@ -38,6 +38,7 @@ var (
 	demoEmberID      = opaqueID("player", "demo-player-ember")
 	demoJuniperID    = opaqueID("player", "demo-player-juniper")
 	demoOrbitID      = opaqueID("player", "demo-player-orbit")
+	demoSableID      = opaqueID("player", "demo-player-sable")
 )
 
 var demoPlayers = []demoPlayer{
@@ -99,13 +100,32 @@ func (d *DemoSource) Players(ctx context.Context) ([]Player, error) {
 	return demoPlayersAt(elapsed), nil
 }
 
+// Roster adds a fictional offline member so demo deployments exercise the
+// same leaderboard, guild, and gray-marker paths as save-backed servers.
+func (d *DemoSource) Roster(ctx context.Context) (RosterSnapshot, error) {
+	if err := ctx.Err(); err != nil {
+		return RosterSnapshot{}, err
+	}
+	now := d.now().UTC()
+	players := demoPlayersAt(now.Sub(d.started).Seconds())
+	for index := range players {
+		players[index].Online = false
+	}
+	players = append(players, Player{
+		ID: demoSableID, Name: "Sable", GuildKey: demoGuildKey, GuildName: "Aurora Expedition",
+		Level: 53, LastSeenAt: now.Add(-2*time.Hour - 17*time.Minute),
+		X: -338000, Y: 91000, Map: "palpagos",
+	})
+	return RosterSnapshot{SnapshotAt: now.Add(-30 * time.Second), Players: players}, nil
+}
+
 func demoPlayersAt(elapsed float64) []Player {
 	players := make([]Player, 0, len(demoPlayers))
 	for _, spec := range demoPlayers {
 		angle := spec.phase + elapsed/spec.periodSeconds*2*math.Pi
 		players = append(players, Player{
 			ID: spec.id, Name: spec.name,
-			GuildKey: spec.guildKey, GuildName: spec.guildName, Level: spec.level, Map: spec.mapID,
+			GuildKey: spec.guildKey, GuildName: spec.guildName, Level: spec.level, Online: true, Map: spec.mapID,
 			X: spec.centerX + math.Sin(angle)*spec.radiusX,
 			Y: spec.centerY + math.Cos(angle)*spec.radiusY,
 		})

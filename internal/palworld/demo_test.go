@@ -89,6 +89,14 @@ func TestDemoSourceProvidesAllPublicDataKinds(t *testing.T) {
 			t.Fatalf("demo player has no guild relation: %#v", player)
 		}
 	}
+	roster, err := source.Roster(context.Background())
+	if err != nil || len(roster.Players) != len(players)+1 || roster.SnapshotAt.IsZero() {
+		t.Fatalf("Roster() = %+v, %v", roster, err)
+	}
+	offline := roster.Players[len(roster.Players)-1]
+	if offline.ID != demoSableID || offline.Online || offline.LastSeenAt.IsZero() || offline.GuildKey != demoGuildKey {
+		t.Fatalf("demo offline roster member = %#v", offline)
+	}
 	objects, err := source.WorldObjects(context.Background())
 	if err != nil {
 		t.Fatalf("WorldObjects() error = %v", err)

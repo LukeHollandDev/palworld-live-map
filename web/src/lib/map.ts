@@ -8,8 +8,21 @@ const MARKER_STACK_ORDER: Record<ItemKind, number> = {
   npcs: 20,
   workers: 30,
   companions: 40,
-  bases: 50,
-  players: 60
+  'alpha-pals': 50,
+  bosses: 60,
+  bases: 70,
+  players: 80
+}
+
+const ITEM_KIND_SEARCH_TERMS: Record<ItemKind, string> = {
+  players: 'player players guild member guild members',
+  bases: 'base bases palbox',
+  workers: 'base worker base workers assigned pal assigned pals',
+  companions: 'companion pal companion pals',
+  'wild-pals': 'wild pal wild pals',
+  'alpha-pals': 'alpha pal alpha pals field alpha field alphas',
+  bosses: 'tower boss tower bosses biome boss biome bosses',
+  npcs: 'npc npcs non-player character non-player characters'
 }
 
 export interface Point {
@@ -96,6 +109,11 @@ export function markerText(item: MapItem): string {
   return `${item.name} · Lv ${item.level}`
 }
 
+export function itemSearchText(item: MapItem, relatedName = ''): string {
+  const playerStatus = item.kind === 'players' ? (item.online === false ? 'offline' : 'online') : ''
+  return `${item.name} ${item.detail || ''} ${item.level || ''} ${item.guildName || ''} ${ITEM_KIND_SEARCH_TERMS[item.kind]} ${playerStatus} ${relatedName}`.toLowerCase()
+}
+
 export function markerStackOrder(kind: ItemKind): number {
   return MARKER_STACK_ORDER[kind]
 }
@@ -108,6 +126,8 @@ export function kindLabel(kind: MapItem['kind']): string {
       workers: 'Base worker',
       companions: 'Companion Pal',
       'wild-pals': 'Wild Pal',
+      'alpha-pals': 'Alpha Pal',
+      bosses: 'Tower boss',
       npcs: 'NPC'
     } as const
   )[kind]

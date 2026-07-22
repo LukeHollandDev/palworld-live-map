@@ -85,7 +85,7 @@ func TestClientPlayersSanitizesUpstreamResponse(t *testing.T) {
 	if len(players) != 2 {
 		t.Fatalf("len(players) = %d", len(players))
 	}
-	if players[0].Name != "Alice" || players[0].Map != "world-tree" {
+	if players[0].Name != "Alice" || players[0].Map != "world-tree" || !players[0].Online {
 		t.Fatalf("players[0] = %#v", players[0])
 	}
 	if players[1].Name != "Zed" || players[1].Map != "palpagos" {
@@ -100,6 +100,28 @@ func TestClientPlayersSanitizesUpstreamResponse(t *testing.T) {
 	}
 	if strings.Contains(string(encoded), "private-player-id") || strings.Contains(string(encoded), "private-account") {
 		t.Fatalf("players expose an upstream identifier: %s", encoded)
+	}
+}
+
+func TestClientProjectsSaveGUIDsIntoRESTIdentityNamespaces(t *testing.T) {
+	client, err := NewClient("http://palworld:8212", "secret", time.Second, time.Second)
+	if err != nil {
+		t.Fatal(err)
+	}
+	playerFromSave, ok := client.PublicPlayerID("00112233-4455-6677-8899-AABBCCDDEEFF")
+	if !ok {
+		t.Fatal("valid save player GUID was rejected")
+	}
+	playerFromREST := client.publicID("player", "player-id:00112233445566778899aabbccddeeff")
+	if playerFromSave != playerFromREST {
+		t.Fatalf("save player ID %q != REST player ID %q", playerFromSave, playerFromREST)
+	}
+	guild, ok := client.PublicGuildKey("FFEEDDCCBBAA99887766554433221100")
+	if !ok || guild != client.publicID("guild", "ffeeddccbbaa99887766554433221100") {
+		t.Fatalf("guild key = %q, ok = %v", guild, ok)
+	}
+	if _, ok := client.PublicPlayerID("../../not-a-guid"); ok {
+		t.Fatal("invalid save player GUID was accepted")
 	}
 }
 

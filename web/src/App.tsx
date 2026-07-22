@@ -6,33 +6,47 @@ import { ProjectLinks } from './components/ProjectLinks'
 import { StatusBar } from './components/StatusBar'
 import { usePolling } from './hooks/usePolling'
 import { guildIdForBase } from './lib/guilds'
-import { loadFilterPreferences, saveFilterPreferences } from './lib/preferences'
+import type { LeaderboardId } from './lib/leaderboards'
 import {
-  ALL_KINDS,
+  DEFAULT_ENABLED_KINDS,
+  DEFAULT_ENABLED_PLAYER_STATUSES,
+  loadFilterPreferences,
+  saveFilterPreferences
+} from './lib/preferences'
+import {
   EMPTY_OBJECT_STATE,
   type ItemKind,
   type MapItem,
   type MapLayer,
   type ObjectState,
   type PlayerState,
+  type PlayerStatus,
   type PublicConfig
 } from './types'
 
-function SearchToggleIcon({ className = '' }: { className?: string }) {
+// Trophy icon from Primer Octicons (MIT): https://primer.style/octicons/icon/trophy-24/
+function LeaderboardIcon() {
   return (
-    <svg
-      className={className}
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.75"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <path d="m9 6 6 6-6 6" />
+    <svg className="size-6" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+      <path d="M5.09 10.121A5.251 5.251 0 0 1 1 5V3.75C1 2.784 1.784 2 2.75 2h2.364c.236-.586.81-1 1.48-1h10.812c.67 0 1.244.414 1.48 1h2.489c.966 0 1.75.784 1.75 1.75V5a5.252 5.252 0 0 1-4.219 5.149 7.01 7.01 0 0 1-4.644 5.478l.231 3.003.034.031c.079.065.303.203.836.282.838.124 1.637.81 1.637 1.807v.75h2.25a.75.75 0 0 1 0 1.5H4.75a.75.75 0 0 1 0-1.5H7v-.75c0-.996.8-1.683 1.637-1.807.533-.08.757-.217.836-.282l.034-.031.231-3.003A7.012 7.012 0 0 1 5.09 10.12ZM6.5 2.594V9a5.5 5.5 0 1 0 11 0V2.594a.094.094 0 0 0-.094-.094H6.594a.094.094 0 0 0-.094.094Zm4.717 13.363-.215 2.793-.001.021-.003.043a1.212 1.212 0 0 1-.022.147c-.05.237-.194.567-.553.86-.348.286-.853.5-1.566.605a.478.478 0 0 0-.274.136.264.264 0 0 0-.083.188v.75h7v-.75a.264.264 0 0 0-.083-.188.478.478 0 0 0-.274-.136c-.713-.105-1.218-.32-1.567-.604-.358-.294-.502-.624-.552-.86a1.22 1.22 0 0 1-.025-.19l-.001-.022-.215-2.793a7.069 7.069 0 0 1-1.566 0ZM19 8.578A3.751 3.751 0 0 0 21.625 5V3.75a.25.25 0 0 0-.25-.25H19ZM5 3.5H2.75a.25.25 0 0 0-.25.25V5A3.752 3.752 0 0 0 5 8.537Z" />
     </svg>
   )
+}
+
+function releaseVersionParts(version: string | undefined) {
+  const match = version?.trim().match(/^v?(\d+(?:\.\d+){2,3})$/i)
+  return match?.[1].split('.') || []
+}
+
+function landmarkCatalogueCompatibility(catalogueVersion: string, serverVersion: string | undefined) {
+  if (serverVersion?.trim().toLowerCase() === '1.0 demo') return 'compatible'
+  const catalogueParts = releaseVersionParts(catalogueVersion)
+  const serverParts = releaseVersionParts(serverVersion)
+  if (catalogueParts.length === 0 || serverParts.length === 0) return 'unverifiable'
+  return catalogueParts.length === serverParts.length &&
+    catalogueParts.every((part, index) => part === serverParts[index])
+    ? 'compatible'
+    : 'mismatch'
 }
 
 export function App() {
@@ -58,15 +72,15 @@ export function App() {
 
   if (!config) {
     return (
-      <div className="grid h-dvh grid-rows-[64px_1fr] bg-[#171a1d] text-[#f4f5f5] max-md:grid-rows-[76px_1fr]">
+      <div className="relative h-dvh overflow-hidden bg-[#171a1d] text-[#f4f5f5]">
         <StatusBar playerState={null} offline={configError} />
-        <main className="grid place-items-center bg-[#111416] text-sm text-[#8f989d]">
+        <main className="absolute inset-0 grid place-items-center bg-[#111416] text-sm text-[#8f989d]">
           {configError ? (
             <div className="grid justify-items-center gap-3">
               <p className="m-0">Map unavailable</p>
               <button
                 type="button"
-                className="min-h-11 cursor-pointer border border-[#64d7e7]/60 bg-[#112b33] px-4 text-xs text-[#e5f7f8] hover:border-[#9cebf4] hover:bg-[#173b46]"
+                className="pal-glass-control min-h-11 cursor-pointer px-4 text-xs text-[#e5f7f8]"
                 onClick={() => {
                   setConfigError(false)
                   setConfigAttempt((attempt) => attempt + 1)
@@ -96,37 +110,40 @@ function LiveMap({ config }: { config: PublicConfig }) {
     () => config.layers.find((layer) => layer.id === initialPreferences.activeLayerId) || config.layers[0]
   )
   const [enabledKinds, setEnabledKinds] = useState(
-    () => initialPreferences.enabledKinds || new Set<ItemKind>(ALL_KINDS)
+    () => new Set<ItemKind>(initialPreferences.enabledKinds || DEFAULT_ENABLED_KINDS)
+  )
+  const [enabledPlayerStatuses, setEnabledPlayerStatuses] = useState(
+    () => new Set<PlayerStatus>(initialPreferences.enabledPlayerStatuses || DEFAULT_ENABLED_PLAYER_STATUSES)
   )
   const [hiddenIds, setHiddenIds] = useState(() => initialPreferences.hiddenIds || new Set<string>())
-  const [expandedPlayers, setExpandedPlayers] = useState(() => new Set<string>())
   const [expandedGuilds, setExpandedGuilds] = useState(() => new Set<string>())
   const [expandedBases, setExpandedBases] = useState(() => new Set<string>())
   const [search, setSearch] = useState('')
-  const [searchOpen, setSearchOpen] = useState(() => typeof window === 'undefined' || window.innerWidth >= 640)
   const [filtersOpen, setFiltersOpen] = useState(() => typeof window === 'undefined' || window.innerWidth >= 640)
   const [detail, setDetail] = useState<Detail | null>(null)
   const [returnFocus, setReturnFocus] = useState<HTMLElement | null>(null)
   const mapRef = useRef<MapViewportHandle>(null)
   const pendingFocusRef = useRef<{ itemId: string; returnFocus: HTMLElement } | null>(null)
   const searchRef = useRef<HTMLInputElement>(null)
-  const searchToggleRef = useRef<HTMLButtonElement>(null)
+  const leaderboardButtonRef = useRef<HTMLButtonElement>(null)
 
   useEffect(() => {
-    saveFilterPreferences({ activeLayerId: activeLayer.id, enabledKinds, hiddenIds })
-  }, [activeLayer.id, enabledKinds, hiddenIds])
+    saveFilterPreferences({ activeLayerId: activeLayer.id, enabledKinds, enabledPlayerStatuses, hiddenIds })
+  }, [activeLayer.id, enabledKinds, enabledPlayerStatuses, hiddenIds])
 
-  const items = useMemo<MapItem[]>(
-    () => [
+  const items = useMemo<MapItem[]>(() => {
+    const combined: MapItem[] = [
+      ...(config.landmarks || []),
+      ...(objectState.objects || []),
       ...(playerState?.players || []).map((player) => ({
         ...player,
         kind: 'players' as const,
-        detail: `Level ${player.level}`
-      })),
-      ...(objectState.objects || [])
-    ],
-    [objectState.objects, playerState?.players]
-  )
+        online: player.online !== false,
+        detail: `${player.online === false ? 'Offline' : 'Online'} · Level ${player.level}`
+      }))
+    ]
+    return Array.from(new Map(combined.map((item) => [item.id, item])).values())
+  }, [config.landmarks, objectState.objects, playerState?.players])
   const itemById = useMemo(() => new Map(items.map((item) => [item.id, item])), [items])
   const detailedItem = detail?.kind === 'item' ? itemById.get(detail.itemId) : undefined
   const detailedGuildExists =
@@ -144,7 +161,7 @@ function LiveMap({ config }: { config: PublicConfig }) {
       if (event.key !== '/' || event.metaKey || event.ctrlKey || event.altKey) return
       if ((event.target as HTMLElement).matches('input, textarea, select')) return
       event.preventDefault()
-      setSearchOpen(true)
+      setFiltersOpen(true)
       window.requestAnimationFrame(() => searchRef.current?.focus())
     }
     window.addEventListener('keydown', handleShortcut)
@@ -153,6 +170,7 @@ function LiveMap({ config }: { config: PublicConfig }) {
 
   useEffect(() => {
     if (!detail) return
+    if (detail.kind === 'leaderboard') return
     if (detail.kind === 'guild' ? detailedGuildExists : detailedItem?.map === activeLayer.id) return
     setDetail(null)
     mapRef.current?.clearSelection()
@@ -168,7 +186,7 @@ function LiveMap({ config }: { config: PublicConfig }) {
       pendingFocusRef.current = null
       const safeReturnFocus = pending.returnFocus.isConnected
         ? pending.returnFocus
-        : searchToggleRef.current || pending.returnFocus
+        : leaderboardButtonRef.current || pending.returnFocus
       mapRef.current?.focusItem(item, safeReturnFocus)
     })
     return () => window.cancelAnimationFrame(frame)
@@ -187,6 +205,13 @@ function LiveMap({ config }: { config: PublicConfig }) {
     setDetail({ kind: 'guild', guildId })
   }
 
+  const showLeaderboard = (leaderboardId: LeaderboardId, focus: HTMLElement) => {
+    pendingFocusRef.current = null
+    setReturnFocus(focus)
+    mapRef.current?.clearSelection()
+    setDetail({ kind: 'leaderboard', leaderboardId })
+  }
+
   const focusItem = (item: MapItem, focus: HTMLElement) => {
     setEnabledKinds((current) => {
       const next = new Set(current)
@@ -198,6 +223,13 @@ function LiveMap({ config }: { config: PublicConfig }) {
       }
       return next
     })
+    if (item.kind === 'players') {
+      setEnabledPlayerStatuses((current) => {
+        const next = new Set(current)
+        next.add(item.online === false ? 'offline' : 'online')
+        return next
+      })
+    }
     setHiddenIds((current) => {
       const next = new Set(current)
       next.delete(item.id)
@@ -241,6 +273,29 @@ function LiveMap({ config }: { config: PublicConfig }) {
     })
   }
 
+  const togglePlayerStatus = (status: PlayerStatus, visible: boolean) => {
+    setEnabledPlayerStatuses((current) => {
+      const next = new Set(current)
+      if (visible) next.add(status)
+      else next.delete(status)
+      return next
+    })
+    if (!visible) return
+    setEnabledKinds((current) => new Set(current).add('players'))
+    setHiddenIds((current) => {
+      const next = new Set(current)
+      for (const item of items) {
+        if (
+          item.kind === 'players' &&
+          item.map === activeLayer.id &&
+          (item.online === false ? 'offline' : 'online') === status
+        )
+          next.delete(item.id)
+      }
+      return next
+    })
+  }
+
   const toggleSetValue = (setter: React.Dispatch<React.SetStateAction<Set<string>>>, id: string) => {
     setter((current) => {
       const next = new Set(current)
@@ -276,20 +331,45 @@ function LiveMap({ config }: { config: PublicConfig }) {
     objectNotice = `Showing ${objectState.objects.length.toLocaleString()} of ${objectState.total.toLocaleString()} world objects; this snapshot reached the configured limit.`
   else if (!objectState.available) objectNotice = 'Loading bases, Pals and NPCs…'
 
+  const catalogueCompatibility = playerState
+    ? landmarkCatalogueCompatibility(config.landmarkCatalogue.gameVersion, playerState.server.version)
+    : 'compatible'
+  if (catalogueCompatibility === 'mismatch') {
+    const catalogueNotice = `Landmark catalogue version mismatch: locations were exported for Palworld ${config.landmarkCatalogue.gameVersion}, but this server reports ${playerState?.server.version}. Alpha Pal and Tower Boss locations may be outdated; regenerate them with make game-assets.`
+    objectNotice = objectNotice ? `${objectNotice} ${catalogueNotice}` : catalogueNotice
+  } else if (catalogueCompatibility === 'unverifiable') {
+    const reportedVersion = playerState?.server.version?.trim()
+    const reason = reportedVersion
+      ? `the server reports an unrecognised version (${reportedVersion})`
+      : 'the server did not report a version'
+    const catalogueNotice = `Landmark catalogue compatibility could not be verified because ${reason}. Alpha Pal and Tower Boss locations may be outdated; regenerate them with make game-assets after confirming the installed game version.`
+    objectNotice = objectNotice ? `${objectNotice} ${catalogueNotice}` : catalogueNotice
+  }
+
+  let rosterNotice: string | null = null
+  if (playerState?.saveEnabled === false)
+    rosterNotice = 'Saved roster is disabled; this ranking includes online players only.'
+  else if (playerState?.saveEnabled && !playerState.saveAvailable)
+    rosterNotice = playerState.saveLastError ? 'Saved players are temporarily unavailable.' : 'Loading saved players…'
+  else if (playerState?.saveEnabled && playerState.saveStale)
+    rosterNotice = 'Offline players use the last successful save snapshot.'
+
   const explorerProps = {
     activeLayer,
     layers: config.layers,
     items,
     search,
+    searchInputRef: searchRef,
     enabledKinds,
+    enabledPlayerStatuses,
     hiddenIds,
-    expandedPlayers,
     expandedGuilds,
     expandedBases,
     objectNotice,
+    onSearchChange: setSearch,
     onToggleKinds: toggleKinds,
+    onTogglePlayerStatus: togglePlayerStatus,
     onToggleItems: toggleItems,
-    onTogglePlayer: (id: string) => toggleSetValue(setExpandedPlayers, id),
     onToggleGuild: (id: string) => toggleSetValue(setExpandedGuilds, id),
     onToggleBase: (id: string) => toggleSetValue(setExpandedBases, id),
     onFocusItem: focusItem,
@@ -304,9 +384,9 @@ function LiveMap({ config }: { config: PublicConfig }) {
   }
 
   return (
-    <div className="grid h-dvh grid-rows-[64px_1fr] overflow-hidden bg-[#171a1d] text-[#f4f5f5] max-md:grid-rows-[76px_1fr]">
+    <div className="relative h-dvh overflow-hidden bg-[#171a1d] text-[#f4f5f5]">
       <StatusBar playerState={playerState} offline={Boolean(players.error)} />
-      <main className="relative min-h-0 w-full overflow-hidden bg-[#0d161e]">
+      <main className="absolute inset-0 overflow-hidden bg-[#0d161e]">
         <Explorer {...explorerProps} open={filtersOpen} onOpen={() => setFiltersOpen(true)} />
         <div className="relative size-full min-h-0 min-w-0 overflow-hidden">
           <MapViewport
@@ -314,115 +394,49 @@ function LiveMap({ config }: { config: PublicConfig }) {
             activeLayer={activeLayer}
             items={items}
             enabledKinds={enabledKinds}
+            enabledPlayerStatuses={enabledPlayerStatuses}
             hiddenIds={hiddenIds}
             search={search}
             onShowItem={showItem}
             inspectorOpen={Boolean(detail)}
           >
-            <search
-              id="map-search-control"
-              aria-label="Map search"
-              className={`absolute top-4 z-20 h-12 overflow-hidden border border-[#cceaef]/35 bg-[#081115]/95 shadow-[0_8px_22px_rgb(0_0_0/24%)] transition-[width,right,border-color,box-shadow] duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] focus-within:border-[#62d6e7] focus-within:shadow-[inset_0_-2px_#22c7e8,0_8px_22px_rgb(0_0_0/24%)] motion-reduce:transition-none max-sm:top-3 ${
-                searchOpen ? 'w-[min(420px,calc(100%_-_32px))] max-sm:w-[calc(100%_-_128px)]' : 'w-12'
-              } ${detail ? 'right-[402px] max-[1180px]:hidden max-sm:right-3 max-sm:block' : 'right-4 max-sm:right-3'}`}
+            <button
+              ref={leaderboardButtonRef}
+              type="button"
+              className={`pal-glass-control absolute top-[78px] z-20 grid size-12 cursor-pointer place-items-center text-[#dceef0] transition-[right,border-color,background-color,opacity,transform] focus-visible:outline-none max-sm:top-[88px] max-sm:size-11 ${
+                detail?.kind === 'leaderboard'
+                  ? 'pointer-events-none right-4 translate-y-1 opacity-0 max-sm:right-3'
+                  : detail
+                    ? 'right-[382px] max-[1180px]:hidden'
+                    : 'right-4 max-sm:right-3'
+              }`}
+              aria-label="Open leaderboards"
+              aria-haspopup="dialog"
+              aria-expanded={detail?.kind === 'leaderboard'}
+              aria-hidden={detail?.kind === 'leaderboard'}
+              inert={detail?.kind === 'leaderboard'}
+              title="Leaderboards"
+              onClick={(event) => showLeaderboard('player-level', event.currentTarget)}
             >
-              <div
-                className={`absolute inset-y-0 right-0 left-12 flex min-w-0 items-center transition-[opacity,transform] duration-150 motion-reduce:transition-none ${
-                  searchOpen ? 'translate-x-0 opacity-100 delay-50' : 'pointer-events-none translate-x-2 opacity-0'
-                }`}
-                aria-hidden={!searchOpen}
-                inert={!searchOpen}
-              >
-                <label className="sr-only" htmlFor="map-search">
-                  Search players, bases, Pals and NPCs
-                </label>
-                <input
-                  id="map-search"
-                  ref={searchRef}
-                  type="search"
-                  aria-label="Search players, bases, Pals and NPCs"
-                  placeholder="Search map…"
-                  autoComplete="off"
-                  enterKeyHint="search"
-                  spellCheck="false"
-                  value={search}
-                  className="h-full min-w-0 flex-1 appearance-none border-0 bg-transparent pl-1 text-sm tracking-[.02em] text-[#e7f6f8] outline-0 placeholder:text-[#60767d] [&::-webkit-search-cancel-button]:hidden [&::-webkit-search-decoration]:hidden"
-                  onChange={(event) => setSearch(event.currentTarget.value)}
-                  onKeyDown={(event) => {
-                    if (event.key !== 'Escape') return
-                    event.preventDefault()
-                    event.stopPropagation()
-                    if (search) {
-                      setSearch('')
-                    } else {
-                      searchToggleRef.current?.focus({ preventScroll: true })
-                      setSearchOpen(false)
-                    }
-                  }}
-                />
-                {search ? (
-                  <button
-                    type="button"
-                    className="size-11 shrink-0 cursor-pointer border-0 bg-transparent text-lg text-[#739097] hover:text-white"
-                    aria-label="Clear search"
-                    onClick={() => {
-                      setSearch('')
-                      searchRef.current?.focus()
-                    }}
-                  >
-                    ×
-                  </button>
-                ) : null}
-              </div>
-              <button
-                ref={searchToggleRef}
-                type="button"
-                className="absolute inset-y-0 left-0 grid size-12 cursor-pointer place-items-center border-0 border-r border-white/10 bg-transparent text-[#65bbc7] transition-colors hover:bg-[#11282f] hover:text-[#8de9f5] focus-visible:outline-none"
-                aria-label={
-                  searchOpen
-                    ? 'Collapse map search'
-                    : search
-                      ? `Open map search, current query: ${search}`
-                      : 'Open map search'
-                }
-                aria-controls="map-search-control"
-                aria-expanded={searchOpen}
-                title={searchOpen ? 'Collapse search' : 'Open search'}
-                onClick={() => {
-                  if (searchOpen) {
-                    setSearchOpen(false)
-                  } else {
-                    setSearchOpen(true)
-                    window.requestAnimationFrame(() => searchRef.current?.focus())
-                  }
-                }}
-              >
-                <SearchToggleIcon
-                  className={`size-5 transition-transform duration-200 motion-reduce:transition-none ${
-                    searchOpen ? 'rotate-0' : 'rotate-180'
-                  }`}
-                />
-                {!searchOpen && search ? (
-                  <span
-                    className="absolute top-2 right-2 size-1.5 rounded-full bg-[#55d4e7] shadow-[0_0_5px_rgb(85_212_231/65%)]"
-                    aria-hidden="true"
-                  />
-                ) : null}
-              </button>
-            </search>
+              <LeaderboardIcon />
+            </button>
             <ProjectLinks hidden={Boolean(detail)} />
             <DetailsDialog
               detail={detail}
               items={items}
               layers={config.layers}
+              rosterNotice={rosterNotice}
               returnFocus={returnFocus}
-              fallbackFocus={searchToggleRef.current}
+              fallbackFocus={leaderboardButtonRef.current}
               onSelectItem={(item, focus) => {
                 setSearch('')
-                focusItem(item, returnFocus?.isConnected ? returnFocus : searchToggleRef.current || focus)
+                focusItem(item, returnFocus?.isConnected ? returnFocus : leaderboardButtonRef.current || focus)
               }}
               onSelectGuild={(guildId, focus) => {
-                showGuild(guildId, returnFocus?.isConnected ? returnFocus : searchToggleRef.current || focus)
+                showGuild(guildId, returnFocus?.isConnected ? returnFocus : leaderboardButtonRef.current || focus)
+              }}
+              onSelectLeaderboard={(leaderboardId) => {
+                setDetail({ kind: 'leaderboard', leaderboardId })
               }}
               onClose={() => {
                 pendingFocusRef.current = null

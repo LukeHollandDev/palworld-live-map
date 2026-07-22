@@ -5,7 +5,7 @@ interface ProjectLinksProps {
 export function ProjectLinks({ hidden }: ProjectLinksProps) {
   return (
     <nav
-      className={`absolute right-[354px] bottom-[18px] z-[18] flex h-11 items-center overflow-hidden border border-[#d3eff2]/45 bg-[#070f14]/85 shadow-[0_9px_22px_rgb(0_0_0/28%)] backdrop-blur-sm transition-[opacity,transform] max-sm:right-3.5 max-sm:bottom-[68px] ${
+      className={`pal-glass-surface absolute right-[354px] bottom-[18px] z-[18] flex h-11 items-center overflow-hidden transition-[opacity,transform] max-sm:right-3.5 max-sm:bottom-[68px] ${
         hidden ? 'pointer-events-none translate-y-2 opacity-0' : ''
       }`}
       aria-label="Project links"
@@ -18,7 +18,7 @@ export function ProjectLinks({ hidden }: ProjectLinksProps) {
         <span className="whitespace-nowrap text-xs tracking-[.025em] text-[#e2f3f5]">Palworld Live Map</span>
       </div>
       <a
-        className="grid size-11 place-items-center border-l border-white/10 text-[#789da5] transition-colors hover:bg-[#087fab] hover:text-white focus-visible:bg-[#087fab] focus-visible:text-white focus-visible:outline-none"
+        className="pal-interactive grid size-11 place-items-center border-l border-white/10 text-[#8bb8c1] focus-visible:outline-none"
         href="https://github.com/LukeHollandDev/palworld-live-map"
         target="_blank"
         rel="noreferrer"
@@ -41,7 +41,7 @@ export function ProjectLinks({ hidden }: ProjectLinksProps) {
         <span className="sr-only">Palworld Live Map on GitHub</span>
       </a>
       <a
-        className="flex h-11 items-center border-l border-white/10 px-3 text-[11px] tracking-[.035em] whitespace-nowrap text-[#9bb7bd] transition-colors hover:bg-[#087fab] hover:text-white focus-visible:bg-[#087fab] focus-visible:text-white focus-visible:outline-none"
+        className="pal-interactive flex h-11 items-center border-l border-white/10 px-3 text-[11px] tracking-[.035em] whitespace-nowrap text-[#9bb7bd] focus-visible:outline-none"
         href="https://lukeholland.dev"
         target="_blank"
         rel="noreferrer"

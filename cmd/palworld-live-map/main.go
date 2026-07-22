@@ -16,7 +16,10 @@ import (
 	"time"
 
 	"github.com/LukeHollandDev/palworld-live-map/internal/config"
+	"github.com/LukeHollandDev/palworld-live-map/internal/oodlelib"
 	"github.com/LukeHollandDev/palworld-live-map/internal/palworld"
+	"github.com/LukeHollandDev/palworld-live-map/internal/savegame"
+	"github.com/LukeHollandDev/palworld-live-map/internal/saveroster"
 	webserver "github.com/LukeHollandDev/palworld-live-map/internal/server"
 )
 
@@ -39,8 +42,11 @@ func main() {
 	}
 
 	var source palworld.Source
+	var roster palworld.RosterSource
 	if cfg.DemoMode {
-		source = palworld.NewDemoSource()
+		demo := palworld.NewDemoSource()
+		source = demo
+		roster = demo
 		logger.Info("demo mode enabled; no Palworld server will be contacted")
 	} else {
 		client, clientErr := palworld.NewClient(cfg.RESTURL, cfg.AdminPassword, cfg.UpstreamTimeout, cfg.WorldTimeout)
@@ -49,8 +55,39 @@ func main() {
 			os.Exit(1)
 		}
 		source = client
+		if cfg.SaveDataEnabled {
+			setupCtx, cancel := context.WithTimeout(context.Background(), cfg.SaveTimeout)
+			libraryPath, libraryErr := oodlelib.Resolve(setupCtx, oodlelib.Options{
+				LibraryPath: cfg.SaveOodleLibrary,
+				DownloadURL: cfg.SaveOodleURL,
+				SHA256:      cfg.SaveOodleSHA256,
+				CacheDir:    cfg.SaveOodleCacheDir,
+			})
+			cancel()
+			if libraryErr != nil {
+				logger.Error("save reader Oodle setup failed", "error", libraryErr)
+				os.Exit(1)
+			}
+			reader, readerErr := savegame.NewReader(savegame.Options{OodleLibraryPath: libraryPath})
+			if readerErr != nil {
+				logger.Error("save reader setup failed", "error", readerErr)
+				os.Exit(1)
+			}
+			rosterSource, rosterErr := saveroster.New(saveroster.Options{
+				Root: cfg.SaveRoot, WorldID: cfg.SaveWorldID, Timeout: cfg.SaveTimeout, Reader: reader,
+				ProjectPlayerID: client.PublicPlayerID, ProjectGuildID: client.PublicGuildKey,
+			})
+			if rosterErr != nil {
+				logger.Error("save roster setup failed", "error", rosterErr)
+				os.Exit(1)
+			}
+			roster = rosterSource
+			logger.Info("save-backed player roster enabled", "pollInterval", cfg.SavePollInterval)
+		}
 	}
-	poller := palworld.NewPoller(source, cfg.PollInterval, cfg.WorldPollInterval, cfg.WorldDataEnabled, logger)
+	poller := palworld.NewPollerWithRoster(
+		source, roster, cfg.PollInterval, cfg.WorldPollInterval, cfg.SavePollInterval, cfg.WorldDataEnabled, logger,
+	)
 	app, err := webserver.New(cfg, poller)
 	if err != nil {
 		logger.Error("web server setup failed", "error", err)

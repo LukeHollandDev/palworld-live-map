@@ -117,12 +117,16 @@ func TestStateIsPublicAndSanitized(t *testing.T) {
 
 func TestSplitStateEndpointsDoNotRepeatUnrelatedData(t *testing.T) {
 	cfg := testConfig()
+	captureTotal, uniqueCaptured, paldeckUnlocked := int64(4321), 117, 119
 	source := fixedSnapshot{value: palworld.Snapshot{
 		Server:           palworld.ServerInfo{Name: "The Chaos"},
 		Metrics:          palworld.ServerMetrics{ServerFPS: 59, MaxPlayers: 20},
 		MetricsAvailable: true,
 		Connected:        true,
-		Players:          []palworld.Player{{Name: "Luke", Level: 55, X: 10, Y: -20, Map: "palpagos"}},
+		Players: []palworld.Player{{
+			Name: "Luke", Level: 55, X: 10, Y: -20, Map: "palpagos",
+			CaptureTotal: &captureTotal, UniquePalsCaptured: &uniqueCaptured, PaldeckUnlocked: &paldeckUnlocked,
+		}},
 		ObjectsAvailable: true,
 		Objects:          []palworld.WorldObject{{Kind: "bases", Name: "Home", X: 5, Y: 6, Map: "palpagos"}},
 	}}
@@ -138,6 +142,11 @@ func TestSplitStateEndpointsDoNotRepeatUnrelatedData(t *testing.T) {
 	}
 	if !strings.Contains(players.Body.String(), `"serverFps":59`) || !strings.Contains(players.Body.String(), `"maxPlayers":20`) {
 		t.Fatalf("players response has no metrics: %s", players.Body.String())
+	}
+	for _, progress := range []string{`"captureTotal":4321`, `"uniquePalsCaptured":117`, `"paldeckUnlocked":119`} {
+		if !strings.Contains(players.Body.String(), progress) {
+			t.Fatalf("players response has no save progress %s: %s", progress, players.Body.String())
+		}
 	}
 	if strings.Contains(players.Body.String(), `"name":"Home"`) || strings.Contains(players.Body.String(), `"objects"`) {
 		t.Fatalf("players response contains world objects: %s", players.Body.String())
@@ -254,6 +263,12 @@ func TestPublicConfigUsesManifestAssetHash(t *testing.T) {
 	if !strings.Contains(body, `/assets/map/palpagos.jpg?v=`) || strings.Contains(body, `?v=8192`) {
 		t.Fatalf("config response does not use manifest asset hash: %s", body)
 	}
+	if !strings.Contains(body, `"kind":"alpha-pals"`) || !strings.Contains(body, `"name":"Penking"`) || !strings.Contains(body, `"id":"landmark:tower:REGION_Grass_Boss"`) {
+		t.Fatalf("config response does not include embedded encounter landmarks: %s", body)
+	}
+	if !strings.Contains(body, `"landmarkCatalogue":{"gameVersion":"1.0.1.100619","generator":"palworld-map-exporter/2"`) {
+		t.Fatalf("config response does not expose landmark provenance: %s", body)
+	}
 }
 
 func TestServerServesOnlyKnownEmbeddedMapArtwork(t *testing.T) {
@@ -329,6 +344,12 @@ func TestServerServesViteFrontendAssets(t *testing.T) {
 	}
 	if !strings.Contains(asset.Header().Get("Cache-Control"), "immutable") {
 		t.Fatalf("built asset cache policy = %q", asset.Header().Get("Cache-Control"))
+	}
+
+	favicon := httptest.NewRecorder()
+	service.Handler().ServeHTTP(favicon, httptest.NewRequest(http.MethodGet, "/assets/favicon.svg", nil))
+	if favicon.Code != http.StatusOK || favicon.Header().Get("Content-Type") != "image/svg+xml" || !strings.Contains(favicon.Body.String(), "<svg") {
+		t.Fatalf("favicon response = status %d, type %q, body %q", favicon.Code, favicon.Header().Get("Content-Type"), favicon.Body.String())
 	}
 }
 

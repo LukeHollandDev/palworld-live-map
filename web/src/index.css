@@ -7,6 +7,13 @@
 
 @layer base {
   :root {
+    --pal-glass-border: rgb(205 231 235 / 22%);
+    --pal-glass-border-strong: rgb(100 215 231 / 58%);
+    --pal-glass-surface: rgb(12 18 21 / 82%);
+    --pal-glass-panel: rgb(10 16 19 / 97%);
+    --pal-glass-inset: rgb(5 11 14 / 62%);
+    --pal-glass-hover: rgb(39 52 57 / 72%);
+    --pal-glass-active: rgb(48 65 71 / 82%);
     color-scheme: dark;
     font-family: var(--font-sans);
     background: #080d11;
@@ -33,6 +40,71 @@
 }
 
 @layer components {
+  .pal-glass-surface {
+    border: 1px solid var(--pal-glass-border);
+    background: var(--pal-glass-surface);
+    box-shadow:
+      inset 0 1px rgb(217 250 255 / 7%),
+      0 10px 28px rgb(0 0 0 / 28%);
+    backdrop-filter: blur(18px) saturate(125%);
+  }
+
+  .pal-glass-panel {
+    border: 1px solid var(--pal-glass-border);
+    background: var(--pal-glass-panel);
+    box-shadow:
+      inset 0 1px rgb(217 250 255 / 6%),
+      -10px 12px 30px rgb(0 0 0 / 30%);
+    backdrop-filter: blur(18px) saturate(120%);
+  }
+
+  .pal-panel-header {
+    border-color: var(--pal-glass-border);
+    background: rgb(26 35 39 / 96%);
+    box-shadow: inset 4px 0 var(--pal-panel-accent, #24b8dd);
+  }
+
+  .pal-glass-control {
+    border: 1px solid rgb(205 231 235 / 28%);
+    background: rgb(15 22 25 / 93%);
+    box-shadow:
+      inset 0 1px rgb(217 250 255 / 7%),
+      0 8px 22px rgb(0 0 0 / 24%);
+    backdrop-filter: blur(14px) saturate(125%);
+    transition-property: border-color, background-color, color, opacity, transform;
+    transition-duration: 160ms;
+  }
+
+  .pal-glass-control:hover,
+  .pal-glass-control:focus-visible {
+    border-color: var(--pal-glass-border-strong);
+    background: rgb(35 47 52 / 96%);
+    color: white;
+  }
+
+  .pal-glass-inset {
+    border: 1px solid rgb(205 231 235 / 16%);
+    background: var(--pal-glass-inset);
+  }
+
+  .pal-interactive {
+    transition-property: border-color, background-color, color;
+    transition-duration: 140ms;
+  }
+
+  .pal-interactive:hover,
+  .pal-interactive:focus-visible {
+    border-color: rgb(132 207 217 / 42%);
+    background: var(--pal-glass-hover);
+    color: white;
+  }
+
+  .pal-selected {
+    border-color: rgb(114 215 229 / 48%);
+    background: var(--pal-glass-active);
+    color: #f2fbfc;
+  }
+
   .metric-tooltip {
     position: relative;
     cursor: help;
@@ -46,8 +118,8 @@
     width: max-content;
     max-width: min(260px, calc(100vw - 24px));
     padding: 7px 9px;
-    border: 1px solid rgb(198 229 234 / 35%);
-    background: rgb(5 13 17 / 97%);
+    border: 1px solid var(--pal-glass-border);
+    background: rgb(10 16 19 / 98%);
     box-shadow: 0 8px 22px rgb(0 0 0 / 32%);
     color: #dcecef;
     content: attr(data-tooltip);
@@ -141,9 +213,11 @@
   .filter-panel-body-motion::before {
     position: absolute;
     inset: 0;
-    border: 1px solid rgb(196 228 233 / 25%);
+    border: 1px solid var(--pal-glass-border);
     border-top: 0;
-    background: rgb(9 17 21 / 97%);
+    background: var(--pal-glass-panel);
+    box-shadow: inset 0 1px rgb(217 250 255 / 5%);
+    backdrop-filter: blur(18px) saturate(120%);
     content: "";
     pointer-events: none;
   }
@@ -216,6 +290,22 @@
 
   .marker-glyph.kind-wild-pals {
     --marker-glyph-color: #55c7bd;
+  }
+
+  .marker-glyph.kind-alpha-pals {
+    --marker-glyph-color: #e9c65f;
+  }
+
+  .marker-glyph.kind-bosses {
+    --marker-glyph-color: #e36b72;
+  }
+
+  .marker-glyph.kind-players.player-online {
+    --marker-glyph-color: #65c783;
+  }
+
+  .marker-glyph.kind-players.player-offline {
+    --marker-glyph-color: #7d878c;
   }
 
   .marker-glyph.kind-npcs {
@@ -318,8 +408,8 @@
     max-width: 180px;
     padding: 4px 6px;
     translate: -50% 0;
-    border: 1px solid rgb(205 238 242 / 48%);
-    background: rgb(6 13 17 / 94%);
+    border: 1px solid rgb(205 231 235 / 30%);
+    background: rgb(11 17 20 / 96%);
     color: white;
     font-size: 12px;
     font-weight: 550;

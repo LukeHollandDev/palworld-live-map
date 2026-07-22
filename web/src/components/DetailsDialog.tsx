@@ -1,9 +1,14 @@
 import { useEffect, useRef } from 'react'
 import { buildGuildDetails, type GuildDetails as GuildDetailsModel } from '../lib/guilds'
+import { LEADERBOARDS, type LeaderboardId, leaderboardById } from '../lib/leaderboards'
 import { kindLabel } from '../lib/map'
 import type { MapItem, MapLayer } from '../types'
+import { MarkerGlyph } from './MarkerGlyph'
 
-export type Detail = { kind: 'item'; itemId: string } | { kind: 'guild'; guildId: string }
+export type Detail =
+  | { kind: 'item'; itemId: string }
+  | { kind: 'guild'; guildId: string }
+  | { kind: 'leaderboard'; leaderboardId: LeaderboardId }
 
 const DETAIL_WORKER_LIMIT = 250
 
@@ -11,11 +16,13 @@ interface DetailsDialogProps {
   detail: Detail | null
   items: MapItem[]
   layers: MapLayer[]
+  rosterNotice: string | null
   returnFocus: HTMLElement | null
   fallbackFocus: HTMLElement | null
   onClose: () => void
   onSelectItem: (item: MapItem, focus: HTMLElement) => void
   onSelectGuild: (guildId: string, focus: HTMLElement) => void
+  onSelectLeaderboard: (leaderboardId: LeaderboardId) => void
 }
 
 function canRestoreFocus(target: HTMLElement | null) {
@@ -35,15 +42,23 @@ export function DetailsDialog({
   detail,
   items,
   layers,
+  rosterNotice,
   returnFocus,
   fallbackFocus,
   onClose,
   onSelectItem,
-  onSelectGuild
+  onSelectGuild,
+  onSelectLeaderboard
 }: DetailsDialogProps) {
   const titleRef = useRef<HTMLHeadingElement>(null)
   const bodyRef = useRef<HTMLDivElement>(null)
-  const detailKey = detail ? (detail.kind === 'item' ? `item:${detail.itemId}` : `guild:${detail.guildId}`) : undefined
+  const detailKey = detail
+    ? detail.kind === 'item'
+      ? `item:${detail.itemId}`
+      : detail.kind === 'guild'
+        ? `guild:${detail.guildId}`
+        : `leaderboard:${detail.leaderboardId}`
+    : undefined
 
   useEffect(() => {
     if (!detailKey) return
@@ -69,9 +84,12 @@ export function DetailsDialog({
 
   const item = detail.kind === 'item' ? items.find((candidate) => candidate.id === detail.itemId) : undefined
   const guild = detail.kind === 'guild' ? buildGuildDetails(detail.guildId, items) : undefined
+  const leaderboard = detail.kind === 'leaderboard' ? leaderboardById(detail.leaderboardId) : undefined
   if (detail.kind === 'item' && !item) return null
-  const title = item?.name || guild?.name || 'Unnamed guild'
-  const eyebrow = (item ? `${kindLabel(item.kind)} DETAILS` : 'GUILD DETAILS').toUpperCase()
+  const title = leaderboard ? 'Leaderboards' : item?.name || guild?.name || 'Unnamed guild'
+  const eyebrow = (
+    leaderboard ? 'SERVER RANKINGS' : item ? `${kindLabel(item.kind)} DETAILS` : 'GUILD DETAILS'
+  ).toUpperCase()
 
   const close = () => {
     onClose()
@@ -80,12 +98,12 @@ export function DetailsDialog({
 
   return (
     <aside
-      className="surface-enter-motion absolute top-4 right-4 bottom-4 z-[24] flex w-[370px] flex-col overflow-hidden border border-[#cbe9ee]/30 bg-[#091115]/96 text-[#e5f0f2] shadow-[-10px_12px_30px_rgb(0_0_0/30%)] backdrop-blur-sm max-sm:top-auto max-sm:right-0 max-sm:bottom-0 max-sm:left-0 max-sm:max-h-[49dvh] max-sm:w-auto max-sm:border-x-0 max-sm:border-b-0"
+      className="pal-glass-panel surface-enter-motion absolute top-[78px] right-4 bottom-4 z-[24] flex w-[350px] flex-col overflow-hidden text-[#e5f0f2] max-sm:top-auto max-sm:right-0 max-sm:bottom-0 max-sm:left-0 max-sm:max-h-[49dvh] max-sm:w-auto max-sm:border-x-0 max-sm:border-b-0"
       role="dialog"
       aria-modal="false"
       aria-labelledby="details-title"
     >
-      <header className="relative z-[2] flex min-h-[78px] shrink-0 items-center justify-between gap-3.5 border-b border-[#c6e5ea]/20 bg-[linear-gradient(90deg,#72d7e5_0_3px,rgb(24_40_47/98%)_3px_100%)] pr-3.5 pl-5">
+      <header className="pal-panel-header relative z-[2] flex min-h-[78px] shrink-0 items-center justify-between gap-3.5 border-b pr-3.5 pl-5 [--pal-panel-accent:#72d7e5]">
         <div>
           <p className="m-0 mb-1 text-[10px] font-normal tracking-[.14em] text-[#b6f5fc]">{eyebrow}</p>
           <h2
@@ -99,7 +117,7 @@ export function DetailsDialog({
         </div>
         <button
           type="button"
-          className="grid size-11 cursor-pointer place-items-center border-0 bg-transparent text-xl text-[#d7eef1] hover:bg-black/25 hover:text-white"
+          className="pal-interactive grid size-11 cursor-pointer place-items-center border-0 bg-transparent text-xl text-[#d7eef1]"
           aria-label="Close details"
           onClick={close}
         >
@@ -118,6 +136,14 @@ export function DetailsDialog({
             />
           ) : guild ? (
             <GuildDetails guild={guild} layers={layers} onSelectItem={onSelectItem} />
+          ) : leaderboard ? (
+            <LeaderboardDetails
+              leaderboardId={leaderboard.id}
+              items={items}
+              rosterNotice={rosterNotice}
+              onSelectItem={onSelectItem}
+              onSelectLeaderboard={onSelectLeaderboard}
+            />
           ) : null}
         </div>
       </div>
@@ -125,10 +151,88 @@ export function DetailsDialog({
   )
 }
 
+function LeaderboardDetails({
+  leaderboardId,
+  items,
+  rosterNotice,
+  onSelectItem,
+  onSelectLeaderboard
+}: {
+  leaderboardId: LeaderboardId
+  items: MapItem[]
+  rosterNotice: string | null
+  onSelectItem: (item: MapItem, focus: HTMLElement) => void
+  onSelectLeaderboard: (leaderboardId: LeaderboardId) => void
+}) {
+  const leaderboard = leaderboardById(leaderboardId)
+  const entries = leaderboard.entries(items)
+  return (
+    <>
+      <nav className="grid gap-1.5" aria-label="Leaderboard types">
+        {LEADERBOARDS.map((candidate) => (
+          <button
+            key={candidate.id}
+            type="button"
+            className={`min-h-11 cursor-pointer border px-3 text-left text-xs transition-colors focus-visible:border-[#8de9f5] focus-visible:outline-none ${
+              candidate.id === leaderboard.id
+                ? 'pal-selected shadow-[inset_3px_0_#72d7e5]'
+                : 'pal-glass-inset pal-interactive text-[#9fb0b5]'
+            }`}
+            aria-current={candidate.id === leaderboard.id ? 'page' : undefined}
+            onClick={() => onSelectLeaderboard(candidate.id)}
+          >
+            {candidate.title}
+          </button>
+        ))}
+      </nav>
+      <section>
+        <SectionTitle>{leaderboard.title}</SectionTitle>
+        <p className="mt-0 mb-3 text-xs leading-5 text-[#9fb0b5]">{leaderboard.description}</p>
+        {rosterNotice ? (
+          <p className="my-3 border border-[#66583d] bg-[#302b22] px-3 py-2.5 text-[11px] leading-4 text-[#d8c18a]">
+            {rosterNotice}
+          </p>
+        ) : null}
+        {entries.length > 0 ? (
+          <ol className="m-0 grid list-none gap-1.5 p-0">
+            {entries.map(({ item, rank, value }) => {
+              const status = item.online === false ? 'Offline' : 'Online'
+              return (
+                <li key={item.id}>
+                  <button
+                    type="button"
+                    className="pal-glass-inset pal-interactive grid min-h-12 w-full cursor-pointer grid-cols-[28px_22px_minmax(0,1fr)_auto] items-center gap-2 px-2.5 py-2 text-left text-xs focus-visible:outline-none"
+                    aria-label={`View leaderboard rank ${rank}: ${item.name} · ${value}, ${status}`}
+                    onClick={(event) => onSelectItem(item, event.currentTarget)}
+                  >
+                    <strong className="text-right text-[11px] font-semibold text-[#789097] tabular-nums">{rank}</strong>
+                    <MarkerGlyph kind="players" online={item.online} />
+                    <span className="min-w-0">
+                      <span className="block truncate text-[#f0f9fa]">{item.name}</span>
+                      <span
+                        className={`mt-0.5 block text-[10px] ${item.online === false ? 'text-[#9aa3a7]' : 'text-[#76d39a]'}`}
+                      >
+                        {status}
+                      </span>
+                    </span>
+                    <strong className="font-medium text-[#d8eef1] tabular-nums">{value}</strong>
+                  </button>
+                </li>
+              )
+            })}
+          </ol>
+        ) : (
+          <p className="m-0 text-[13px] text-[#8f989d]">No players are currently known.</p>
+        )}
+      </section>
+    </>
+  )
+}
+
 function FactList({ entries }: { entries: Array<[string, string | number | undefined]> }) {
   const visible = entries.filter(([, value]) => value !== undefined && value !== '')
   return (
-    <dl className="m-0 grid grid-cols-[minmax(105px,.7fr)_minmax(0,1fr)] border border-[#ceeaee]/30 bg-[#030a0e]/50 text-xs">
+    <dl className="pal-glass-inset m-0 grid grid-cols-[minmax(105px,.7fr)_minmax(0,1fr)] text-xs">
       {visible.map(([label, value], index) => {
         const border = index === visible.length - 1 ? '' : 'border-b border-[#ceeaee]/15'
         return (
@@ -176,7 +280,7 @@ function buildRelationships(item: MapItem, items: MapItem[]): ItemRelationships 
   const guildKey =
     item.guildKey || base?.guildKey || (item.kind === 'players' ? playerGuild(item) : owner && playerGuild(owner))
   const guild = guildKey ? buildGuildDetails(guildKey, items) : undefined
-  const guildMembers = guild?.onlineMembers || []
+  const guildMembers = guild?.members || []
   const guildBases = guild?.bases || []
   const guildPals = guild?.pals || []
   const baseKey = base ? itemBaseKey(base) : undefined
@@ -225,6 +329,18 @@ function coordinates(item: MapItem) {
   return `X ${Math.round(item.x)}\u00a0\u00a0Y ${Math.round(item.y)}`
 }
 
+function formatTimestamp(value?: string) {
+  if (!value) return undefined
+  const timestamp = new Date(value)
+  return Number.isNaN(timestamp.getTime())
+    ? value
+    : timestamp.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })
+}
+
+function formatCount(value?: number) {
+  return value === undefined ? undefined : value.toLocaleString()
+}
+
 function baseLabel(base: MapItem, guildBases: MapItem[]) {
   if (guildBases.length <= 1) return base.name
   const index = guildBases.findIndex((candidate) => candidate.id === base.id)
@@ -233,7 +349,7 @@ function baseLabel(base: MapItem, guildBases: MapItem[]) {
 
 function SectionTitle({ children }: { children: React.ReactNode }) {
   return (
-    <h3 className="m-0 mb-2 border-l-[3px] border-[#a8f6ff] bg-[#415a64] px-2 py-1 text-xs font-normal tracking-[.08em] text-[#edf9fb] uppercase">
+    <h3 className="m-0 mb-2 border-l-[3px] border-[#a8f6ff] bg-[#38494f]/80 px-2 py-1 text-xs font-normal tracking-[.08em] text-[#edf9fb] uppercase">
       {children}
     </h3>
   )
@@ -252,7 +368,7 @@ function ItemLink({ item, relation, title, detail, showRelation = false, onSelec
   return (
     <button
       type="button"
-      className="grid min-h-11 w-full cursor-pointer grid-cols-[minmax(0,1fr)_auto] items-center gap-3 border border-[#ceeaee]/20 bg-[#040c10]/55 px-2.5 py-2 text-left text-xs transition-colors hover:border-[#64d7e7]/60 hover:bg-[#10252c] focus-visible:border-[#8de9f5] focus-visible:outline-none"
+      className="pal-glass-inset pal-interactive grid min-h-11 w-full cursor-pointer grid-cols-[minmax(0,1fr)_auto] items-center gap-3 px-2.5 py-2 text-left text-xs focus-visible:outline-none"
       aria-label={`View ${relation} ${title}`}
       onClick={(event) => onSelectItem(item, event.currentTarget)}
     >
@@ -274,6 +390,7 @@ function GuildLink({
   guildId,
   name,
   memberCount,
+  onlineMemberCount,
   baseCount,
   palCount,
   onSelectGuild
@@ -281,6 +398,7 @@ function GuildLink({
   guildId: string
   name: string
   memberCount: number
+  onlineMemberCount: number
   baseCount: number
   palCount: number
   onSelectGuild: (guildId: string, focus: HTMLElement) => void
@@ -288,7 +406,7 @@ function GuildLink({
   return (
     <button
       type="button"
-      className="grid min-h-14 w-full cursor-pointer grid-cols-[minmax(0,1fr)_auto] items-center gap-3 border border-[#72d7e5]/30 bg-[#0b1c22]/75 px-3 py-2.5 text-left transition-colors hover:border-[#64d7e7]/60 hover:bg-[#102a32] focus-visible:border-[#8de9f5] focus-visible:outline-none"
+      className="pal-glass-inset pal-interactive grid min-h-14 w-full cursor-pointer grid-cols-[minmax(0,1fr)_auto] items-center gap-3 px-3 py-2.5 text-left focus-visible:outline-none"
       aria-label={`View guild ${name}`}
       onClick={(event) => onSelectGuild(guildId, event.currentTarget)}
     >
@@ -296,7 +414,9 @@ function GuildLink({
         <span className="block text-[10px] tracking-[.12em] text-[#75cbd6] uppercase">Guild</span>
         <strong className="mt-0.5 block truncate text-sm font-medium text-[#f0fafb]">{name}</strong>
         <span className="mt-1 block text-[10px] text-[#91a6ac]">
-          {plural(memberCount, 'online player')} · {plural(baseCount, 'base')} · {plural(palCount, 'Pal')}
+          {plural(onlineMemberCount, 'online player')}
+          {memberCount === onlineMemberCount ? '' : ` · ${plural(memberCount, 'member')}`} · {plural(baseCount, 'base')}{' '}
+          · {plural(palCount, 'Pal')}
         </span>
       </span>
       <span className="text-base text-[#63cddd]" aria-hidden="true">
@@ -380,7 +500,7 @@ function GuildDetails({
 }) {
   const regions = Array.from(
     new Set(
-      [...guild.onlineMembers, ...guild.bases, ...guild.pals].map(
+      [...guild.members, ...guild.bases, ...guild.pals].map(
         (item) => layers.find((layer) => layer.id === item.map)?.name || item.map
       )
     )
@@ -390,6 +510,7 @@ function GuildDetails({
     <>
       <FactList
         entries={[
+          ['Members', guild.members.length],
           ['Online members', guild.onlineMembers.length],
           ['Bases', guild.bases.length],
           ['Pals', guild.pals.length],
@@ -401,6 +522,13 @@ function GuildDetails({
         items={guild.onlineMembers}
         relation="guild member"
         empty="No guild members are currently online."
+        onSelectItem={onSelectItem}
+      />
+      <GuildRoster
+        title="Offline members"
+        items={guild.members.filter((member) => member.online === false)}
+        relation="guild member"
+        empty="No guild members are currently offline."
         onSelectItem={onSelectItem}
       />
       <GuildRoster
@@ -440,8 +568,25 @@ function ItemDetails({
 
   const entries: Array<[string, string | number | undefined]> = []
   if (item.level) entries.push(['Level', item.level])
+  if (item.kind === 'players') {
+    entries.push(['Status', item.online === false ? 'Offline' : 'Online'])
+    entries.push(['Pals caught', formatCount(item.captureTotal)])
+    entries.push(['Unique Pals caught', formatCount(item.uniquePalsCaptured)])
+    entries.push(['Paldeck unlocked', formatCount(item.paldeckUnlocked)])
+    if (item.online === false) {
+      entries.push(['Position', 'Last saved'])
+      entries.push(['Last seen', formatTimestamp(item.lastSeenAt)])
+    }
+  }
   if (item.detail && item.kind !== 'players') {
-    const detailLabel = item.kind === 'bases' ? 'Description' : item.kind === 'npcs' ? 'Type' : 'Species'
+    const detailLabel =
+      item.kind === 'bases'
+        ? 'Description'
+        : item.kind === 'npcs'
+          ? 'Type'
+          : item.kind === 'bosses' || item.kind === 'alpha-pals'
+            ? 'Encounter'
+            : 'Species'
     entries.push([detailLabel, item.detail])
   }
   if (item.kind === 'bases') entries.push(['Assigned Pals', relatedPals.length])
@@ -461,50 +606,55 @@ function ItemDetails({
           ? 'Assigned Pals'
           : 'Other Pals assigned to this base'
   const relatedPalRelation = item.kind === 'players' || item.kind === 'companions' ? 'companion Pal' : 'assigned Pal'
+  const hasGuildRelationships =
+    item.kind === 'players' || item.kind === 'bases' || item.kind === 'workers' || item.kind === 'companions'
 
   return (
     <>
       <FactList entries={entries} />
-      <section>
-        <SectionTitle>Guild</SectionTitle>
-        <div className="grid gap-1.5">
-          {guildKey ? (
-            <GuildLink
-              guildId={guildKey}
-              name={guildName || 'Unnamed guild'}
-              memberCount={guildMembers.length}
-              baseCount={guildBases.length}
-              palCount={guildPals.length}
-              onSelectGuild={onSelectGuild}
-            />
-          ) : null}
-          {owner ? (
-            <ItemLink
-              item={owner}
-              relation="owner"
-              title={levelLabel(owner)}
-              detail={owner.guildName || 'Player'}
-              showRelation
-              onSelectItem={onSelectItem}
-            />
-          ) : item.ownerId ? (
-            <p className="m-0 border border-[#ceeaee]/20 bg-[#040c10]/55 px-3 py-2.5 text-xs text-[#a9b7bc]">
-              This companion Pal’s owner is not currently online.
-            </p>
-          ) : null}
-          {base && item.kind !== 'bases' ? (
-            <ItemLink
-              item={base}
-              relation="assigned base"
-              title={baseLabel(base, guildBases)}
-              detail={coordinates(base)}
-              showRelation
-              onSelectItem={onSelectItem}
-            />
-          ) : null}
-          {!guildKey ? <p className="m-0 text-[13px] text-[#8f989d]">{guildMembershipNotice}</p> : null}
-        </div>
-      </section>
+      {hasGuildRelationships ? (
+        <section>
+          <SectionTitle>Guild</SectionTitle>
+          <div className="grid gap-1.5">
+            {guildKey ? (
+              <GuildLink
+                guildId={guildKey}
+                name={guildName || 'Unnamed guild'}
+                memberCount={guildMembers.length}
+                onlineMemberCount={guildMembers.filter((member) => member.online !== false).length}
+                baseCount={guildBases.length}
+                palCount={guildPals.length}
+                onSelectGuild={onSelectGuild}
+              />
+            ) : null}
+            {owner ? (
+              <ItemLink
+                item={owner}
+                relation="owner"
+                title={levelLabel(owner)}
+                detail={`${owner.online === false ? 'Offline' : 'Online'}${owner.guildName ? ` · ${owner.guildName}` : ''}`}
+                showRelation
+                onSelectItem={onSelectItem}
+              />
+            ) : item.ownerId ? (
+              <p className="pal-glass-inset m-0 px-3 py-2.5 text-xs text-[#a9b7bc]">
+                This companion Pal’s owner is not available in the current roster.
+              </p>
+            ) : null}
+            {base && item.kind !== 'bases' ? (
+              <ItemLink
+                item={base}
+                relation="assigned base"
+                title={baseLabel(base, guildBases)}
+                detail={coordinates(base)}
+                showRelation
+                onSelectItem={onSelectItem}
+              />
+            ) : null}
+            {!guildKey ? <p className="m-0 text-[13px] text-[#8f989d]">{guildMembershipNotice}</p> : null}
+          </div>
+        </section>
+      ) : null}
       <RelatedItems
         title={relatedPalTitle}
         items={relatedPals}

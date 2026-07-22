@@ -1,8 +1,8 @@
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
-import { useLayoutEffect } from 'react'
+import { createRef, useLayoutEffect } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { ItemKind, MapItem, MapLayer } from '../types'
-import { MapViewport } from './MapViewport'
+import { MapViewport, type MapViewportHandle } from './MapViewport'
 
 const VIEWPORT_WIDTH = 1200
 const VIEWPORT_HEIGHT = 600
@@ -90,6 +90,7 @@ function renderViewport(items: MapItem[] = [], enabledKinds: Set<ItemKind> = new
       activeLayer={layer}
       items={items}
       enabledKinds={enabledKinds}
+      enabledPlayerStatuses={new Set(['online', 'offline'])}
       hiddenIds={new Set<string>()}
       search=""
       onShowItem={() => undefined}
@@ -135,6 +136,7 @@ describe('MapViewport zoom controls', () => {
         activeLayer={imageLayer}
         items={[]}
         enabledKinds={new Set<ItemKind>()}
+        enabledPlayerStatuses={new Set(['online', 'offline'])}
         hiddenIds={new Set<string>()}
         search=""
         onShowItem={() => undefined}
@@ -161,6 +163,7 @@ describe('MapViewport zoom controls', () => {
         }}
         items={[]}
         enabledKinds={new Set<ItemKind>()}
+        enabledPlayerStatuses={new Set(['online', 'offline'])}
         hiddenIds={new Set<string>()}
         search=""
         onShowItem={() => undefined}
@@ -178,6 +181,7 @@ describe('MapViewport zoom controls', () => {
       activeLayer: layer,
       items: [] as MapItem[],
       enabledKinds: new Set<ItemKind>(),
+      enabledPlayerStatuses: new Set(['online', 'offline'] as const),
       hiddenIds: new Set<string>(),
       search: '',
       onShowItem: () => undefined
@@ -218,6 +222,7 @@ describe('MapViewport zoom controls', () => {
         activeLayer={layer}
         items={[]}
         enabledKinds={new Set<ItemKind>()}
+        enabledPlayerStatuses={new Set(['online', 'offline'])}
         hiddenIds={new Set<string>()}
         search=""
         onShowItem={() => undefined}
@@ -272,6 +277,54 @@ describe('MapViewport zoom controls', () => {
     expect(readTransform(scene)).toEqual(zoomedAgain)
     advanceFrame(220)
     expect(readTransform(scene)).toEqual(fitted)
+  })
+
+  it('animates an item focus instead of jumping to its map position', () => {
+    const advanceFrame = installViewportMocks()
+    const item: MapItem = {
+      id: 'focus-target',
+      kind: 'players',
+      name: 'Focus target',
+      x: 80,
+      y: -70,
+      map: layer.id
+    }
+    const ref = createRef<MapViewportHandle>()
+    const onShowItem = vi.fn()
+    const { container } = render(
+      <MapViewport
+        ref={ref}
+        activeLayer={layer}
+        items={[item]}
+        enabledKinds={new Set<ItemKind>(['players'])}
+        enabledPlayerStatuses={new Set(['online', 'offline'])}
+        hiddenIds={new Set<string>()}
+        search=""
+        onShowItem={onShowItem}
+        inspectorOpen={false}
+      >
+        <button type="button" onClick={(event) => ref.current?.focusItem(item, event.currentTarget)}>
+          Focus selected item
+        </button>
+      </MapViewport>
+    )
+    const scene = container.querySelector<HTMLElement>('.map-scene')
+    if (!scene) throw new Error('Expected map scene')
+    const fitted = readTransform(scene)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Focus selected item' }))
+    expect(readTransform(scene)).toEqual(fitted)
+    expect(onShowItem).toHaveBeenCalledOnce()
+
+    advanceFrame(210)
+    const midway = readTransform(scene)
+    expect(midway.scale).toBeGreaterThan(fitted.scale)
+    expect(midway.x).not.toBe(fitted.x)
+
+    advanceFrame(210)
+    const focused = readTransform(scene)
+    expect(focused.scale).toBeGreaterThan(midway.scale)
+    expect(focused.x).not.toBe(midway.x)
   })
 
   it('keeps the artwork padded on initial load and screen rotation', () => {

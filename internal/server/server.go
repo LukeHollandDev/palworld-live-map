@@ -20,6 +20,7 @@ import (
 
 	mapassets "github.com/LukeHollandDev/palworld-live-map/assets"
 	"github.com/LukeHollandDev/palworld-live-map/internal/config"
+	"github.com/LukeHollandDev/palworld-live-map/internal/landmarks"
 	"github.com/LukeHollandDev/palworld-live-map/internal/mapdata"
 	"github.com/LukeHollandDev/palworld-live-map/internal/palworld"
 	"github.com/LukeHollandDev/palworld-live-map/web"
@@ -32,13 +33,15 @@ type snapshotSource interface {
 }
 
 type Server struct {
-	settings serverSettings
-	source   snapshotSource
-	assets   fs.FS
-	maps     fs.FS
-	mapFiles map[string]mapFile
-	layers   []mapLayer
-	handler  http.Handler
+	settings          serverSettings
+	source            snapshotSource
+	assets            fs.FS
+	maps              fs.FS
+	mapFiles          map[string]mapFile
+	layers            []mapLayer
+	landmarks         []palworld.WorldObject
+	landmarkCatalogue landmarks.Metadata
+	handler           http.Handler
 }
 
 type serverSettings struct {
@@ -98,6 +101,10 @@ func New(cfg config.Config, source snapshotSource) (*Server, error) {
 	if err != nil {
 		return nil, err
 	}
+	landmarkCatalogue, err := landmarks.Load(mapassets.Landmarks)
+	if err != nil {
+		return nil, fmt.Errorf("load embedded landmarks: %w", err)
+	}
 
 	s := &Server{
 		settings: serverSettings{
@@ -105,6 +112,7 @@ func New(cfg config.Config, source snapshotSource) (*Server, error) {
 			worldDataEnabled: cfg.WorldDataEnabled,
 		},
 		source: source, assets: webAssets, maps: maps, mapFiles: mapFiles, layers: layers,
+		landmarks: landmarkCatalogue.Locations, landmarkCatalogue: landmarkCatalogue.Metadata,
 	}
 	s.handler = s.securityHeaders(s.routes())
 	return s, nil
@@ -138,6 +146,8 @@ func (s *Server) publicConfig(w http.ResponseWriter, r *http.Request) {
 		"worldPollIntervalMs": s.settings.worldPollInterval.Milliseconds(),
 		"worldDataEnabled":    s.settings.worldDataEnabled,
 		"layers":              s.layers,
+		"landmarks":           s.landmarks,
+		"landmarkCatalogue":   s.landmarkCatalogue,
 	})
 }
 

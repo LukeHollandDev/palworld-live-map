@@ -10,4 +10,4 @@ Both textures are exported at their native 8192×8192 resolution and converted t
 
 Palworld and the underlying artwork are owned by Pocketpair. This unofficial project is not affiliated with or endorsed by Pocketpair or Palworld Entertainment. Technical extraction from an installed copy does not itself grant redistribution permission.
 
-Rights holders can request a change or removal by opening an issue or using the private reporting address in [`SECURITY.md`](../../SECURITY.md). A valid request will be handled promptly; the documented fallback is to distribute only the exporter and require operators to supply their own installed copy.
+Rights holders can request a change or removal by opening an issue or using the private reporting channel in [`SECURITY.md`](../../SECURITY.md). A valid request will be handled promptly; the documented fallback is to distribute only the exporter and require operators to supply their own installed copy.

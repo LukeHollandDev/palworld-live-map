@@ -1,5 +1,4 @@
 using System.Reflection;
-using System.Security.Cryptography;
 using System.Text.Json;
 using CUE4Parse.FileProvider;
 using CUE4Parse.MappingsProvider.Usmap;
@@ -11,16 +10,22 @@ using SixLabors.ImageSharp.Formats.Jpeg;
 using SixLabors.ImageSharp.Processing;
 
 const int OutputSize = 8192;
-const string GeneratorVersion = "1";
+const string GeneratorVersion = "2";
 
 var options = ParseOptions(args);
-Directory.CreateDirectory(options.OutputDirectory);
+using var mapOutput = StagedOutputDirectory.Create(options.OutputDirectory);
+using var landmarkOutput = StagedOutputDirectory.Create(options.LandmarkOutputDirectory);
 
-var pakFiles = Directory.GetFiles(options.PakDirectory, "*.pak", SearchOption.TopDirectoryOnly);
+var pakFiles = FindPakFiles(options.PakDirectory);
 if (pakFiles.Length == 0)
 {
     throw new InvalidOperationException($"No .pak files found in {options.PakDirectory}");
 }
+
+Console.WriteLine($"Hashing {pakFiles.Length} source PAK file(s) before extraction...");
+var pakManifest = SourceSnapshots.CaptureFiles(pakFiles);
+var mappingsManifest = SourceSnapshots.CaptureFile(options.MappingsFile);
+Console.WriteLine("Captured initial PAK provenance; mounting verified sources...");
 
 Console.WriteLine($"Indexing {pakFiles.Length} Palworld PAK file(s)...");
 var versions = new VersionContainer(EGame.GAME_UE5_1, ETexturePlatform.DesktopMobile);
@@ -32,6 +37,14 @@ provider.Initialize();
 provider.Mount();
 provider.PostMount();
 Console.WriteLine($"Mounted {provider.Files.Count} game files.");
+var gameVersion = GameVersionExtractor.ReadMounted(provider);
+if (options.ExpectedGameVersion is not null &&
+    !string.Equals(options.ExpectedGameVersion, gameVersion, StringComparison.Ordinal))
+{
+    throw new InvalidOperationException(
+        $"Installed Palworld ProjectVersion is {gameVersion}, but --game-version expected {options.ExpectedGameVersion}.");
+}
+Console.WriteLine($"Detected Palworld ProjectVersion {gameVersion} from {GameVersionExtractor.SourcePath}.");
 
 var layers = new[]
 {
@@ -70,43 +83,61 @@ foreach (var layer in layers)
     image.Metadata.IccProfile = null;
     image.Metadata.XmpProfile = null;
 
-    var destination = Path.Combine(options.OutputDirectory, layer.FileName);
+    var destination = Path.Combine(mapOutput.PayloadDirectory, layer.FileName);
     image.Save(destination, new JpegEncoder { Quality = 90 });
-    var outputHash = HashFile(destination);
-    Console.WriteLine($"Wrote {destination} ({sourceWidth}x{sourceHeight} -> {OutputSize}x{OutputSize})");
+    var outputHash = SourceSnapshots.HashFile(destination);
+    Console.WriteLine($"Staged {layer.FileName} ({sourceWidth}x{sourceHeight} -> {OutputSize}x{OutputSize})");
     exported.Add(new LayerManifest(
         layer.Id, layer.Name, layer.FileName, objectPath, layer.Bounds,
         sourceWidth, sourceHeight, OutputSize, OutputSize, outputHash));
 }
 
-var pakManifest = pakFiles
-    .OrderBy(Path.GetFileName, StringComparer.Ordinal)
-    .Select(path => new SourceFile(Path.GetFileName(path), new FileInfo(path).Length, HashFile(path)))
-    .ToArray();
 var cue4ParseVersion = GetAssemblyMetadata("CUE4ParseVersion");
 var manifest = new MapManifest(
     1,
-    options.GameVersion,
+    gameVersion,
     $"palworld-map-exporter/{GeneratorVersion}",
     $"CUE4Parse/{cue4ParseVersion}",
-    new SourceFile(Path.GetFileName(options.MappingsFile), new FileInfo(options.MappingsFile).Length, HashFile(options.MappingsFile)),
+    mappingsManifest,
     pakManifest,
     exported);
 
-var manifestPath = Path.Combine(options.OutputDirectory, "manifest.json");
+var manifestPath = Path.Combine(mapOutput.PayloadDirectory, "manifest.json");
 File.WriteAllText(manifestPath, JsonSerializer.Serialize(manifest, new JsonSerializerOptions
 {
     WriteIndented = true,
     PropertyNamingPolicy = JsonNamingPolicy.CamelCase
 }) + Environment.NewLine);
-Console.WriteLine($"Wrote {manifestPath}");
+Console.WriteLine("Staged map manifest.json");
+
+LandmarkExporter.Export(
+    provider,
+    landmarkOutput.PayloadDirectory,
+    gameVersion,
+    $"palworld-map-exporter/{GeneratorVersion}",
+    $"CUE4Parse/{cue4ParseVersion}",
+    mappingsManifest,
+    pakManifest);
+
+Console.WriteLine("Re-hashing source PAKs to verify provenance coherence...");
+var finalPakManifest = SourceSnapshots.CaptureFiles(FindPakFiles(options.PakDirectory));
+SourceSnapshots.EnsureUnchanged("Palworld source PAKs", pakManifest, finalPakManifest);
+Console.WriteLine("Re-hashing the mappings file to verify provenance coherence...");
+var finalMappingsManifest = SourceSnapshots.CaptureFile(options.MappingsFile);
+SourceSnapshots.EnsureUnchanged("Palworld mappings file", [mappingsManifest], [finalMappingsManifest]);
+Console.WriteLine("Verified that every source PAK and the mappings file remained unchanged throughout the export.");
+
+OutputPromotion.Promote(mapOutput, landmarkOutput);
+Console.WriteLine($"Promoted map output to {mapOutput.DestinationDirectory}");
+Console.WriteLine($"Promoted landmark output to {landmarkOutput.DestinationDirectory}");
 
 static ExportOptions ParseOptions(string[] arguments)
 {
     string? pakDirectory = null;
     string? mappingsFile = null;
     string? outputDirectory = null;
-    var gameVersion = "unknown";
+    string? landmarkOutputDirectory = null;
+    string? gameVersion = null;
 
     for (var index = 0; index < arguments.Length; index++)
     {
@@ -121,25 +152,32 @@ static ExportOptions ParseOptions(string[] arguments)
             case "--pak-directory": pakDirectory = value; break;
             case "--mappings": mappingsFile = value; break;
             case "--output": outputDirectory = value; break;
+            case "--landmark-output": landmarkOutputDirectory = value; break;
             case "--game-version": gameVersion = value; break;
             default: throw new ArgumentException($"Unknown option: {key}");
         }
     }
 
-    if (string.IsNullOrWhiteSpace(pakDirectory) || string.IsNullOrWhiteSpace(mappingsFile) || string.IsNullOrWhiteSpace(outputDirectory))
+    if (string.IsNullOrWhiteSpace(pakDirectory) || string.IsNullOrWhiteSpace(mappingsFile) ||
+        string.IsNullOrWhiteSpace(outputDirectory) || string.IsNullOrWhiteSpace(landmarkOutputDirectory))
     {
-        throw new ArgumentException("Usage: MapExporter --pak-directory PATH --mappings FILE --output PATH [--game-version VERSION]");
+        throw new ArgumentException("Usage: MapExporter --pak-directory PATH --mappings FILE --output PATH --landmark-output PATH [--game-version EXPECTED_VERSION]");
+    }
+    gameVersion = gameVersion?.Trim();
+    if (gameVersion is not null && !GameVersionExtractor.IsCompleteVersion(gameVersion))
+    {
+        throw new ArgumentException(
+            "--game-version is an optional assertion and must be a complete three- or four-component numeric Palworld release when supplied.");
     }
     if (!Directory.Exists(pakDirectory)) throw new DirectoryNotFoundException(pakDirectory);
     if (!File.Exists(mappingsFile)) throw new FileNotFoundException("Mappings file not found", mappingsFile);
-    return new ExportOptions(pakDirectory, mappingsFile, outputDirectory, gameVersion);
+    return new ExportOptions(pakDirectory, mappingsFile, outputDirectory, landmarkOutputDirectory, gameVersion);
 }
 
-static string HashFile(string path)
-{
-    using var stream = File.OpenRead(path);
-    return Convert.ToHexString(SHA256.HashData(stream)).ToLowerInvariant();
-}
+static string[] FindPakFiles(string pakDirectory) => Directory
+    .GetFiles(pakDirectory, "*.pak", SearchOption.TopDirectoryOnly)
+    .OrderBy(Path.GetFileName, StringComparer.Ordinal)
+    .ToArray();
 
 static string GetAssemblyMetadata(string key)
 {
@@ -173,9 +211,13 @@ static string ResolveObjectPath(DefaultFileProvider provider, string documentedO
     return matches[0][..^".uasset".Length] + $".{objectName}";
 }
 
-record ExportOptions(string PakDirectory, string MappingsFile, string OutputDirectory, string GameVersion);
+record ExportOptions(
+    string PakDirectory,
+    string MappingsFile,
+    string OutputDirectory,
+    string LandmarkOutputDirectory,
+    string? ExpectedGameVersion);
 record LayerSource(string Id, string Name, string FileName, string ObjectPath, double[] Bounds);
-record SourceFile(string File, long Bytes, string Sha256);
 record LayerManifest(
     string Id,
     string Name,

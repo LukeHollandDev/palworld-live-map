@@ -21,6 +21,17 @@ type stubSource struct {
 	objectErr error
 }
 
+type stubRoster struct {
+	snapshot RosterSnapshot
+	err      error
+}
+
+func (s *stubRoster) Roster(context.Context) (RosterSnapshot, error) {
+	result := s.snapshot
+	result.Players = clonePlayers(result.Players)
+	return result, s.err
+}
+
 func (s *stubSource) Info(context.Context) (ServerInfo, error) {
 	return s.info, s.infoErr
 }
@@ -163,5 +174,64 @@ func TestPollerEmptySnapshotsUseNonNullSlices(t *testing.T) {
 	poller := testPoller(&stubSource{})
 	if poller.Snapshot().Players == nil || poller.Snapshot().Objects == nil || poller.PlayerSnapshot().Players == nil || poller.ObjectSnapshot().Objects == nil {
 		t.Fatal("empty snapshot contains a nil slice")
+	}
+}
+
+func TestPollerMergesPersistentRosterWithOnlinePlayers(t *testing.T) {
+	snapshotAt := time.Date(2026, time.July, 21, 10, 11, 12, 0, time.UTC)
+	captureTotal, uniqueCaptured, paldeckUnlocked := int64(4321), 117, 119
+	roster := &stubRoster{snapshot: RosterSnapshot{
+		SnapshotAt: snapshotAt,
+		Players: []Player{
+			{ID: "player:one", Name: "Alice", GuildKey: "guild:one", GuildName: "Builders", Level: 49, X: 10, Y: 20, Map: "palpagos", LastSeenAt: snapshotAt.Add(-time.Minute), CaptureTotal: &captureTotal, UniquePalsCaptured: &uniqueCaptured, PaldeckUnlocked: &paldeckUnlocked},
+			{ID: "player:two", Name: "Bob", GuildKey: "guild:one", GuildName: "Builders", Level: 51, X: 30, Y: 40, Map: "palpagos", LastSeenAt: snapshotAt.Add(-time.Hour)},
+		},
+	}}
+	source := &stubSource{players: []Player{{ID: "player:one", Name: "Alice", Level: 50, X: 100, Y: 200, Map: "palpagos"}}}
+	poller := NewPollerWithRoster(source, roster, time.Minute, time.Minute, time.Minute, false, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	poller.refreshRoster(context.Background())
+	poller.refreshPlayers(context.Background())
+
+	state := poller.PlayerSnapshot()
+	if !state.SaveEnabled || !state.SaveAvailable || state.SaveStale || !state.SaveSnapshotAt.Equal(snapshotAt) || state.SaveUpdatedAt.IsZero() || state.SaveLastError != "" {
+		t.Fatalf("save state = %#v", state)
+	}
+	if len(state.Players) != 2 {
+		t.Fatalf("players = %#v", state.Players)
+	}
+	alice, bob := state.Players[0], state.Players[1]
+	if !alice.Online || alice.Level != 50 || alice.X != 100 || alice.GuildName != "Builders" || alice.LastSeenAt.IsZero() ||
+		alice.CaptureTotal == nil || *alice.CaptureTotal != captureTotal || alice.UniquePalsCaptured == nil || *alice.UniquePalsCaptured != uniqueCaptured ||
+		alice.PaldeckUnlocked == nil || *alice.PaldeckUnlocked != paldeckUnlocked {
+		t.Fatalf("merged online player = %#v", alice)
+	}
+	if bob.Online || bob.Level != 51 || bob.X != 30 || bob.GuildKey != "guild:one" {
+		t.Fatalf("offline player = %#v", bob)
+	}
+
+	// A successful empty REST result immediately changes the saved member to
+	// offline and restores the last saved position.
+	source.players = []Player{}
+	poller.refreshPlayers(context.Background())
+	alice = poller.PlayerSnapshot().Players[0]
+	if alice.Online || alice.X != 10 || alice.Level != 49 {
+		t.Fatalf("offline transition = %#v", alice)
+	}
+
+	roster.err = errors.New("temporary save error")
+	poller.refreshRoster(context.Background())
+	stale := poller.PlayerSnapshot()
+	if !stale.SaveAvailable || !stale.SaveStale || stale.SaveLastError != "refresh-failed" || len(stale.Players) != 2 {
+		t.Fatalf("stale save state = %#v", stale)
+	}
+}
+
+func TestMergePlayersIsDeterministicAndDoesNotMergeEmptyIDs(t *testing.T) {
+	players := mergePlayers(
+		[]Player{{ID: "", Name: "Same"}, {ID: "player:b", Name: "zed"}},
+		[]Player{{ID: "", Name: "Same"}, {ID: "player:a", Name: "Alice"}},
+	)
+	if len(players) != 4 || players[0].ID != "player:a" || players[1].Online || !players[2].Online || players[3].ID != "player:b" {
+		t.Fatalf("merged players = %#v", players)
 	}
 }

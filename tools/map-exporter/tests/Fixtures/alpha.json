@@ -1,0 +1,29 @@
+{
+  "rowName": "BOSS_Penguin_Emperor",
+  "row": {
+    "CharacterID": "Penguin_Emperor",
+    "SpawnerID": "BossSpawner_Penguin_Emperor",
+    "Location": {
+      "X": -285331.3,
+      "Y": 210162.69
+    },
+    "Level": 15
+  },
+  "monsterRows": {
+    "Penguin_Emperor": {
+      "IsPal": true,
+      "IsBoss": true,
+      "IsTowerBoss": false,
+      "OverrideNameTextID": "PAL_NAME_Penguin_Emperor",
+      "ElementType1": "EPalElementType::Water",
+      "ElementType2": "EPalElementType::Ice"
+    }
+  },
+  "palNameRows": {
+    "PAL_NAME_Penguin_Emperor": {
+      "TextData": {
+        "LocalizedString": "Penking"
+      }
+    }
+  }
+}

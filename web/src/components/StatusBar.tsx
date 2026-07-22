@@ -13,7 +13,8 @@ function updateAge(lastSuccessAt?: string): string {
   return seconds < 2 ? 'Now' : `${seconds}s ago`
 }
 
-const metricClass = 'grid min-w-0 content-center justify-items-center gap-0.5 px-2 text-center max-lg:px-1 max-md:px-1'
+const metricClass =
+  'grid min-w-0 content-center justify-items-center gap-1 px-4 text-center max-lg:px-2 max-md:gap-0.5 max-md:px-1'
 
 const metricTones = {
   neutral: 'text-[#e5f7f8]',
@@ -53,11 +54,11 @@ function Metric({
         data-tooltip={tooltip}
         aria-describedby={tooltipId}
       >
-        <span className="w-full overflow-hidden text-center text-ellipsis whitespace-nowrap text-[10px] font-semibold tracking-[.08em] text-[#789096] uppercase">
+        <span className="w-full overflow-hidden text-center text-ellipsis whitespace-nowrap text-[11px] font-semibold tracking-[.09em] text-[#829da4] uppercase max-md:text-[10px]">
           {label}
         </span>
         <span
-          className={`m-0 w-full overflow-hidden text-center text-ellipsis whitespace-nowrap text-[13px] font-medium max-md:text-[11px] ${metricTones[tone]}`}
+          className={`m-0 w-full overflow-hidden text-center text-ellipsis whitespace-nowrap text-[15px] font-medium max-md:text-xs ${metricTones[tone]}`}
         >
           {value}
         </span>
@@ -69,82 +70,73 @@ function Metric({
   )
 }
 
-function Metrics({ metrics, status, age }: { metrics: ServerMetrics; status: string; age: string }) {
+function Metrics({
+  metrics,
+  status,
+  age,
+  connectionAvailable,
+  onlinePlayerCount
+}: {
+  metrics: ServerMetrics | null
+  status: string
+  age: string
+  connectionAvailable: boolean
+  onlinePlayerCount: number
+}) {
   const statusTone: MetricTone = status === 'live' ? 'live' : status === 'stale' ? 'stale' : 'offline'
+  const unavailable = 'N/A'
   return (
     <div className="contents max-md:col-start-1 max-md:row-start-2 max-md:grid max-md:min-w-0 max-md:grid-cols-5 max-md:divide-x max-md:divide-white/10">
       <div className="col-start-1 row-start-1 grid min-w-0 grid-cols-3 divide-x divide-white/10 max-md:contents">
         <Metric
           label={status}
-          value={age}
+          value={connectionAvailable ? age : unavailable}
           tone={statusTone}
           tooltip="Time since the map last received live player and server data successfully."
           tooltipAlign="start"
         />
         <Metric
           label="Players"
-          value={`${metrics.currentPlayers}/${metrics.maxPlayers}`}
+          value={
+            metrics
+              ? `${metrics.currentPlayers}/${metrics.maxPlayers}`
+              : connectionAvailable
+                ? onlinePlayerCount
+                : unavailable
+          }
           tone="players"
           tooltip="Players currently connected, followed by the server's maximum player capacity."
         />
         <Metric
           label="Server FPS"
-          value={metrics.serverFps}
+          value={metrics?.serverFps ?? unavailable}
           tone="performance"
           tooltip="The server's current frames per second, as reported by Palworld."
           mobileHidden
         />
       </div>
       <span className="col-start-2 row-start-1 max-md:hidden" aria-hidden="true" />
-      <div className="col-start-3 row-start-1 grid min-w-0 grid-cols-4 divide-x divide-white/10 max-md:contents">
-        <Metric
-          label="Frame"
-          value={`${metrics.serverFrameTime.toFixed(1)} ms`}
-          tone="performance"
-          tooltip="The server's current frame-processing time in milliseconds."
-          mobileHidden
-        />
+      <div className="col-start-3 row-start-1 grid min-w-0 grid-cols-3 divide-x divide-white/10 max-md:contents">
         <Metric
           label="Uptime"
-          value={formatUptime(metrics.uptimeSeconds)}
+          value={metrics ? formatUptime(metrics.uptimeSeconds) : unavailable}
           tone="uptime"
           tooltip="How long the Palworld server has been running since its last start."
         />
         <Metric
           label="Bases"
-          value={metrics.baseCount}
+          value={metrics?.baseCount ?? unavailable}
           tone="world"
           tooltip="The number of base camps currently registered on the server."
         />
         <Metric
           label="Day"
-          value={metrics.days}
+          value={metrics?.days ?? unavailable}
           tone="world"
           tooltip="The server's current in-game day count."
           tooltipAlign="end"
         />
       </div>
-    </div>
-  )
-}
-
-function StatusSummary({ status, age, text }: { status: string; age: string; text: string }) {
-  const statusTone: MetricTone = status === 'live' ? 'live' : status === 'stale' ? 'stale' : 'offline'
-  return (
-    <div className="contents max-md:col-start-1 max-md:row-start-2 max-md:grid max-md:min-w-0 max-md:grid-cols-[minmax(80px,1fr)_minmax(0,3fr)] max-md:divide-x max-md:divide-white/10">
-      <div className="col-start-1 row-start-1 grid min-w-0 grid-cols-1 divide-x divide-white/10 max-md:contents">
-        <Metric
-          label={status}
-          value={age}
-          tone={statusTone}
-          tooltip="Time since the map last received live player and server data successfully."
-          tooltipAlign="start"
-        />
-      </div>
-      <span className="col-start-2 row-start-1 max-md:hidden" aria-hidden="true" />
-      <p className="col-start-3 row-start-1 m-0 grid min-w-0 place-items-center px-3 text-center text-xs text-[#e5f7f8] max-md:col-start-2">
-        {text}
-      </p>
     </div>
   )
 }
@@ -158,9 +150,12 @@ export function StatusBar({ playerState, offline }: StatusBarProps) {
     return () => window.clearInterval(timer)
   }, [playerState?.lastSuccessAt])
 
-  const metrics = playerState?.metricsAvailable && !playerState.metricsStale && !offline ? playerState.metrics : null
-  const playerCount = playerState?.players?.length ?? 0
-  const currentPlayers = metrics?.currentPlayers ?? playerCount
+  const connectionAvailable = Boolean(playerState?.connected && !playerState.stale && !offline)
+  const metrics =
+    connectionAvailable && playerState?.metricsAvailable && !playerState.metricsStale ? playerState.metrics : null
+  const rosterCount = playerState?.players?.length ?? 0
+  const onlinePlayerCount = playerState?.players?.filter((player) => player.online !== false).length ?? 0
+  const currentPlayers = metrics?.currentPlayers ?? onlinePlayerCount
   const retainedRequestFailed = offline && Boolean(playerState)
   const stale = Boolean(playerState?.stale || playerState?.metricsStale || retainedRequestFailed)
   const status =
@@ -171,39 +166,46 @@ export function StatusBar({ playerState, offline }: StatusBarProps) {
             kind: 'live',
             text: metrics
               ? `${currentPlayers} / ${metrics.maxPlayers} players; server live`
-              : `${playerCount} player${playerCount === 1 ? '' : 's'} online`
+              : `${onlinePlayerCount} player${onlinePlayerCount === 1 ? '' : 's'} online`
           }
         : stale
           ? {
               kind: 'stale',
               text: retainedRequestFailed
-                ? `${playerCount} players; map connection interrupted`
+                ? `${onlinePlayerCount} players online; map connection interrupted`
                 : playerState?.metricsStale && !playerState.stale
-                  ? `${playerCount} players; server metrics stale`
+                  ? `${onlinePlayerCount} players online; server metrics stale`
                   : `${currentPlayers}${metrics ? ` / ${metrics.maxPlayers}` : ''} players; last known data`
             }
-          : { kind: 'offline', text: playerState ? 'Server unavailable' : 'Connecting…' }
+          : {
+              kind: 'offline',
+              text: playerState
+                ? `${onlinePlayerCount} online of ${rosterCount} known; server unavailable`
+                : 'Connecting…'
+            }
 
   const server = playerState?.server
   const title = server?.name || 'Palworld Live Map'
   return (
-    <header className="status-commandbar relative z-30 flex min-w-0 items-center border-b border-[#bfeff6]/45 bg-[#0f1b21]/98 px-[22px] shadow-[0_8px_22px_rgb(0_0_0/24%)] max-md:px-3 max-md:py-1.5">
-      <div className="relative z-[1] mx-auto grid h-[42px] w-full max-w-[1180px] min-w-0 grid-cols-[minmax(0,1fr)_clamp(280px,24vw,330px)_minmax(0,1fr)] items-stretch border border-white/15 bg-[#070f13]/60 text-center text-xs text-[#e5f7f8] max-md:h-16 max-md:grid-cols-1 max-md:grid-rows-[28px_36px]">
+    <header className="status-commandbar pointer-events-none absolute inset-x-0 top-0 z-40 flex min-w-0 px-7 pt-3 min-[1600px]:inset-x-[386px] min-[1600px]:px-0 max-md:px-2.5 max-md:pt-2">
+      <div className="pal-glass-surface pointer-events-auto relative z-[1] mx-auto grid h-[54px] w-full max-w-[1240px] min-w-0 grid-cols-[minmax(0,1fr)_clamp(300px,25vw,360px)_minmax(0,1fr)] items-stretch text-center text-xs text-[#e5f7f8] min-[1600px]:max-w-none max-md:h-[70px] max-md:grid-cols-1 max-md:grid-rows-[30px_40px]">
         <span role="status" className="sr-only">
           {status.text}
         </span>
-        {metrics ? (
-          <Metrics metrics={metrics} status={status.kind} age={age} />
-        ) : (
-          <StatusSummary status={status.kind} age={age} text={status.text} />
-        )}
-        <div className="relative z-[2] col-start-2 row-start-1 flex min-w-0 flex-col items-center justify-center border-x border-white/10 px-4 text-center max-lg:px-2 max-md:col-start-1 max-md:h-7 max-md:border-x-0 max-md:border-b">
-          <h1 className="m-0 w-full overflow-hidden text-ellipsis whitespace-nowrap text-lg leading-5 font-normal tracking-[.035em] text-[#f2fbfc] max-md:text-base">
+        <Metrics
+          metrics={metrics}
+          status={status.kind}
+          age={age}
+          connectionAvailable={connectionAvailable}
+          onlinePlayerCount={onlinePlayerCount}
+        />
+        <div className="relative z-[2] col-start-2 row-start-1 flex min-w-0 flex-col items-center justify-center border-x border-white/10 px-6 text-center max-lg:px-3 max-md:col-start-1 max-md:h-[30px] max-md:border-x-0 max-md:border-b">
+          <h1 className="m-0 w-full overflow-hidden text-ellipsis whitespace-nowrap text-[21px] leading-6 font-bold tracking-[.04em] text-[#f2fbfc] max-md:text-[17px] max-md:leading-5">
             {title}
           </h1>
           {server?.description && (
             <p
-              className="m-0 w-full overflow-hidden text-ellipsis whitespace-nowrap text-[11px] leading-4 text-[#9baab0] max-md:hidden"
+              className="m-0 w-full overflow-hidden text-ellipsis whitespace-nowrap text-xs leading-4 text-[#a5b7bc] max-md:hidden"
               title={`${server.description}${server.version ? ` · Palworld ${server.version}` : ''}`}
             >
               {server.description}

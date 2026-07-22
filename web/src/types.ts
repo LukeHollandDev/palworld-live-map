@@ -1,4 +1,5 @@
-export type ItemKind = 'players' | 'bases' | 'workers' | 'companions' | 'wild-pals' | 'npcs'
+export type ItemKind = 'players' | 'bases' | 'workers' | 'companions' | 'wild-pals' | 'alpha-pals' | 'bosses' | 'npcs'
+export type PlayerStatus = 'online' | 'offline'
 
 export interface MapLayer {
   id: string
@@ -12,6 +13,14 @@ export interface PublicConfig {
   worldPollIntervalMs: number
   worldDataEnabled: boolean
   layers: MapLayer[]
+  landmarks: WorldObject[]
+  landmarkCatalogue: LandmarkCatalogue
+}
+
+export interface LandmarkCatalogue {
+  gameVersion: string
+  generator: string
+  decoder: string
 }
 
 export interface ServerInfo {
@@ -36,6 +45,11 @@ export interface Player {
   level: number
   guildKey?: string
   guildName?: string
+  online: boolean
+  lastSeenAt?: string
+  captureTotal?: number
+  uniquePalsCaptured?: number
+  paldeckUnlocked?: number
   x: number
   y: number
   map: string
@@ -65,6 +79,11 @@ export interface MapItem {
   guildName?: string
   ownerId?: string
   level?: number
+  online?: boolean
+  lastSeenAt?: string
+  captureTotal?: number
+  uniquePalsCaptured?: number
+  paldeckUnlocked?: number
   x: number
   y: number
   map: string
@@ -79,6 +98,12 @@ export interface PlayerState {
   connected: boolean
   stale: boolean
   lastSuccessAt?: string
+  saveEnabled: boolean
+  saveAvailable: boolean
+  saveStale: boolean
+  saveUpdatedAt?: string
+  saveSnapshotAt?: string
+  saveLastError?: string
   players: Player[]
 }
 
@@ -94,7 +119,16 @@ export interface ObjectState {
   objects: WorldObject[]
 }
 
-export const ALL_KINDS: ItemKind[] = ['players', 'bases', 'workers', 'companions', 'wild-pals', 'npcs']
+export const ALL_KINDS: ItemKind[] = [
+  'players',
+  'bases',
+  'workers',
+  'companions',
+  'wild-pals',
+  'alpha-pals',
+  'bosses',
+  'npcs'
+]
 
 export const EMPTY_OBJECT_STATE: ObjectState = {
   enabled: false,

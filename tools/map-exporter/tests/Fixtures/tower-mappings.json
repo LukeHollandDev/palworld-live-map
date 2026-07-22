@@ -1,0 +1,11 @@
+[
+  { "bossType": "GrassBoss", "regionId": "REGION_Grass_Boss", "textRow": "REGION_Grass_Boss" },
+  { "bossType": "ForestBoss", "regionId": "REGION_Forest_Boss", "textRow": "REGION_Forest_Boss" },
+  { "bossType": "ElectricBoss", "regionId": "REGION_Volcano_Boss", "textRow": "REGION_Volcano_Boss" },
+  { "bossType": "DesertBoss", "regionId": "REGION_Desert_Boss", "textRow": "REGION_Desert_Boss" },
+  { "bossType": "SnowBoss", "regionId": "REGION_Frost_Boss", "textRow": "REGION_Frost_Boss" },
+  { "bossType": "SakurajimaBoss", "regionId": "REGION_Sakurajima_Boss", "textRow": "REGION_Sakurajima_Boss" },
+  { "bossType": "VikingBoss", "regionId": "REGION_Darkisland_Boss", "textRow": "REGION_Darkisland_Boss" },
+  { "bossType": "SorajimaBoss", "regionId": "REGION_Skyisland_Boss", "textRow": "REGION_Skyisland_Boss" },
+  { "bossType": "WorldTreeBoss", "regionId": "REGION_WorldTree_Boss", "textRow": "REGION_WorldTree08" }
+]

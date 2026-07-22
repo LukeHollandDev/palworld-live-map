@@ -37,4 +37,24 @@ describe('MarkerGlyph', () => {
     expect(pathFor('workers')).toBe(pathFor('players'))
     expect(pathFor('wild-pals')).toBe(pathFor('companions'))
   })
+
+  it('uses distinct landmark glyphs and online states for players', () => {
+    const { container } = render(
+      <>
+        <MarkerGlyph kind="alpha-pals" />
+        <MarkerGlyph kind="bosses" />
+        <MarkerGlyph kind="players" online />
+        <MarkerGlyph kind="players" online={false} />
+      </>
+    )
+    const pathFor = (kind: string) =>
+      container.querySelector(`[data-marker-kind="${kind}"] .marker-glyph-fill`)?.getAttribute('d')
+    const players = container.querySelectorAll('[data-marker-kind="players"]')
+
+    expect(pathFor('alpha-pals')).not.toBe(pathFor('bosses'))
+    expect(players[0]).toHaveClass('player-online')
+    expect(players[0]).toHaveAttribute('data-player-status', 'online')
+    expect(players[1]).toHaveClass('player-offline')
+    expect(players[1]).toHaveAttribute('data-player-status', 'offline')
+  })
 })

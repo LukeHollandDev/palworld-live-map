@@ -1,0 +1,18 @@
+Palworld Live Map savegame reader
+Copyright 2026 Luke Holland
+
+This directory contains code derived from Palhelm's backend/internal/sav
+package at commit e099e8afe4823d6cf6b371e5e3938955e5a1becd:
+
+    https://github.com/8tp/palhelm/tree/e099e8afe4823d6cf6b371e5e3938955e5a1becd/backend/internal/sav
+
+Copyright 2026 Palhelm contributors. Palhelm is licensed under the Apache
+License, Version 2.0. A copy is included as LICENSE in this directory.
+
+The port was modified to expose a roster-only Reader API, require an explicit
+caller-supplied Oodle library, avoid all network and write operations, read
+persisted player transforms/date-times, enforce bounded input/output, and
+support the Palworld July 2026 guild-role layout.
+
+No Palworld save, account identifier, player name, proprietary Oodle binary,
+or GPL parser code is included in this directory.

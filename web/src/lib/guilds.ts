@@ -3,6 +3,7 @@ import type { MapItem } from '../types'
 export interface GuildDetails {
   id: string
   name: string
+  members: MapItem[]
   onlineMembers: MapItem[]
   bases: MapItem[]
   pals: MapItem[]
@@ -41,7 +42,8 @@ export function buildGuildDetails(id: string, items: MapItem[]): GuildDetails {
     return pal.ownerId ? guildByOwnerId.get(pal.ownerId) || playersById.get(pal.ownerId)?.guildKey : undefined
   }
 
-  const onlineMembers = items.filter((item) => item.kind === 'players' && playerGuild(item) === id).sort(compareItems)
+  const members = items.filter((item) => item.kind === 'players' && playerGuild(item) === id).sort(compareItems)
+  const onlineMembers = members.filter((member) => member.online !== false)
   const bases = items
     .filter((item) => item.kind === 'bases' && guildIdForBase(item) === id)
     .sort((left, right) => left.x - right.x || left.y - right.y || left.id.localeCompare(right.id))
@@ -49,7 +51,7 @@ export function buildGuildDetails(id: string, items: MapItem[]): GuildDetails {
     .filter((item) => (item.kind === 'workers' || item.kind === 'companions') && guildForPal(item) === id)
     .sort(compareItems)
   const namedBase = bases.find((base) => base.name.trim().toLowerCase() !== 'palbox')
-  const name = onlineMembers.find((member) => member.guildName)?.guildName || namedBase?.name || 'Unnamed guild'
+  const name = members.find((member) => member.guildName)?.guildName || namedBase?.name || 'Unnamed guild'
 
-  return { id, name, onlineMembers, bases, pals }
+  return { id, name, members, onlineMembers, bases, pals }
 }

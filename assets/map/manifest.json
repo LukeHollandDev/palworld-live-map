@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
-  "gameVersion": "1.0",
-  "generator": "palworld-map-exporter/1",
+  "gameVersion": "1.0.1.100619",
+  "generator": "palworld-map-exporter/2",
   "decoder": "CUE4Parse/1.2.2.202607",
   "mappings": {
     "file": "mappings.usmap",

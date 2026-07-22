@@ -38,14 +38,19 @@ const (
 )
 
 type Player struct {
-	ID        string  `json:"id"`
-	Name      string  `json:"name"`
-	GuildKey  string  `json:"guildKey,omitempty"`
-	GuildName string  `json:"guildName,omitempty"`
-	Level     int     `json:"level"`
-	X         float64 `json:"x"`
-	Y         float64 `json:"y"`
-	Map       string  `json:"map"`
+	ID                 string    `json:"id"`
+	Name               string    `json:"name"`
+	GuildKey           string    `json:"guildKey,omitempty"`
+	GuildName          string    `json:"guildName,omitempty"`
+	Level              int       `json:"level"`
+	Online             bool      `json:"online"`
+	LastSeenAt         time.Time `json:"lastSeenAt,omitzero"`
+	CaptureTotal       *int64    `json:"captureTotal,omitempty"`
+	UniquePalsCaptured *int      `json:"uniquePalsCaptured,omitempty"`
+	PaldeckUnlocked    *int      `json:"paldeckUnlocked,omitempty"`
+	X                  float64   `json:"x"`
+	Y                  float64   `json:"y"`
+	Map                string    `json:"map"`
 }
 
 type ServerInfo struct {
@@ -283,11 +288,12 @@ func (c *Client) Players(ctx context.Context) ([]Player, error) {
 		}
 		identityCounts[identity]++
 		player := Player{
-			Name:  name,
-			Level: *raw.Level,
-			X:     *raw.LocationX,
-			Y:     *raw.LocationY,
-			Map:   mapID,
+			Name:   name,
+			Level:  *raw.Level,
+			Online: true,
+			X:      *raw.LocationX,
+			Y:      *raw.LocationY,
+			Map:    mapID,
 		}
 		if linked {
 			player.GuildKey = relation.guildKey
@@ -704,6 +710,25 @@ func (c *Client) publicID(namespace string, parts ...string) string {
 	return fmt.Sprintf("%s:%x", namespace, hash.Sum(nil)[:16])
 }
 
+// PublicPlayerID and PublicGuildKey project persistent save identifiers into
+// the same opaque namespace as REST records. Raw game/account identifiers are
+// never returned to browsers or retained in a public snapshot.
+func (c *Client) PublicPlayerID(playerID string) (string, bool) {
+	playerID = canonicalGUID(playerID)
+	if playerID == "" {
+		return "", false
+	}
+	return c.publicID("player", "player-id:"+playerID), true
+}
+
+func (c *Client) PublicGuildKey(guildID string) (string, bool) {
+	guildID = canonicalGUID(guildID)
+	if guildID == "" {
+		return "", false
+	}
+	return c.publicID("guild", guildID), true
+}
+
 func opaqueID(namespace string, parts ...string) string {
 	hash := sha256.New()
 	writeIDParts(hash, namespace, parts...)
@@ -767,6 +792,14 @@ func cleanName(value string) string {
 
 func canonicalExternalID(value string) string {
 	return strings.ToLower(strings.TrimSpace(value))
+}
+
+func canonicalGUID(value string) string {
+	value = strings.ReplaceAll(canonicalExternalID(value), "-", "")
+	if !isHexID(value) {
+		return ""
+	}
+	return value
 }
 
 func isHexID(value string) bool {
