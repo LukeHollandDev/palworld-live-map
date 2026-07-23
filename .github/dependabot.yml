@@ -20,3 +20,9 @@ updates:
     directory: /tools/map-exporter
     schedule:
       interval: weekly
+    ignore:
+      # CUE4Parse-Conversion pins these to exact versions, so they can only be
+      # bumped in lockstep with a CUE4Parse-Conversion release that moves to them.
+      # ImageSharp 4.x also relicensed and requires a paid Six Labors license.
+      - dependency-name: "SixLabors.ImageSharp"
+      - dependency-name: "SkiaSharp.NativeAssets.*"
