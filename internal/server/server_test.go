@@ -117,7 +117,6 @@ func TestStateIsPublicAndSanitized(t *testing.T) {
 
 func TestSplitStateEndpointsDoNotRepeatUnrelatedData(t *testing.T) {
 	cfg := testConfig()
-	captureTotal, uniqueCaptured, paldeckUnlocked := int64(4321), 117, 119
 	source := fixedSnapshot{value: palworld.Snapshot{
 		Server:           palworld.ServerInfo{Name: "The Chaos"},
 		Metrics:          palworld.ServerMetrics{ServerFPS: 59, MaxPlayers: 20},
@@ -125,7 +124,6 @@ func TestSplitStateEndpointsDoNotRepeatUnrelatedData(t *testing.T) {
 		Connected:        true,
 		Players: []palworld.Player{{
 			Name: "Luke", Level: 55, X: 10, Y: -20, Map: "palpagos",
-			CaptureTotal: &captureTotal, UniquePalsCaptured: &uniqueCaptured, PaldeckUnlocked: &paldeckUnlocked,
 		}},
 		ObjectsAvailable: true,
 		Objects:          []palworld.WorldObject{{Kind: "bases", Name: "Home", X: 5, Y: 6, Map: "palpagos"}},
@@ -142,11 +140,6 @@ func TestSplitStateEndpointsDoNotRepeatUnrelatedData(t *testing.T) {
 	}
 	if !strings.Contains(players.Body.String(), `"serverFps":59`) || !strings.Contains(players.Body.String(), `"maxPlayers":20`) {
 		t.Fatalf("players response has no metrics: %s", players.Body.String())
-	}
-	for _, progress := range []string{`"captureTotal":4321`, `"uniquePalsCaptured":117`, `"paldeckUnlocked":119`} {
-		if !strings.Contains(players.Body.String(), progress) {
-			t.Fatalf("players response has no save progress %s: %s", progress, players.Body.String())
-		}
 	}
 	if strings.Contains(players.Body.String(), `"name":"Home"`) || strings.Contains(players.Body.String(), `"objects"`) {
 		t.Fatalf("players response contains world objects: %s", players.Body.String())

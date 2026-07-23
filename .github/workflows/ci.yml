@@ -103,7 +103,7 @@ jobs:
           labels: |
             org.opencontainers.image.title=Palworld Live Map
             org.opencontainers.image.description=Public read-only live world map for Palworld dedicated servers
-            org.opencontainers.image.licenses=MIT AND Apache-2.0 AND GPL-3.0-or-later AND CC0-1.0 AND LicenseRef-Pocketpair-Proprietary
+            org.opencontainers.image.licenses=MIT AND LicenseRef-Pocketpair-Proprietary
 
       - name: Build and publish container image
         uses: docker/build-push-action@v7

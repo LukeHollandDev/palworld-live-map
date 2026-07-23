@@ -5,8 +5,6 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
-	"sort"
-	"strings"
 	"sync"
 	"time"
 )
@@ -17,12 +15,6 @@ type Snapshot struct {
 	Stale              bool          `json:"stale"`
 	LastSuccessAt      time.Time     `json:"lastSuccessAt,omitzero"`
 	Players            []Player      `json:"players"`
-	SaveEnabled        bool          `json:"saveEnabled"`
-	SaveAvailable      bool          `json:"saveAvailable"`
-	SaveStale          bool          `json:"saveStale"`
-	SaveUpdatedAt      time.Time     `json:"saveUpdatedAt,omitzero"`
-	SaveSnapshotAt     time.Time     `json:"saveSnapshotAt,omitzero"`
-	SaveLastError      string        `json:"saveLastError,omitempty"`
 	Metrics            ServerMetrics `json:"metrics"`
 	MetricsAvailable   bool          `json:"metricsAvailable"`
 	MetricsStale       bool          `json:"metricsStale"`
@@ -43,12 +35,6 @@ type PlayerSnapshot struct {
 	Stale            bool          `json:"stale"`
 	LastSuccessAt    time.Time     `json:"lastSuccessAt,omitzero"`
 	Players          []Player      `json:"players"`
-	SaveEnabled      bool          `json:"saveEnabled"`
-	SaveAvailable    bool          `json:"saveAvailable"`
-	SaveStale        bool          `json:"saveStale"`
-	SaveUpdatedAt    time.Time     `json:"saveUpdatedAt,omitzero"`
-	SaveSnapshotAt   time.Time     `json:"saveSnapshotAt,omitzero"`
-	SaveLastError    string        `json:"saveLastError,omitempty"`
 	Metrics          ServerMetrics `json:"metrics"`
 	MetricsAvailable bool          `json:"metricsAvailable"`
 	MetricsStale     bool          `json:"metricsStale"`
@@ -73,44 +59,23 @@ type Source interface {
 	WorldObjects(context.Context) ([]WorldObject, error)
 }
 
-// RosterSnapshot is the persistent, save-derived view of players. Positions
-// are the last saved positions and are superseded by REST coordinates while a
-// player is online.
-type RosterSnapshot struct {
-	SnapshotAt time.Time
-	Players    []Player
-}
-
-type RosterSource interface {
-	Roster(context.Context) (RosterSnapshot, error)
-}
-
 type Poller struct {
 	source         Source
-	roster         RosterSource
 	playerEvery    time.Duration
 	worldEvery     time.Duration
-	rosterEvery    time.Duration
 	worldEnabled   bool
 	logger         *slog.Logger
 	unsupportedLog bool
 
 	mu       sync.RWMutex
 	snapshot Snapshot
-	online   []Player
-	saved    []Player
 }
 
 func NewPoller(source Source, playerEvery, worldEvery time.Duration, worldEnabled bool, logger *slog.Logger) *Poller {
-	return NewPollerWithRoster(source, nil, playerEvery, worldEvery, 0, worldEnabled, logger)
-}
-
-func NewPollerWithRoster(source Source, roster RosterSource, playerEvery, worldEvery, rosterEvery time.Duration, worldEnabled bool, logger *slog.Logger) *Poller {
 	return &Poller{
-		source: source, roster: roster, playerEvery: playerEvery, worldEvery: worldEvery,
-		rosterEvery: rosterEvery, worldEnabled: worldEnabled, logger: logger,
-		snapshot: Snapshot{Players: []Player{}, Objects: []WorldObject{}, SaveEnabled: roster != nil},
-		online:   []Player{}, saved: []Player{},
+		source: source, playerEvery: playerEvery, worldEvery: worldEvery,
+		worldEnabled: worldEnabled, logger: logger,
+		snapshot: Snapshot{Players: []Player{}, Objects: []WorldObject{}},
 	}
 }
 
@@ -136,13 +101,6 @@ func (p *Poller) Run(ctx context.Context) {
 			p.runWorld(ctx)
 		}()
 	}
-	if p.roster != nil {
-		workers.Add(1)
-		go func() {
-			defer workers.Done()
-			p.runRoster(ctx)
-		}()
-	}
 	workers.Wait()
 }
 
@@ -160,10 +118,6 @@ func (p *Poller) runMetrics(ctx context.Context) {
 
 func (p *Poller) runWorld(ctx context.Context) {
 	runEvery(ctx, p.worldEvery, p.refreshWorld)
-}
-
-func (p *Poller) runRoster(ctx context.Context) {
-	runEvery(ctx, p.rosterEvery, p.refreshRoster)
 }
 
 func runEvery(ctx context.Context, interval time.Duration, refresh func(context.Context)) {
@@ -197,9 +151,6 @@ func (p *Poller) PlayerSnapshot() PlayerSnapshot {
 	return PlayerSnapshot{
 		Server: p.snapshot.Server, Connected: p.snapshot.Connected, Stale: p.snapshot.Stale,
 		LastSuccessAt: p.snapshot.LastSuccessAt, Players: clonePlayers(p.snapshot.Players),
-		SaveEnabled: p.snapshot.SaveEnabled, SaveAvailable: p.snapshot.SaveAvailable,
-		SaveStale: p.snapshot.SaveStale, SaveUpdatedAt: p.snapshot.SaveUpdatedAt,
-		SaveSnapshotAt: p.snapshot.SaveSnapshotAt, SaveLastError: p.snapshot.SaveLastError,
 		Metrics: p.snapshot.Metrics, MetricsAvailable: p.snapshot.MetricsAvailable,
 		MetricsStale: p.snapshot.MetricsStale, MetricsUpdatedAt: p.snapshot.MetricsUpdatedAt,
 	}
@@ -242,36 +193,7 @@ func (p *Poller) refreshPlayers(ctx context.Context) {
 	p.snapshot.Connected = true
 	p.snapshot.Stale = false
 	p.snapshot.LastSuccessAt = time.Now().UTC()
-	p.online = clonePlayers(players)
-	for index := range p.online {
-		p.online[index].Online = true
-	}
-	p.snapshot.Players = mergePlayers(p.saved, p.online)
-	p.mu.Unlock()
-}
-
-func (p *Poller) refreshRoster(ctx context.Context) {
-	roster, err := p.roster.Roster(ctx)
-	if err != nil {
-		p.mu.Lock()
-		p.snapshot.SaveStale = p.snapshot.SaveAvailable
-		p.snapshot.SaveLastError = "refresh-failed"
-		p.mu.Unlock()
-		p.logger.Warn("Palworld save-roster refresh failed", "error", err)
-		return
-	}
-	now := time.Now().UTC()
-	p.mu.Lock()
-	p.saved = clonePlayers(roster.Players)
-	for index := range p.saved {
-		p.saved[index].Online = false
-	}
-	p.snapshot.SaveAvailable = true
-	p.snapshot.SaveStale = false
-	p.snapshot.SaveUpdatedAt = now
-	p.snapshot.SaveSnapshotAt = roster.SnapshotAt.UTC()
-	p.snapshot.SaveLastError = ""
-	p.snapshot.Players = mergePlayers(p.saved, p.online)
+	p.snapshot.Players = clonePlayers(players)
 	p.mu.Unlock()
 }
 
@@ -352,57 +274,6 @@ func (p *Poller) refreshWorld(ctx context.Context) {
 func clonePlayers(players []Player) []Player {
 	result := make([]Player, len(players))
 	copy(result, players)
-	return result
-}
-
-func mergePlayers(saved, online []Player) []Player {
-	result := make([]Player, 0, len(saved)+len(online))
-	byID := make(map[string]int, len(saved))
-	for _, player := range saved {
-		player.Online = false
-		if player.ID != "" {
-			if _, duplicate := byID[player.ID]; duplicate {
-				continue
-			}
-			byID[player.ID] = len(result)
-		}
-		result = append(result, player)
-	}
-	for _, player := range online {
-		player.Online = true
-		index, found := byID[player.ID]
-		if !found || player.ID == "" {
-			result = append(result, player)
-			continue
-		}
-		persisted := result[index]
-		if player.GuildKey == "" {
-			player.GuildKey = persisted.GuildKey
-		}
-		if player.GuildName == "" {
-			player.GuildName = persisted.GuildName
-		}
-		if player.LastSeenAt.IsZero() {
-			player.LastSeenAt = persisted.LastSeenAt
-		}
-		if player.CaptureTotal == nil {
-			player.CaptureTotal = persisted.CaptureTotal
-		}
-		if player.UniquePalsCaptured == nil {
-			player.UniquePalsCaptured = persisted.UniquePalsCaptured
-		}
-		if player.PaldeckUnlocked == nil {
-			player.PaldeckUnlocked = persisted.PaldeckUnlocked
-		}
-		result[index] = player
-	}
-	sort.SliceStable(result, func(i, j int) bool {
-		left, right := strings.ToLower(result[i].Name), strings.ToLower(result[j].Name)
-		if left != right {
-			return left < right
-		}
-		return result[i].ID < result[j].ID
-	})
 	return result
 }
 

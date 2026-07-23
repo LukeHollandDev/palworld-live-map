@@ -30,9 +30,6 @@ func TestLoadDefaults(t *testing.T) {
 	if cfg.WorldPollInterval != 15*time.Second || cfg.WorldTimeout != 10*time.Second || !cfg.WorldDataEnabled {
 		t.Fatalf("unexpected world defaults: interval=%s timeout=%s enabled=%v", cfg.WorldPollInterval, cfg.WorldTimeout, cfg.WorldDataEnabled)
 	}
-	if cfg.SaveDataEnabled || cfg.SaveRoot != "/data/palworld/saves" || cfg.SavePollInterval != 30*time.Second || cfg.SaveTimeout != 20*time.Second {
-		t.Fatalf("unexpected save defaults: enabled=%v root=%q interval=%s timeout=%s", cfg.SaveDataEnabled, cfg.SaveRoot, cfg.SavePollInterval, cfg.SaveTimeout)
-	}
 }
 
 func TestLoadDemoModeWithoutPalworldCredentials(t *testing.T) {
@@ -45,15 +42,6 @@ func TestLoadDemoModeWithoutPalworldCredentials(t *testing.T) {
 	}
 	if !cfg.DemoMode || cfg.RESTURL != "" || cfg.AdminPassword != "" {
 		t.Fatalf("unexpected demo config: %+v", cfg)
-	}
-}
-
-func TestLoadRejectsSaveDataInDemoMode(t *testing.T) {
-	t.Setenv("DEMO_MODE", "true")
-	t.Setenv("SAVE_DATA_ENABLED", "true")
-	_, err := Load()
-	if err == nil || !strings.Contains(err.Error(), "DEMO_MODE") {
-		t.Fatalf("Load() error = %v", err)
 	}
 }
 
@@ -78,7 +66,6 @@ func TestLoadRejectsInvalidConfiguration(t *testing.T) {
 		{name: "demo boolean", key: "DEMO_MODE", value: "sometimes", want: "DEMO_MODE"},
 		{name: "poll too short", key: "POLL_INTERVAL", value: "1s", want: "at least 2s"},
 		{name: "world timeout", key: "WORLD_TIMEOUT", value: "20s", want: "shorter"},
-		{name: "save boolean", key: "SAVE_DATA_ENABLED", value: "sometimes", want: "SAVE_DATA_ENABLED"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -89,53 +76,6 @@ func TestLoadRejectsInvalidConfiguration(t *testing.T) {
 				t.Fatalf("Load() error = %v, want error containing %q", err, tt.want)
 			}
 		})
-	}
-}
-
-func TestLoadValidatesEnabledSaveReader(t *testing.T) {
-	tests := []struct {
-		name  string
-		key   string
-		value string
-		want  string
-	}{
-		{name: "relative root", key: "PALWORLD_SAVE_ROOT", value: "saves", want: "absolute"},
-		{name: "poll too short", key: "SAVE_POLL_INTERVAL", value: "10s", want: "at least 15s"},
-		{name: "timeout", key: "SAVE_TIMEOUT", value: "30s", want: "shorter"},
-	}
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			validEnvironment(t)
-			t.Setenv("SAVE_DATA_ENABLED", "true")
-			t.Setenv(test.key, test.value)
-			_, err := Load()
-			if err == nil || !strings.Contains(err.Error(), test.want) {
-				t.Fatalf("Load() error = %v, want error containing %q", err, test.want)
-			}
-		})
-	}
-}
-
-func TestLoadDoesNotValidateUnusedSaveTimingWhenSaveDataIsDisabled(t *testing.T) {
-	validEnvironment(t)
-	t.Setenv("SAVE_DATA_ENABLED", "false")
-	t.Setenv("PALWORLD_SAVE_ROOT", "relative")
-	t.Setenv("SAVE_POLL_INTERVAL", "1s")
-	t.Setenv("SAVE_TIMEOUT", "2m")
-	if _, err := Load(); err != nil {
-		t.Fatalf("Load() error = %v", err)
-	}
-}
-
-func TestLoadAcceptsEnabledSaveReader(t *testing.T) {
-	validEnvironment(t)
-	t.Setenv("SAVE_DATA_ENABLED", "true")
-	cfg, err := Load()
-	if err != nil {
-		t.Fatalf("Load() error = %v", err)
-	}
-	if !cfg.SaveDataEnabled {
-		t.Fatalf("save config = %+v", cfg)
 	}
 }
 

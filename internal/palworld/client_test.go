@@ -103,28 +103,6 @@ func TestClientPlayersSanitizesUpstreamResponse(t *testing.T) {
 	}
 }
 
-func TestClientProjectsSaveGUIDsIntoRESTIdentityNamespaces(t *testing.T) {
-	client, err := NewClient("http://palworld:8212", "secret", time.Second, time.Second)
-	if err != nil {
-		t.Fatal(err)
-	}
-	playerFromSave, ok := client.PublicPlayerID("00112233-4455-6677-8899-AABBCCDDEEFF")
-	if !ok {
-		t.Fatal("valid save player GUID was rejected")
-	}
-	playerFromREST := client.publicID("player", "player-id:00112233445566778899aabbccddeeff")
-	if playerFromSave != playerFromREST {
-		t.Fatalf("save player ID %q != REST player ID %q", playerFromSave, playerFromREST)
-	}
-	guild, ok := client.PublicGuildKey("FFEEDDCCBBAA99887766554433221100")
-	if !ok || guild != client.publicID("guild", "ffeeddccbbaa99887766554433221100") {
-		t.Fatalf("guild key = %q, ok = %v", guild, ok)
-	}
-	if _, ok := client.PublicPlayerID("../../not-a-guid"); ok {
-		t.Fatal("invalid save player GUID was accepted")
-	}
-}
-
 func TestClientLinksPlayersGuildsAndCompanionsWithOpaqueIDs(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {

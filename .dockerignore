@@ -12,7 +12,6 @@ coverage*
 **/node_modules/
 web/dist/
 tools/
-third_party/palworld-save-decode/palworld-save-decode
 assets/images/
 assets/map/README.md
 **/*_test.go

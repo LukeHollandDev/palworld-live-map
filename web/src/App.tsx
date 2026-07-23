@@ -346,14 +346,6 @@ function LiveMap({ config }: { config: PublicConfig }) {
     objectNotice = objectNotice ? `${objectNotice} ${catalogueNotice}` : catalogueNotice
   }
 
-  let rosterNotice: string | null = null
-  if (playerState?.saveEnabled === false)
-    rosterNotice = 'Saved roster is disabled; this ranking includes online players only.'
-  else if (playerState?.saveEnabled && !playerState.saveAvailable)
-    rosterNotice = playerState.saveLastError ? 'Saved players are temporarily unavailable.' : 'Loading saved players…'
-  else if (playerState?.saveEnabled && playerState.saveStale)
-    rosterNotice = 'Offline players use the last successful save snapshot.'
-
   const explorerProps = {
     activeLayer,
     layers: config.layers,
@@ -425,7 +417,6 @@ function LiveMap({ config }: { config: PublicConfig }) {
               detail={detail}
               items={items}
               layers={config.layers}
-              rosterNotice={rosterNotice}
               returnFocus={returnFocus}
               fallbackFocus={leaderboardButtonRef.current}
               onSelectItem={(item, focus) => {

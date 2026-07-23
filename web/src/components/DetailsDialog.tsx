@@ -16,7 +16,6 @@ interface DetailsDialogProps {
   detail: Detail | null
   items: MapItem[]
   layers: MapLayer[]
-  rosterNotice: string | null
   returnFocus: HTMLElement | null
   fallbackFocus: HTMLElement | null
   onClose: () => void
@@ -42,7 +41,6 @@ export function DetailsDialog({
   detail,
   items,
   layers,
-  rosterNotice,
   returnFocus,
   fallbackFocus,
   onClose,
@@ -140,7 +138,6 @@ export function DetailsDialog({
             <LeaderboardDetails
               leaderboardId={leaderboard.id}
               items={items}
-              rosterNotice={rosterNotice}
               onSelectItem={onSelectItem}
               onSelectLeaderboard={onSelectLeaderboard}
             />
@@ -154,13 +151,11 @@ export function DetailsDialog({
 function LeaderboardDetails({
   leaderboardId,
   items,
-  rosterNotice,
   onSelectItem,
   onSelectLeaderboard
 }: {
   leaderboardId: LeaderboardId
   items: MapItem[]
-  rosterNotice: string | null
   onSelectItem: (item: MapItem, focus: HTMLElement) => void
   onSelectLeaderboard: (leaderboardId: LeaderboardId) => void
 }) {
@@ -188,11 +183,6 @@ function LeaderboardDetails({
       <section>
         <SectionTitle>{leaderboard.title}</SectionTitle>
         <p className="mt-0 mb-3 text-xs leading-5 text-[#9fb0b5]">{leaderboard.description}</p>
-        {rosterNotice ? (
-          <p className="my-3 border border-[#66583d] bg-[#302b22] px-3 py-2.5 text-[11px] leading-4 text-[#d8c18a]">
-            {rosterNotice}
-          </p>
-        ) : null}
         {entries.length > 0 ? (
           <ol className="m-0 grid list-none gap-1.5 p-0">
             {entries.map(({ item, rank, value }) => {
@@ -327,18 +317,6 @@ function levelLabel(item: MapItem) {
 
 function coordinates(item: MapItem) {
   return `X ${Math.round(item.x)}\u00a0\u00a0Y ${Math.round(item.y)}`
-}
-
-function formatTimestamp(value?: string) {
-  if (!value) return undefined
-  const timestamp = new Date(value)
-  return Number.isNaN(timestamp.getTime())
-    ? value
-    : timestamp.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })
-}
-
-function formatCount(value?: number) {
-  return value === undefined ? undefined : value.toLocaleString()
 }
 
 function baseLabel(base: MapItem, guildBases: MapItem[]) {
@@ -570,13 +548,6 @@ function ItemDetails({
   if (item.level) entries.push(['Level', item.level])
   if (item.kind === 'players') {
     entries.push(['Status', item.online === false ? 'Offline' : 'Online'])
-    entries.push(['Pals caught', formatCount(item.captureTotal)])
-    entries.push(['Unique Pals caught', formatCount(item.uniquePalsCaptured)])
-    entries.push(['Paldeck unlocked', formatCount(item.paldeckUnlocked)])
-    if (item.online === false) {
-      entries.push(['Position', 'Last saved'])
-      entries.push(['Last seen', formatTimestamp(item.lastSeenAt)])
-    }
   }
   if (item.detail && item.kind !== 'players') {
     const detailLabel =

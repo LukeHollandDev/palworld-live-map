@@ -4,7 +4,7 @@ This document covers the technical details intentionally kept out of the main RE
 
 ## How It Works
 
-The Go service connects to one Palworld dedicated server and polls its official REST API. It can also read completed native save backups through a separate read-only adapter. Browsers only talk to the live-map service; they never connect directly to Palworld, receive the REST admin password, or receive raw save identifiers.
+The Go service connects to one Palworld dedicated server and polls its official REST API. Browsers only talk to the live-map service; they never connect directly to Palworld or receive the REST admin password.
 
 The service uses four upstream endpoints:
 
@@ -13,11 +13,9 @@ The service uses four upstream endpoints:
 - [`/v1/api/metrics`](https://docs.palworldgame.com/api/rest-api/metrics/) provides player capacity, performance, uptime, base-count, and in-game day metrics.
 - [`/v1/api/game-data`](https://docs.palworldgame.com/api/rest-api/game-data/) provides the optional world-object layers.
 
-Only fields needed by the UI are exposed publicly. Account names, raw player IDs, user IDs, IP addresses, raw guild IDs, the world GUID, and REST credentials are not represented in the browser-facing models. REST and save records use the same credential-keyed opaque player/guild projections, allowing an online record to overlay its persistent save record without publishing upstream identifiers. World objects receive equivalent stable opaque IDs.
+Only fields needed by the UI are exposed publicly. Account names, raw player IDs, user IDs, IP addresses, raw guild IDs, the world GUID, and REST credentials are not represented in the browser-facing models. Players, guilds, and world objects receive stable credential-keyed opaque IDs.
 
-Player and server-metric data are refreshed using `POLL_INTERVAL`; world objects use `WORLD_POLL_INTERVAL`; the save roster uses `SAVE_POLL_INTERVAL`; server information is refreshed once per minute. A single set of background pollers serves every connected browser. Browsers fetch `/api/players` and `/api/objects` independently at their respective intervals, so unchanged world-object data is not retransmitted with every player update. The combined `/api/state` route remains available for compatibility. The last successful player, metric, world-object, and save-roster results are retained independently, with explicit availability/staleness timestamps in the public state.
-
-The save adapter selects the second-newest complete `backup/world` generation when at least two exist, or the only complete generation otherwise, and then runs a bounded selective decoder. It currently extracts roster identity, level, guild membership/name, `LastTransform.Translation`, `LastOnlineDateTime`, and typed `RecordData` capture/Paldeck aggregates. The data-source contract and extension path are detailed in [`docs/save-data.md`](docs/save-data.md).
+Player and server-metric data are refreshed using `POLL_INTERVAL`; world objects use `WORLD_POLL_INTERVAL`; server information is refreshed once per minute. A single set of background pollers serves every connected browser. Browsers fetch `/api/players` and `/api/objects` independently at their respective intervals, so unchanged world-object data is not retransmitted with every player update. The combined `/api/state` route remains available for compatibility. The last successful player, metric, and world-object results are retained independently, with explicit availability/staleness timestamps in the public state.
 
 Field Alpha and tower-boss locations are versioned static game data under `assets/landmarks`, not live server actors. The checked-in manifest is generated directly from an installed Palworld PAK, including exact tower actor coordinates and source provenance. The locations are returned with public configuration and share the normal `WorldObject` projection/filter pipeline.
 
@@ -27,18 +25,18 @@ World records without coordinates inside a shipped map are omitted, as are legac
 
 ### Membership and ownership projection
 
-The live endpoints and persistent roster are joined internally before their identifiers are discarded. An online `/players` record is matched to the saved roster by normalized player GUID; its current level and coordinates win, while saved guild metadata fills REST gaps. The game-data player actor still supplies the full instance identity needed to connect an `OtomoPal.TrainerInstanceID` to its owner. The public snapshot contains only deployment-scoped opaque IDs and display fields.
+The game-data player actor supplies the full instance identity needed to connect an `OtomoPal.TrainerInstanceID` to its owner and associate live players with guild metadata. The public snapshot contains only deployment-scoped opaque IDs and display fields.
 
-The Explorer is intentionally limited to controls for the selected map. Online Players, Offline Players, and Guilds are the only expanded and enabled categories for a fresh or migrated default. Search is hosted at the top of the Explorer and feeds the shared list/map query; selecting a result follows the normal focus path, enabling its kind or player status and smoothly moving to its coordinates before opening details.
+The Explorer is intentionally limited to controls for the selected map. Search is hosted at the top of the Explorer and feeds the shared list/map query; selecting a result follows the normal focus path, enabling its kind and smoothly moving to its coordinates before opening details.
 
-- **Online Players and Offline Players:** separate categories use the same green/gray status treatment as their markers. Offline entries use the last position available from the completed save snapshot.
+- **Online Players:** live players and positions come from the REST API.
 - **Companion Pals:** a separate flat map-object category. Exact opaque owner-ID relationships remain available from the companion and player detail panels.
 - **Guilds → bases → assigned Pals:** Palboxes group by opaque guild key. A `BaseCampPal` is nested below a base only after the same-guild, same-map perimeter test above. Same-guild workers outside every qualifying perimeter remain under that guild's "Outside base perimeters" group; records without a linked guild use a separate fallback group.
 - **Wild Pals, Field Alphas, Tower Bosses, and NPCs:** independent map categories that remain collapsed and disabled by default.
 
 The hierarchy controls affect the complete group even when search and rendering caps show only part of it. Guild-member rosters are deliberately available from guild details rather than the map filter. Companion and wild Pals are never captured by base proximity, and ambient guild-like values on wild Pals or NPCs are not treated as player-guild membership.
 
-When `DEMO_MODE=true`, the application does not construct the REST client or contact a Palworld server. A deterministic fictional source implements both live and roster interfaces, including one offline member, so online/offline merging, the leaderboard, public API, and browser UI are exercised. Its workers stay inside their assigned base perimeters, companion Pals follow their owners, and both maps contain a complete player-guild-base example. Demo mode is suitable for screenshots, smoke tests, and public evaluation—not load or upstream-compatibility testing.
+When `DEMO_MODE=true`, the application does not construct the REST client or contact a Palworld server. A deterministic fictional source exercises the leaderboard, public API, and browser UI. Its workers stay inside their assigned base perimeters, companion Pals follow their owners, and both maps contain a complete player-guild-base example. Demo mode is suitable for screenshots, smoke tests, and public evaluation—not load or upstream-compatibility testing.
 
 ## Frontend
 
@@ -50,9 +48,7 @@ Source builds are intended for development. Production deployments should use
 the container described in the main README.
 
 Clone this repository before running the build commands below. Go 1.26.5 or
-newer, Node.js 24 or newer, GNU Make, and a C++17 compiler are required. The
-build compiles the decoder helper from the source included in
-`third_party/palworld-save-decode`; no separate upstream checkout is needed.
+newer, Node.js 24 or newer, and GNU Make are required.
 
 ```bash
 cp .env.example .env

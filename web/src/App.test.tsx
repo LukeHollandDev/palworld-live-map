@@ -32,9 +32,6 @@ const responses: Record<string, unknown> = {
     connected: true,
     stale: false,
     lastSuccessAt: new Date().toISOString(),
-    saveEnabled: true,
-    saveAvailable: true,
-    saveStale: false,
     players: [{ id: 'player-luke', name: 'Luke', level: 55, online: true, x: 10, y: 20, map: 'palpagos' }]
   },
   '/api/objects': {
@@ -684,7 +681,7 @@ describe('App', () => {
     expect(mapGlyph?.getAttribute('class')).toBe(explorerGlyph?.getAttribute('class'))
   })
 
-  it('separates online and offline player filters and ranks the complete roster', async () => {
+  it('separates online and offline player filters and ranks players', async () => {
     const roster = [
       {
         id: 'player-zoe',
@@ -693,10 +690,6 @@ describe('App', () => {
         guildKey: 'guild-save',
         guildName: 'Save Crew',
         online: false,
-        lastSeenAt: '2026-07-20T18:30:00Z',
-        captureTotal: 575,
-        uniquePalsCaptured: 182,
-        paldeckUnlocked: 182,
         x: 25,
         y: 35,
         map: 'palpagos'
@@ -811,12 +804,6 @@ describe('App', () => {
     expect(within(playerInspector).getByRole('heading', { name: 'Zoe' })).toBeVisible()
     const status = within(playerInspector).getByText('Status')
     expect(status.nextElementSibling).toHaveTextContent('Offline')
-    const position = within(playerInspector).getByText('Position')
-    expect(position.nextElementSibling).toHaveTextContent('Last saved')
-    expect(within(playerInspector).getByText('Last seen')).toBeVisible()
-    expect(within(playerInspector).getByText('Pals caught').nextElementSibling).toHaveTextContent('575')
-    expect(within(playerInspector).getByText('Unique Pals caught').nextElementSibling).toHaveTextContent('182')
-    expect(within(playerInspector).getByText('Paldeck unlocked').nextElementSibling).toHaveTextContent('182')
 
     await user.click(within(playerInspector).getByRole('button', { name: 'View guild Save Crew' }))
 
@@ -908,29 +895,6 @@ describe('App', () => {
     expect(within(inspector).getByText('TOWER BOSS DETAILS')).toBeVisible()
     expect(within(inspector).getByText('Encounter')).toBeVisible()
     expect(within(inspector).getByText('Rayne Syndicate Tower')).toBeVisible()
-  })
-
-  it.each([
-    [{ saveEnabled: false }, 'Saved roster is disabled; this ranking includes online players only.'],
-    [{ saveEnabled: true, saveAvailable: false, saveLastError: undefined }, 'Loading saved players…'],
-    [
-      { saveEnabled: true, saveAvailable: false, saveLastError: 'read-failed' },
-      'Saved players are temporarily unavailable.'
-    ],
-    [
-      { saveEnabled: true, saveAvailable: true, saveStale: true },
-      'Offline players use the last successful save snapshot.'
-    ]
-  ])('shows the saved-roster state for %j', async (saveState, message) => {
-    mockAPI((path) =>
-      path === '/api/players' ? { ...(responses[path] as Record<string, unknown>), ...saveState } : responses[path]
-    )
-    const user = userEvent.setup()
-    render(<App />)
-
-    await screen.findByRole('heading', { name: 'Test Realm' })
-    await user.click(screen.getByRole('button', { name: 'Open leaderboards' }))
-    expect(within(screen.getByRole('dialog')).getByText(message)).toBeVisible()
   })
 
   it('collapses and expands individual filter sections', async () => {
