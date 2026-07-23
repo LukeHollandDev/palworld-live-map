@@ -13,16 +13,16 @@ updates:
     schedule:
       interval: weekly
   - package-ecosystem: docker
-    directory: /tools/map-exporter
+    directory: /exporter
     schedule:
       interval: weekly
   - package-ecosystem: nuget
-    directory: /tools/map-exporter
+    directory: /exporter/src
     schedule:
       interval: weekly
     ignore:
       # CUE4Parse-Conversion pins these to exact versions, so they can only be
       # bumped in lockstep with a CUE4Parse-Conversion release that moves to them.
-      # ImageSharp 4.x also relicensed and requires a paid Six Labors license.
+      # Keep these aligned with the exact versions required by CUE4Parse-Conversion.
       - dependency-name: "SixLabors.ImageSharp"
       - dependency-name: "SkiaSharp.NativeAssets.*"

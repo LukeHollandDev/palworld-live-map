@@ -8,9 +8,6 @@
     <Cue4ParseVersion>1.2.2.202607</Cue4ParseVersion>
   </PropertyGroup>
   <ItemGroup>
-    <Compile Remove="tests/**/*.cs" />
-  </ItemGroup>
-  <ItemGroup>
     <AssemblyMetadata Include="CUE4ParseVersion" Value="$(Cue4ParseVersion)" />
     <PackageReference Include="CUE4Parse" Version="$(Cue4ParseVersion)" />
     <PackageReference Include="CUE4Parse-Conversion" Version="$(Cue4ParseVersion)" />

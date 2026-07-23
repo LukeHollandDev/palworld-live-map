@@ -41,7 +41,6 @@ FROM gcr.io/distroless/static-debian12:nonroot
 COPY --from=build /out/palworld-live-map /usr/local/bin/palworld-live-map
 COPY LICENSE /licenses/palworld-live-map/LICENSE
 COPY LICENSING.md /licenses/palworld-live-map/LICENSING.md
-COPY LICENSES/React-MIT.txt /licenses/react/React-MIT.txt
 
 LABEL org.opencontainers.image.licenses="MIT AND LicenseRef-Pocketpair-Proprietary"
 

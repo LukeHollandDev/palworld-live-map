@@ -4,15 +4,16 @@ FROM mcr.microsoft.com/dotnet/sdk:10.0.302-noble@sha256:ed034a8bf0b24ded0cbbac07
 WORKDIR /src
 
 # Restore separately so dependency downloads remain cached when the source changes.
-COPY global.json MapExporter.csproj packages.lock.json ./
-COPY tests/MapExporter.Tests.csproj tests/packages.lock.json ./tests/
-RUN dotnet restore tests/MapExporter.Tests.csproj --locked-mode
+COPY global.json ./
+COPY src/PalworldAssetExporter.csproj src/packages.lock.json ./src/
+COPY tests/PalworldAssetExporter.Tests.csproj tests/packages.lock.json ./tests/
+RUN dotnet restore tests/PalworldAssetExporter.Tests.csproj --locked-mode
 
-COPY Program.cs ExportInfrastructure.cs GameVersionExtractor.cs LandmarkExporter.cs LandmarkShaper.cs AssemblyInfo.cs ./
+COPY src/*.cs ./src/
 COPY tests/Program.cs ./tests/
 COPY tests/Fixtures/ ./tests/Fixtures/
-RUN dotnet run --project tests/MapExporter.Tests.csproj -c Release --no-restore
-RUN dotnet publish MapExporter.csproj -c Release --no-restore -o /out
+RUN dotnet run --project tests/PalworldAssetExporter.Tests.csproj -c Release --no-restore
+RUN dotnet publish src/PalworldAssetExporter.csproj -c Release --no-restore -o /out
 
 # Run the published exporter without the .NET SDK.
 FROM mcr.microsoft.com/dotnet/runtime:10.0.10-noble@sha256:ed5d539b27842d656a06a5984dbcb5114d3e885fbada612a49a5a7c3c3a44e1c
@@ -20,4 +21,4 @@ FROM mcr.microsoft.com/dotnet/runtime:10.0.10-noble@sha256:ed5d539b27842d656a06a
 WORKDIR /app
 COPY --from=build /out ./
 
-ENTRYPOINT ["dotnet", "MapExporter.dll"]
+ENTRYPOINT ["dotnet", "PalworldAssetExporter.dll"]

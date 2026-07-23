@@ -2,7 +2,7 @@
 
 `palpagos.jpg` and `world-tree.jpg` are 8192×8192 overview textures exported from a locally installed Palworld 1.0 client. The browser samples each image's outer pixel after decoding so the surrounding viewport uses the same rendered background colour.
 
-The repeatable, read-only export workflow is documented under [`tools/map-exporter`](../../tools/map-exporter/README.md). [`manifest.json`](manifest.json) records the exact Unreal object paths, source PAK and mappings hashes, native dimensions, conversion tool version, coordinate bounds, and output hashes.
+The repeatable, read-only export workflow is documented by the top-level [Palworld Asset Exporter](../../exporter/README.md). [`manifest.json`](manifest.json) records the exact Unreal object paths, source PAK and mappings hashes, native dimensions, conversion tool version, coordinate bounds, and output hashes.
 
 Both textures are exported at their native 8192×8192 resolution and converted to JPEG using the documented export workflow.
 

@@ -38,7 +38,7 @@ web-build: web-typecheck web-assets
 web-check: web-lint web-typecheck web-test
 
 exporter-check:
-	docker build -t palworld-live-map/map-exporter:check "$(PROJECT_ROOT)/tools/map-exporter"
+	docker build -t palworld-live-map/asset-exporter:check "$(PROJECT_ROOT)/exporter"
 
 image:
 	docker build -t palworld-live-map:dev "$(PROJECT_ROOT)"
@@ -50,7 +50,7 @@ demo: web-build
 	DEMO_MODE=true go run ./cmd/palworld-live-map
 
 game-assets:
-	"$(PROJECT_ROOT)/tools/map-exporter/export.sh"
+	"$(PROJECT_ROOT)/exporter/export.sh"
 
 maps: game-assets
 
@@ -58,7 +58,7 @@ clean:
 	@test -n "$(PROJECT_ROOT)"
 	@test "$(PROJECT_ROOT)" != "/"
 	@test -f "$(PROJECT_ROOT)/go.mod"
-	rm -rf -- "$(PROJECT_ROOT)/bin" "$(PROJECT_ROOT)/coverage.out" "$(PROJECT_ROOT)/web/coverage" "$(PROJECT_ROOT)/web/dist" "$(PROJECT_ROOT)/tools/map-exporter/bin" "$(PROJECT_ROOT)/tools/map-exporter/obj"
+	rm -rf -- "$(PROJECT_ROOT)/bin" "$(PROJECT_ROOT)/coverage.out" "$(PROJECT_ROOT)/web/coverage" "$(PROJECT_ROOT)/web/dist" "$(PROJECT_ROOT)/exporter/src/bin" "$(PROJECT_ROOT)/exporter/src/obj" "$(PROJECT_ROOT)/exporter/tests/bin" "$(PROJECT_ROOT)/exporter/tests/obj"
 
 distclean: clean
 	rm -rf -- "$(PROJECT_ROOT)/build" "$(PROJECT_ROOT)/web/node_modules"

@@ -10,7 +10,8 @@ using SixLabors.ImageSharp.Formats.Jpeg;
 using SixLabors.ImageSharp.Processing;
 
 const int OutputSize = 8192;
-const string GeneratorVersion = "2";
+const string GeneratorName = "palworld-asset-exporter";
+const string GeneratorVersion = "3";
 
 var options = ParseOptions(args);
 using var mapOutput = StagedOutputDirectory.Create(options.OutputDirectory);
@@ -96,7 +97,7 @@ var cue4ParseVersion = GetAssemblyMetadata("CUE4ParseVersion");
 var manifest = new MapManifest(
     1,
     gameVersion,
-    $"palworld-map-exporter/{GeneratorVersion}",
+    $"{GeneratorName}/{GeneratorVersion}",
     $"CUE4Parse/{cue4ParseVersion}",
     mappingsManifest,
     pakManifest,
@@ -114,7 +115,7 @@ LandmarkExporter.Export(
     provider,
     landmarkOutput.PayloadDirectory,
     gameVersion,
-    $"palworld-map-exporter/{GeneratorVersion}",
+    $"{GeneratorName}/{GeneratorVersion}",
     $"CUE4Parse/{cue4ParseVersion}",
     mappingsManifest,
     pakManifest);
@@ -161,7 +162,9 @@ static ExportOptions ParseOptions(string[] arguments)
     if (string.IsNullOrWhiteSpace(pakDirectory) || string.IsNullOrWhiteSpace(mappingsFile) ||
         string.IsNullOrWhiteSpace(outputDirectory) || string.IsNullOrWhiteSpace(landmarkOutputDirectory))
     {
-        throw new ArgumentException("Usage: MapExporter --pak-directory PATH --mappings FILE --output PATH --landmark-output PATH [--game-version EXPECTED_VERSION]");
+        throw new ArgumentException(
+            "Usage: PalworldAssetExporter --pak-directory PATH --mappings FILE --output PATH " +
+            "--landmark-output PATH [--game-version EXPECTED_VERSION]");
     }
     gameVersion = gameVersion?.Trim();
     if (gameVersion is not null && !GameVersionExtractor.IsCompleteVersion(gameVersion))

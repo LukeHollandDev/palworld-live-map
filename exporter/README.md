@@ -1,6 +1,9 @@
-# Map Exporter
+# Palworld Asset Exporter
 
-This maintainer tool exports overview map textures and encounter landmarks from an installed copy of Palworld. It runs inside Docker and mounts the game's PAK directory read-only, so it does not modify the game installation.
+The Palworld Asset Exporter is a top-level maintainer component that exports overview map textures and encounter landmarks from an installed copy of Palworld. It runs inside Docker and mounts the game's PAK directory read-only, so it does not modify the game installation.
+
+Production code lives in [`src`](src), while the self-contained fixture harness
+and its synthetic inputs live in [`tests`](tests).
 
 ## What It Creates
 
@@ -34,10 +37,10 @@ The Docker build pins .NET SDK 10.0.302 and runtime 10.0.10 by release tag and m
 
 ```bash
 docker run --rm \
-  --mount "type=bind,src=$PWD/tools/map-exporter,dst=/src" \
+  --mount "type=bind,src=$PWD/exporter,dst=/src" \
   --workdir /src \
   mcr.microsoft.com/dotnet/sdk:10.0.302-noble@sha256:ed034a8bf0b24ded0cbbac07e17825d8e9ebfe21e308191d0f7421eaf5ad4664 \
-  dotnet restore tests/MapExporter.Tests.csproj --use-lock-file --force-evaluate
+  dotnet restore tests/PalworldAssetExporter.Tests.csproj --use-lock-file --force-evaluate
 ```
 
 ## Quick Start on macOS with CrossOver
@@ -45,7 +48,7 @@ docker run --rm \
 The script knows the default Palworld location in a CrossOver Steam bottle. From the repository root, run:
 
 ```bash
-./tools/map-exporter/export.sh
+./exporter/export.sh
 ```
 
 The exporter reads the exact `ProjectVersion` from `Pal/Config/DefaultGame.ini` inside the mounted PAK. Generated files will appear in `build/maps` and `build/landmarks`.
@@ -53,7 +56,7 @@ The exporter reads the exact `ProjectVersion` from `Pal/Config/DefaultGame.ini` 
 For automation, `PALWORLD_GAME_VERSION` may be supplied as an optional assertion. It never overrides the PAK value; the export stops unless both values match exactly:
 
 ```bash
-PALWORLD_GAME_VERSION="1.0.1.100619" ./tools/map-exporter/export.sh
+PALWORLD_GAME_VERSION="1.0.1.100619" ./exporter/export.sh
 ```
 
 ## Use a Different Palworld Installation
@@ -61,7 +64,7 @@ PALWORLD_GAME_VERSION="1.0.1.100619" ./tools/map-exporter/export.sh
 Set `PALWORLD_ROOT` to the directory containing the game's `Pal` and `Engine` folders:
 
 ```bash
-PALWORLD_ROOT="/path/to/Palworld" ./tools/map-exporter/export.sh
+PALWORLD_ROOT="/path/to/Palworld" ./exporter/export.sh
 ```
 
 To choose a different output directory as well:
@@ -70,7 +73,7 @@ To choose a different output directory as well:
 PALWORLD_ROOT="/path/to/Palworld" \
 MAP_OUTPUT_DIR="$PWD/my-exported-maps" \
 LANDMARK_OUTPUT_DIR="$PWD/my-exported-landmarks" \
-./tools/map-exporter/export.sh
+./exporter/export.sh
 ```
 
 ## Configuration
@@ -83,7 +86,7 @@ The script accepts configuration through environment variables:
 | `PALWORLD_GAME_VERSION` | Optional exact-version assertion checked against the PAK-derived `ProjectVersion` | Unset |
 | `MAP_OUTPUT_DIR` | Directory for the exported images and manifest | `build/maps` |
 | `LANDMARK_OUTPUT_DIR` | Directory for the landmark manifest | `build/landmarks` |
-| `MAP_EXPORT_CACHE_DIR` | Directory for the verified mappings cache | `build/map-exporter-cache` |
+| `ASSET_EXPORT_CACHE_DIR` | Directory for the verified mappings cache | `build/asset-exporter-cache` |
 
 ## What the Exporter Does
 
@@ -108,3 +111,11 @@ The wrapper downloads a pinned Palworld community mappings file, verifies its ch
 - If the final PAK or mappings verification fails, the prior output remains in place. Rerun after the game installation and mappings file have stopped updating.
 
 Keep source PAK files, the mappings cache, and temporary output out of the repository. Only copy reviewed output into `assets/map` or `assets/landmarks` when intentionally updating bundled data.
+
+## Licensing and provenance
+
+The exporter implementation is project-owned and MIT-licensed, but it uses
+third-party packages and a pinned community mappings file to read
+Pocketpair-owned game data. See [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md)
+and the repository's [`LICENSING.md`](../LICENSING.md) before distributing the
+exporter or generated output.

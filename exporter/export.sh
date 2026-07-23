@@ -2,7 +2,7 @@
 set -eu
 
 script_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
-repository_dir=$(CDPATH= cd -- "$script_dir/../.." && pwd)
+repository_dir=$(CDPATH= cd -- "$script_dir/.." && pwd)
 
 default_palworld_root="$HOME/Library/Application Support/CrossOver/Bottles/Steam/drive_c/Program Files (x86)/Steam/steamapps/common/Palworld"
 palworld_root=${PALWORLD_ROOT:-$default_palworld_root}
@@ -10,7 +10,7 @@ pak_directory="$palworld_root/Pal/Content/Paks"
 
 output_directory=${MAP_OUTPUT_DIR:-$repository_dir/build/maps}
 landmark_output_directory=${LANDMARK_OUTPUT_DIR:-$repository_dir/build/landmarks}
-cache_directory=${MAP_EXPORT_CACHE_DIR:-$repository_dir/build/map-exporter-cache}
+cache_directory=${ASSET_EXPORT_CACHE_DIR:-$repository_dir/build/asset-exporter-cache}
 game_version=${PALWORLD_GAME_VERSION-}
 
 mappings_commit=42cf396e714c166f17950a9c964583e0cadf2a15
@@ -18,7 +18,7 @@ mappings_sha256=241c45de9d5b55b246cd4b39d62b9209faf7758ce0637e1f7a545aa0f75f71f0
 mappings_file="$cache_directory/Mappings-$mappings_commit.usmap"
 mappings_url="https://raw.githubusercontent.com/PalworldModding/UsefulFiles/$mappings_commit/Mappings.usmap"
 
-image_name=palworld-live-map/map-exporter:dev
+image_name=palworld-live-map/asset-exporter:dev
 
 fail() {
   printf 'Error: %s\n' "$1" >&2
@@ -60,7 +60,7 @@ prepare_mappings() {
 }
 
 build_exporter() {
-  printf 'Building the map exporter...\n'
+  printf 'Building the Palworld Asset Exporter...\n'
   docker build --quiet -t "$image_name" "$script_dir" >/dev/null
 }
 

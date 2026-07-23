@@ -3,9 +3,9 @@
 `manifest.json` is a compact, versioned projection generated from a locally
 installed copy of Palworld. It contains field Alpha Pal spawners and tower
 bosses. These locations are static game data rather than live actors, so the
-backend ships them separately from REST and save snapshots.
+backend ships them separately from live REST snapshots.
 
-The project-owned exporter under [`tools/map-exporter`](../../tools/map-exporter)
+The project-owned [Palworld Asset Exporter](../../exporter)
 produces the manifest directly from the installed PAK. It records the game
 version, exporter and decoder versions, mappings digest, source PAK digests,
 and every game-data source used by the extraction.

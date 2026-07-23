@@ -1,0 +1,13 @@
+**
+!global.json
+!src/
+!src/PalworldAssetExporter.csproj
+!src/packages.lock.json
+!src/*.cs
+!tests/
+!tests/PalworldAssetExporter.Tests.csproj
+!tests/packages.lock.json
+!tests/Program.cs
+!tests/Fixtures/
+!tests/Fixtures/*.json
+!tests/Fixtures/*.ini

@@ -56,7 +56,7 @@ internal static class SourceSnapshots
 
 internal sealed class StagedOutputDirectory : IDisposable
 {
-    private const string StagingPrefix = ".palworld-map-exporter-stage-";
+    private const string StagingPrefix = ".palworld-asset-exporter-stage-";
     private bool disposed;
     private bool preserveForRecovery;
 

@@ -277,7 +277,7 @@
         "resolved": "0.8.8",
         "contentHash": "UIDFkA5DC3en3tOJ3Mof11yBx9kUQLsaeo/oFdvN6Bbkr9E9+VCqfIadHci8cu+I51K2Sl7XYWVl2R/mA75NBQ=="
       },
-      "mapexporter": {
+      "palworldassetexporter": {
         "type": "Project",
         "dependencies": {
           "CUE4Parse": "[1.2.2.202607, )",

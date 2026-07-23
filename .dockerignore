@@ -11,7 +11,7 @@ coverage*
 **/*.coverprofile
 **/node_modules/
 web/dist/
-tools/
+exporter/
 assets/images/
 assets/map/README.md
 **/*_test.go

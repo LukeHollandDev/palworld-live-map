@@ -452,7 +452,7 @@ internal static class TestProgram
 
     private static void WithTemporaryDirectory(Action<string> action)
     {
-        var path = Path.Combine(Path.GetTempPath(), $"palworld-map-exporter-tests-{Guid.NewGuid():N}");
+        var path = Path.Combine(Path.GetTempPath(), $"palworld-asset-exporter-tests-{Guid.NewGuid():N}");
         Directory.CreateDirectory(path);
         try
         {

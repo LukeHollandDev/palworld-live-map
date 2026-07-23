@@ -91,7 +91,7 @@ npm run dev
 
 Open `http://localhost:5173`. Vite proxies the API and map artwork requests to the Go service on port 8080.
 
-To regenerate the map artwork and encounter catalogue from a local Palworld installation, follow [`tools/map-exporter/README.md`](tools/map-exporter/README.md) or run `make game-assets`. The Dockerised exporter is intentionally outside the production image and Go dependency graph.
+To regenerate the map artwork and encounter catalogue from a local Palworld installation, follow the top-level [Palworld Asset Exporter documentation](exporter/README.md) or run `make game-assets`. The Dockerised exporter is intentionally outside the production image and Go dependency graph.
 
 ## Verification
 
