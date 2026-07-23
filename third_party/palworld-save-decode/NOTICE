@@ -1,0 +1,14 @@
+Palworld Save Decode
+
+Copyright (C) 2026 Luke Holland
+Copyright (C) 2016 Powzix
+Palworld portability and wrapper changes copyright their respective
+PalworldSaveTools contributors.
+
+The decoder is derived from Powzix's ooz implementation and the portable
+palooz decoder distributed by deafdudecomputers/PalworldSaveTools. See
+README.md for the exact source revision and modifications.
+
+Oodle and related names belong to their respective owners. This independent
+project is not affiliated with or endorsed by Epic Games, RAD Game Tools, or
+Pocketpair. No proprietary Oodle runtime is included.

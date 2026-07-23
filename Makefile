@@ -1,14 +1,22 @@
 override PROJECT_ROOT := $(abspath $(dir $(lastword $(MAKEFILE_LIST))))
 WEB_NPM := npm --prefix "$(PROJECT_ROOT)/web"
 BINARY := $(PROJECT_ROOT)/bin/palworld-live-map
+DECODER_BINARY := $(PROJECT_ROOT)/bin/palworld-save-decode
 
-.PHONY: ci build check test web-install web-lint web-typecheck web-test web-assets web-build web-check exporter-check image run demo game-assets maps clean distclean
+.PHONY: ci build decoder decoder-check check test web-install web-lint web-typecheck web-test web-assets web-build web-check exporter-check image run demo game-assets maps clean distclean
 
-ci: check exporter-check
+ci: check decoder-check exporter-check
 
-build: web-build
+build: web-build decoder
 	mkdir -p "$(dir $(BINARY))"
 	go build -o "$(BINARY)" ./cmd/palworld-live-map
+
+decoder:
+	mkdir -p "$(dir $(DECODER_BINARY))"
+	$(MAKE) -C "$(PROJECT_ROOT)/third_party/palworld-save-decode" OUTPUT="$(DECODER_BINARY)"
+
+decoder-check: decoder
+	@test -x "$(DECODER_BINARY)"
 
 check: web-check web-assets
 	test -z "$$(gofmt -l .)"
@@ -43,8 +51,8 @@ exporter-check:
 image:
 	docker build -t palworld-live-map:dev "$(PROJECT_ROOT)"
 
-run: web-build
-	set -a; . ./.env; set +a; go run ./cmd/palworld-live-map
+run: build
+	set -a; . ./.env; set +a; "$(BINARY)"
 
 demo: web-build
 	DEMO_MODE=true go run ./cmd/palworld-live-map

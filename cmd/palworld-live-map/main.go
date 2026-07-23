@@ -11,12 +11,12 @@ import (
 	"net/url"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"strings"
 	"syscall"
 	"time"
 
 	"github.com/LukeHollandDev/palworld-live-map/internal/config"
-	"github.com/LukeHollandDev/palworld-live-map/internal/oodlelib"
 	"github.com/LukeHollandDev/palworld-live-map/internal/palworld"
 	"github.com/LukeHollandDev/palworld-live-map/internal/savegame"
 	"github.com/LukeHollandDev/palworld-live-map/internal/saveroster"
@@ -56,19 +56,15 @@ func main() {
 		}
 		source = client
 		if cfg.SaveDataEnabled {
-			setupCtx, cancel := context.WithTimeout(context.Background(), cfg.SaveTimeout)
-			libraryPath, libraryErr := oodlelib.Resolve(setupCtx, oodlelib.Options{
-				LibraryPath: cfg.SaveOodleLibrary,
-				DownloadURL: cfg.SaveOodleURL,
-				SHA256:      cfg.SaveOodleSHA256,
-				CacheDir:    cfg.SaveOodleCacheDir,
-			})
-			cancel()
-			if libraryErr != nil {
-				logger.Error("save reader Oodle setup failed", "error", libraryErr)
+			executable, executableErr := os.Executable()
+			if executableErr != nil {
+				logger.Error("locate bundled save decoder", "error", executableErr)
 				os.Exit(1)
 			}
-			reader, readerErr := savegame.NewReader(savegame.Options{OodleLibraryPath: libraryPath})
+			decoderPath := filepath.Join(filepath.Dir(executable), "palworld-save-decode")
+			reader, readerErr := savegame.NewReader(savegame.Options{
+				DecoderPath: decoderPath, DecoderTimeout: cfg.SaveTimeout,
+			})
 			if readerErr != nil {
 				logger.Error("save reader setup failed", "error", readerErr)
 				os.Exit(1)

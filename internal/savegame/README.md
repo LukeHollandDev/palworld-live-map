@@ -4,13 +4,13 @@
 snapshots. It extracts the internal player GUID, display name, level, guild
 membership/name, persisted X/Y position, last-online time, lifetime Pal
 captures, distinct Pals caught, and Paldeck unlock count. It does not write to
-the snapshot, expose arbitrary save content, or include an Oodle binary.
+the snapshot or expose arbitrary save content.
 
 ## API
 
 ```go
 reader, err := savegame.NewReader(savegame.Options{
-    OodleLibraryPath: "/absolute/path/to/liboo2corelinux64.so.9",
+    DecoderPath: "/absolute/path/to/palworld-save-decode",
 })
 snapshot, err := reader.ReadSnapshot(ctx, "/path/to/immutable-snapshot")
 ```
@@ -20,15 +20,9 @@ the snapshot outside this package before calling `ReadSnapshot` so the game
 cannot mutate files during decoding. The reader detects a changing
 `Level.sav` and rejects non-regular save files. `_dps.sav` sidecars are ignored.
 
-`OodleLibraryPath` is mandatory and must be absolute. The caller is responsible
-for lawfully acquiring and verifying the compatible Linux library. This package
-only opens it and resolves `OodleLZ_Decompress`; it performs no discovery,
-download, cache, copy, or write operation.
-
-The only external Go dependency is `github.com/ebitengine/purego` (v0.8.4 at
-the time of this port). Non-Linux builds compile and run parser unit tests, but
-`NewReader` returns an unsupported-platform error because the runtime contract
-is specifically a Linux `.so`.
+`DecoderPath` starts the decompressor as a bounded one-shot process with an
+empty environment. This package performs no discovery, download, cache, copy,
+or save-tree write operation.
 
 ## Limits and missing data
 
@@ -44,6 +38,6 @@ bounded aggregate stats; diagnostics never include names or GUIDs.
 ## Licensing
 
 This directory is derived from Apache-2.0 Palhelm code; see [NOTICE](NOTICE)
-and [LICENSE](LICENSE). The small Oodle loader also retains the upstream MIT
-notice in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). No proprietary or
-GPL-licensed parser implementation is bundled.
+and [LICENSE](LICENSE). The separately executed open helper and complete
+GPL-3.0-or-later corresponding source live under
+[`third_party/palworld-save-decode`](../../third_party/palworld-save-decode).

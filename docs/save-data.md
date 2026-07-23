@@ -27,7 +27,7 @@ Per-player progress comes from typed fields under `SaveData.RecordData`:
 - `TribeCaptureCount` provides the distinct Pal-species capture count.
 - `PaldeckUnlockFlag` provides the number of unlocked/discovered Paldeck entries by counting true flags.
 
-The values remain optional through the decoder and public API. A missing or malformed block is reported as unavailable rather than silently presented as zero or as a partial aggregate.
+The values remain optional through the reader and public API. A missing or malformed block is reported as unavailable rather than silently presented as zero or as a partial aggregate.
 
 ### Historical playtime is not in the server save
 
@@ -69,37 +69,21 @@ A failed or format-incompatible refresh never replaces a good roster. The API
 marks the retained snapshot stale, and the browser explains that it is showing
 the last successful save data.
 
-## Oodle runtime
+## Save decompression
 
-Current Palworld `Level.sav` files use Oodle Mermaid compression. Oodle is
-proprietary, and this project does not include it in source, containers, or
-releases. Save reading is disabled by default.
+Current Palworld `Level.sav` files use Oodle Mermaid compression. Save reading
+remains disabled by default.
 
-An operator who has the right to use a compatible runtime can either mount it:
-
-```yaml
-environment:
-  SAVE_OODLE_LIBRARY: /runtime/liboo2corelinux64.so.9
-volumes:
-  - ./private/liboo2corelinux64.so.9:/runtime/liboo2corelinux64.so.9:ro
-```
-
-Or explicitly select a private HTTPS source and pin the exact bytes:
-
-```yaml
-environment:
-  SAVE_OODLE_DOWNLOAD_URL: https://private.example/approved/liboodle.so
-  SAVE_OODLE_SHA256: 64-lowercase-hex-characters
-```
-
-Download mode has no built-in URL or digest. It enforces HTTPS, a 64 MiB size
-limit, and SHA-256 verification before atomically publishing the runtime into
-`SAVE_OODLE_CACHE_DIR`. Save decoding currently requires Linux and a library
-matching the container architecture.
+Decompression runs in a one-shot subprocess. The parent sends only the
+compressed stream and declared output size, removes the subprocess environment,
+caps output and diagnostics, and kills it at `SAVE_TIMEOUT`. Invalid output or
+a subprocess crash fails that refresh without replacing the last good roster.
+Corresponding source and build instructions are included in the repository and
+container.
 
 ## Extending the extractor
 
-The save decoder is a bounded, selective reader rather than a generic object
+The save parser is a bounded, selective reader rather than a generic object
 materializer. Add new fields to its typed snapshot and adapter, with fixtures
 for each supported save layout. Candidate future layers to investigate include
 guild bases and per-player normal/tower boss defeat flags.
@@ -111,7 +95,8 @@ generator and decoder versions, mappings and PAK digests, exact Unreal source
 objects, and deterministic projected locations, making updates auditable when
 Palworld changes spawn data.
 
-The selective parser is derived from Palhelm under Apache-2.0; the dynamic
-loader is derived from `new-world-tools/go-oodle` under MIT. See the repository's
-third-party notices. The static game-data extraction workflow and source-object
-provenance are documented alongside the generated landmark manifest.
+The selective parser is derived from Palhelm under Apache-2.0.
+`palworld-save-decode` and its ooz-derived decoder are GPL-3.0-or-later. See
+the repository's licensing table. The static game-data extraction workflow
+and source-object provenance are documented alongside the generated landmark
+manifest.

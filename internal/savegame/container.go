@@ -12,7 +12,7 @@ import (
 	"os"
 )
 
-type oodleDecompressor interface {
+type saveDecompressor interface {
 	Decompress(src []byte, rawLen int) ([]byte, error)
 }
 
@@ -24,7 +24,7 @@ type containerHeader struct {
 	Offset        int
 }
 
-func readContainer(data []byte, maxBytes int64, oodle oodleDecompressor) ([]byte, containerHeader, error) {
+func readContainer(data []byte, maxBytes int64, decoder saveDecompressor) ([]byte, containerHeader, error) {
 	h, err := parseContainerHeader(data)
 	if err != nil {
 		return nil, h, err
@@ -51,10 +51,10 @@ func readContainer(data []byte, maxBytes int64, oodle oodleDecompressor) ([]byte
 		if h.SaveType != 0x31 {
 			return nil, h, fmt.Errorf("savegame: unsupported PlM save type %#x", h.SaveType)
 		}
-		if oodle == nil {
-			return nil, h, fmt.Errorf("savegame: PlM requires an Oodle decoder")
+		if decoder == nil {
+			return nil, h, fmt.Errorf("savegame: PlM requires a decoder")
 		}
-		raw, err = oodle.Decompress(src, int(h.RawLen))
+		raw, err = decoder.Decompress(src, int(h.RawLen))
 	default:
 		err = fmt.Errorf("savegame: unsupported container magic %q", h.Magic)
 	}
@@ -108,7 +108,7 @@ func zlibBytes(src []byte, rawLen int64) ([]byte, error) {
 
 // readSave performs only read operations and rejects symlinks/non-regular files.
 // It checks size and modification time after reading to detect a torn snapshot.
-func readSave(path string, maxBytes int64, oodle oodleDecompressor) ([]byte, fs.FileInfo, error) {
+func readSave(path string, maxBytes int64, decoder saveDecompressor) ([]byte, fs.FileInfo, error) {
 	before, err := os.Lstat(path)
 	if err != nil {
 		return nil, nil, fmt.Errorf("savegame: stat save: %w", err)
@@ -138,6 +138,6 @@ func readSave(path string, maxBytes int64, oodle oodleDecompressor) ([]byte, fs.
 	if before.Size() != after.Size() || !before.ModTime().Equal(after.ModTime()) {
 		return nil, nil, fmt.Errorf("savegame: save changed while being read")
 	}
-	raw, _, err := readContainer(b, maxBytes, oodle)
+	raw, _, err := readContainer(b, maxBytes, decoder)
 	return raw, before, err
 }

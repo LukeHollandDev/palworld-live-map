@@ -30,7 +30,7 @@ func TestLoadDefaults(t *testing.T) {
 	if cfg.WorldPollInterval != 15*time.Second || cfg.WorldTimeout != 10*time.Second || !cfg.WorldDataEnabled {
 		t.Fatalf("unexpected world defaults: interval=%s timeout=%s enabled=%v", cfg.WorldPollInterval, cfg.WorldTimeout, cfg.WorldDataEnabled)
 	}
-	if cfg.SaveDataEnabled || cfg.SaveRoot != "/data/palworld/saves" || cfg.SavePollInterval != 30*time.Second || cfg.SaveTimeout != 20*time.Second || cfg.SaveOodleCacheDir != "/tmp/palworld-live-map/oodle" {
+	if cfg.SaveDataEnabled || cfg.SaveRoot != "/data/palworld/saves" || cfg.SavePollInterval != 30*time.Second || cfg.SaveTimeout != 20*time.Second {
 		t.Fatalf("unexpected save defaults: enabled=%v root=%q interval=%s timeout=%s", cfg.SaveDataEnabled, cfg.SaveRoot, cfg.SavePollInterval, cfg.SaveTimeout)
 	}
 }
@@ -102,7 +102,6 @@ func TestLoadValidatesEnabledSaveReader(t *testing.T) {
 		{name: "relative root", key: "PALWORLD_SAVE_ROOT", value: "saves", want: "absolute"},
 		{name: "poll too short", key: "SAVE_POLL_INTERVAL", value: "10s", want: "at least 15s"},
 		{name: "timeout", key: "SAVE_TIMEOUT", value: "30s", want: "shorter"},
-		{name: "relative library", key: "SAVE_OODLE_LIBRARY", value: "liboodle.so", want: "absolute"},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -128,64 +127,15 @@ func TestLoadDoesNotValidateUnusedSaveTimingWhenSaveDataIsDisabled(t *testing.T)
 	}
 }
 
-func TestLoadAcceptsExplicitSaveLibrary(t *testing.T) {
+func TestLoadAcceptsEnabledSaveReader(t *testing.T) {
 	validEnvironment(t)
 	t.Setenv("SAVE_DATA_ENABLED", "true")
-	t.Setenv("SAVE_OODLE_LIBRARY", "/opt/palworld/liboo2corelinux64.so.9")
 	cfg, err := Load()
 	if err != nil {
 		t.Fatalf("Load() error = %v", err)
 	}
-	if !cfg.SaveDataEnabled || cfg.SaveOodleLibrary == "" || cfg.SaveOodleURL != "" {
+	if !cfg.SaveDataEnabled {
 		t.Fatalf("save config = %+v", cfg)
-	}
-}
-
-func TestLoadAcceptsPinnedSaveLibraryDownload(t *testing.T) {
-	validEnvironment(t)
-	t.Setenv("SAVE_DATA_ENABLED", "true")
-	t.Setenv("SAVE_OODLE_DOWNLOAD_URL", "https://downloads.example.invalid/oodle.so")
-	t.Setenv("SAVE_OODLE_SHA256", strings.Repeat("a1", 32))
-	cfg, err := Load()
-	if err != nil {
-		t.Fatalf("Load() error = %v", err)
-	}
-	if cfg.SaveOodleURL == "" || cfg.SaveOodleSHA256 != strings.Repeat("a1", 32) {
-		t.Fatalf("save config = %+v", cfg)
-	}
-}
-
-func TestLoadRequiresOneValidSaveLibrarySource(t *testing.T) {
-	tests := []struct {
-		name    string
-		library string
-		url     string
-		digest  string
-		cache   string
-		want    string
-	}{
-		{name: "missing", want: "exactly one"},
-		{name: "both", library: "/opt/oodle.so", url: "https://example.invalid/oodle.so", digest: strings.Repeat("01", 32), want: "exactly one"},
-		{name: "partial download", url: "https://example.invalid/oodle.so", want: "SHA256"},
-		{name: "insecure download", url: "http://example.invalid/oodle.so", digest: strings.Repeat("01", 32), want: "HTTPS URL"},
-		{name: "invalid digest", url: "https://example.invalid/oodle.so", digest: "not-a-digest", want: "SHA256"},
-		{name: "relative cache", library: "/opt/oodle.so", cache: "cache", want: "CACHE_DIR"},
-	}
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			validEnvironment(t)
-			t.Setenv("SAVE_DATA_ENABLED", "true")
-			t.Setenv("SAVE_OODLE_LIBRARY", test.library)
-			t.Setenv("SAVE_OODLE_DOWNLOAD_URL", test.url)
-			t.Setenv("SAVE_OODLE_SHA256", test.digest)
-			if test.cache != "" {
-				t.Setenv("SAVE_OODLE_CACHE_DIR", test.cache)
-			}
-			_, err := Load()
-			if err == nil || !strings.Contains(err.Error(), test.want) {
-				t.Fatalf("Load() error = %v, want error containing %q", err, test.want)
-			}
-		})
 	}
 }
 

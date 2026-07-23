@@ -4,9 +4,17 @@ package savegame
 
 import (
 	"encoding/binary"
+	"strings"
 	"testing"
 	"time"
 )
+
+func TestNewReaderRequiresDecoder(t *testing.T) {
+	_, err := NewReader(Options{})
+	if err == nil || !strings.Contains(err.Error(), "decoder path") {
+		t.Fatalf("NewReader() error = %v", err)
+	}
+}
 
 type testWriter struct{ b []byte }
 
@@ -294,11 +302,13 @@ func TestPlayerProgressRejectsPartialOrMalformedAggregates(t *testing.T) {
 	}
 }
 
-type fakeOodle struct{ raw []byte }
+type fakeDecoder struct{ raw []byte }
 
-func (f fakeOodle) Decompress([]byte, int) ([]byte, error) { return append([]byte(nil), f.raw...), nil }
+func (f fakeDecoder) Decompress([]byte, int) ([]byte, error) {
+	return append([]byte(nil), f.raw...), nil
+}
 
-func TestReadPlMContainerUsesInjectedOodle(t *testing.T) {
+func TestReadPlMContainerUsesInjectedDecoder(t *testing.T) {
 	raw := []byte("GVAS synthetic")
 	w := &testWriter{}
 	w.u32(uint32(len(raw)))
@@ -306,7 +316,7 @@ func TestReadPlMContainerUsesInjectedOodle(t *testing.T) {
 	w.bytes([]byte("PlM"))
 	w.u8(0x31)
 	w.bytes([]byte{1, 2, 3})
-	got, header, err := readContainer(w.b, 1024, fakeOodle{raw: raw})
+	got, header, err := readContainer(w.b, 1024, fakeDecoder{raw: raw})
 	if err != nil {
 		t.Fatal(err)
 	}

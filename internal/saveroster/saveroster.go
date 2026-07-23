@@ -31,7 +31,7 @@ const (
 
 // SnapshotReader is the narrow part of savegame.Reader used by the adapter.
 // The concrete implementation is expected to be *savegame.Reader; keeping the
-// contract narrow lets selection and projection be tested without Oodle.
+// contract narrow lets selection and projection be tested without compression.
 type SnapshotReader interface {
 	ReadSnapshot(context.Context, string) (*savegame.Snapshot, error)
 }

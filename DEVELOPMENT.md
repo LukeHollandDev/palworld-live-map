@@ -46,7 +46,13 @@ The browser application is a self-contained project in [`web/`](web). It uses Re
 
 ## Run from Source
 
-Go 1.26.5 or newer and Node.js 24 or newer are required.
+Source builds are intended for development. Production deployments should use
+the container described in the main README.
+
+Clone this repository before running the build commands below. Go 1.26.5 or
+newer, Node.js 24 or newer, GNU Make, and a C++17 compiler are required. The
+build compiles the decoder helper from the source included in
+`third_party/palworld-save-decode`; no separate upstream checkout is needed.
 
 ```bash
 cp .env.example .env

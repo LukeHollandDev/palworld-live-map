@@ -19,13 +19,13 @@ import (
 
 // Reader is immutable after construction and safe for concurrent use.
 type Reader struct {
-	oodle        oodleDecompressor
+	decoder      saveDecompressor
 	maxSaveBytes int64
 	maxPlayers   int
 }
 
-// NewReader validates options and loads OodleLZ_Decompress from the explicit
-// caller-supplied shared-library path. It performs no downloads or writes.
+// NewReader validates options and initializes the bundled-helper protocol. It
+// performs no downloads and never writes to the save tree.
 func NewReader(opts Options) (*Reader, error) {
 	maxBytes := opts.MaxSaveBytes
 	if maxBytes == 0 {
@@ -41,18 +41,18 @@ func NewReader(opts Options) (*Reader, error) {
 	if maxPlayers <= 0 || maxPlayers > hardMaxPlayers {
 		return nil, fmt.Errorf("savegame: MaxPlayers must be within 1..%d", hardMaxPlayers)
 	}
-	oodle, err := loadOodle(opts.OodleLibraryPath)
+	decoder, err := loadCommandDecoder(opts.DecoderPath, opts.DecoderTimeout)
 	if err != nil {
 		return nil, err
 	}
-	return &Reader{oodle: oodle, maxSaveBytes: maxBytes, maxPlayers: maxPlayers}, nil
+	return &Reader{decoder: decoder, maxSaveBytes: maxBytes, maxPlayers: maxPlayers}, nil
 }
 
 // ReadSnapshot reads Level.sav and Players/*.sav from snapshotDir without
 // modifying them. Callers should provide an immutable copy made by their
 // snapshot layer, never the actively-written server save directory.
 func (r *Reader) ReadSnapshot(ctx context.Context, snapshotDir string) (*Snapshot, error) {
-	if r == nil || r.oodle == nil {
+	if r == nil || r.decoder == nil {
 		return nil, fmt.Errorf("savegame: Reader is not initialized")
 	}
 	if err := ctx.Err(); err != nil {
@@ -70,7 +70,7 @@ func (r *Reader) ReadSnapshot(ctx context.Context, snapshotDir string) (*Snapsho
 		return nil, fmt.Errorf("savegame: snapshot path is not a regular directory")
 	}
 	levelPath := filepath.Join(dir, "Level.sav")
-	raw, levelInfo, err := readSave(levelPath, r.maxSaveBytes, r.oodle)
+	raw, levelInfo, err := readSave(levelPath, r.maxSaveBytes, r.decoder)
 	if err != nil {
 		return nil, fmt.Errorf("savegame: Level.sav: %w", err)
 	}
@@ -133,7 +133,7 @@ func (r *Reader) loadPlayerSaves(ctx context.Context, dir string, snapshot *Snap
 			return err
 		}
 		snapshot.Stats.PlayerFiles++
-		raw, _, readErr := readSave(filepath.Join(dir, name), r.maxSaveBytes, r.oodle)
+		raw, _, readErr := readSave(filepath.Join(dir, name), r.maxSaveBytes, r.decoder)
 		if readErr != nil {
 			snapshot.Stats.DecodeFailures["playerSaves"]++
 			continue

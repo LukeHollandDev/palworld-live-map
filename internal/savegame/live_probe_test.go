@@ -9,16 +9,16 @@ import (
 	"time"
 )
 
-// TestLiveSnapshotProbe is opt-in so CI never needs a proprietary Oodle
-// runtime or real save data. It reports aggregate coverage only—never player,
-// guild, or account identifiers and names.
+// TestLiveSnapshotProbe is opt-in because CI does not contain real save data.
+// It reports aggregate coverage only—never player, guild, or account
+// identifiers and names.
 func TestLiveSnapshotProbe(t *testing.T) {
 	snapshotDir := os.Getenv("PALWORLD_LIVE_SNAPSHOT")
-	oodlePath := os.Getenv("PALWORLD_LIVE_OODLE")
-	if snapshotDir == "" || oodlePath == "" {
-		t.Skip("set PALWORLD_LIVE_SNAPSHOT and PALWORLD_LIVE_OODLE to run")
+	decoderPath := os.Getenv("PALWORLD_LIVE_DECODER")
+	if snapshotDir == "" || decoderPath == "" {
+		t.Skip("set PALWORLD_LIVE_SNAPSHOT and PALWORLD_LIVE_DECODER to run")
 	}
-	reader, err := NewReader(Options{OodleLibraryPath: oodlePath})
+	reader, err := NewReader(Options{DecoderPath: decoderPath, DecoderTimeout: 30 * time.Second})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -26,7 +26,7 @@ func TestLiveSnapshotProbe(t *testing.T) {
 	defer cancel()
 	snapshot, err := reader.ReadSnapshot(ctx, snapshotDir)
 	if err != nil {
-		raw, _, readErr := readSave(filepath.Join(snapshotDir, "Level.sav"), reader.maxSaveBytes, reader.oodle)
+		raw, _, readErr := readSave(filepath.Join(snapshotDir, "Level.sav"), reader.maxSaveBytes, reader.decoder)
 		stats := newStats()
 		gvas, parseErr := parseGVAS(raw, &stats)
 		if readErr == nil && parseErr == nil {

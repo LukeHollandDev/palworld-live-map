@@ -9,10 +9,11 @@ package at commit e099e8afe4823d6cf6b371e5e3938955e5a1becd:
 Copyright 2026 Palhelm contributors. Palhelm is licensed under the Apache
 License, Version 2.0. A copy is included as LICENSE in this directory.
 
-The port was modified to expose a roster-only Reader API, require an explicit
-caller-supplied Oodle library, avoid all network and write operations, read
-persisted player transforms/date-times, enforce bounded input/output, and
+The port was modified to expose a roster-only Reader API, support the bounded
+external open-decoder helper, avoid all network and save-tree write operations,
+read persisted player transforms/date-times, enforce bounded input/output, and
 support the Palworld July 2026 guild-role layout.
 
-No Palworld save, account identifier, player name, proprietary Oodle binary,
-or GPL parser code is included in this directory.
+No Palworld save, account identifier, player name, proprietary Oodle code, or
+GPL decoder code is included in this directory. The separately executed GPL
+helper and corresponding source are under third_party/palworld-save-decode.

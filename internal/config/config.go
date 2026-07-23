@@ -1,10 +1,8 @@
 package config
 
 import (
-	"encoding/hex"
 	"errors"
 	"fmt"
-	"net/url"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -27,10 +25,6 @@ type Config struct {
 	SaveWorldID       string
 	SavePollInterval  time.Duration
 	SaveTimeout       time.Duration
-	SaveOodleLibrary  string
-	SaveOodleURL      string
-	SaveOodleSHA256   string
-	SaveOodleCacheDir string
 }
 
 func Load() (Config, error) {
@@ -86,10 +80,6 @@ func Load() (Config, error) {
 		SaveWorldID:       strings.TrimSpace(os.Getenv("PALWORLD_SAVE_WORLD_ID")),
 		SavePollInterval:  savePollInterval,
 		SaveTimeout:       saveTimeout,
-		SaveOodleLibrary:  strings.TrimSpace(os.Getenv("SAVE_OODLE_LIBRARY")),
-		SaveOodleURL:      strings.TrimSpace(os.Getenv("SAVE_OODLE_DOWNLOAD_URL")),
-		SaveOodleSHA256:   strings.ToLower(strings.TrimSpace(os.Getenv("SAVE_OODLE_SHA256"))),
-		SaveOodleCacheDir: envOr("SAVE_OODLE_CACHE_DIR", "/tmp/palworld-live-map/oodle"),
 	}
 
 	var missing []string
@@ -130,26 +120,6 @@ func Load() (Config, error) {
 		}
 		if cfg.SaveTimeout <= 0 || cfg.SaveTimeout >= cfg.SavePollInterval {
 			return Config{}, errors.New("SAVE_TIMEOUT must be positive and shorter than SAVE_POLL_INTERVAL")
-		}
-		if cfg.SaveOodleLibrary != "" && !filepath.IsAbs(cfg.SaveOodleLibrary) {
-			return Config{}, errors.New("SAVE_OODLE_LIBRARY must be an absolute path")
-		}
-		if !filepath.IsAbs(cfg.SaveOodleCacheDir) {
-			return Config{}, errors.New("SAVE_OODLE_CACHE_DIR must be an absolute path")
-		}
-		hasLibrary := cfg.SaveOodleLibrary != ""
-		hasDownload := cfg.SaveOodleURL != "" || cfg.SaveOodleSHA256 != ""
-		if hasLibrary == hasDownload {
-			return Config{}, errors.New("save data requires exactly one Oodle source: SAVE_OODLE_LIBRARY, or SAVE_OODLE_DOWNLOAD_URL with SAVE_OODLE_SHA256")
-		}
-		if hasDownload {
-			parsed, err := url.Parse(cfg.SaveOodleURL)
-			if err != nil || parsed.Scheme != "https" || parsed.Host == "" || parsed.User != nil {
-				return Config{}, errors.New("SAVE_OODLE_DOWNLOAD_URL must be an absolute HTTPS URL without credentials")
-			}
-			if digest, err := hex.DecodeString(cfg.SaveOodleSHA256); err != nil || len(digest) != 32 {
-				return Config{}, errors.New("SAVE_OODLE_SHA256 must be a 64-character hexadecimal digest")
-			}
 		}
 	}
 	return cfg, nil
