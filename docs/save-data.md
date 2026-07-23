@@ -74,19 +74,28 @@ the last successful save data.
 Current Palworld `Level.sav` files use Oodle Mermaid compression. Save reading
 remains disabled by default.
 
-Decompression runs in a one-shot subprocess. The parent sends only the
-compressed stream and declared output size, removes the subprocess environment,
-caps output and diagnostics, and kills it at `SAVE_TIMEOUT`. Invalid output or
-a subprocess crash fails that refresh without replacing the last good roster.
-Corresponding source and build instructions are included in the repository and
-container.
+Decompression runs in-process through the internal, pure-Go `palsav` package.
+The reader validates declared sizes and applies bounded
+input, output, collection, string, property, and nesting limits. The Mermaid
+implementation intentionally supports the subset exercised by the project's
+fixtures and rejects unsupported Oodle modes rather than attempting a partial
+decode.
+
+In-process execution removes the native helper and C++ runtime, but it also
+removes the old process boundary. `SAVE_TIMEOUT` bounds the surrounding
+snapshot operation; it cannot forcibly interrupt a decompression call that is
+already running. A malformed-input defect can therefore affect the service
+process. Invalid or unsupported data still fails the refresh without replacing
+the last good roster.
 
 ## Extending the extractor
 
-The save parser is a bounded, selective reader rather than a generic object
-materializer. Add new fields to its typed snapshot and adapter, with fixtures
-for each supported save layout. Candidate future layers to investigate include
-guild bases and per-player normal/tower boss defeat flags.
+The internal package exposes a generic, ordered GVAS property model with lazy
+collections, but the live-map currently retains its existing selective GVAS
+parser and deliberately projects only the bounded, typed fields needed by the
+public roster. Add new fields to that adapter, with fixtures for each supported
+save layout. Candidate future layers to investigate include guild bases and
+per-player normal/tower boss defeat flags.
 
 Static encounters live in `assets/landmarks/manifest.json`, independently of
 the live object API. The project exporter under `tools/map-exporter` recreates
@@ -95,8 +104,10 @@ generator and decoder versions, mappings and PAK digests, exact Unreal source
 objects, and deterministic projected locations, making updates auditable when
 Palworld changes spawn data.
 
-The selective parser is derived from Palhelm under Apache-2.0.
-`palworld-save-decode` and its ooz-derived decoder are GPL-3.0-or-later. See
-the repository's licensing table. The static game-data extraction workflow
-and source-object provenance are documented alongside the generated landmark
-manifest.
+The selective adapter and portions of the generic parser are derived from
+Palhelm under Apache-2.0. The internal `palsav` package is distributed under
+GPL-3.0-or-later, so the combined server executable is GPL-3.0-or-later. Its
+ooz/Powzix provenance remains unresolved as described in
+the repository's [licensing statement](../LICENSING.md). The static game-data
+extraction workflow and source-object provenance are documented alongside the
+generated landmark manifest.

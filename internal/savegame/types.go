@@ -12,14 +12,8 @@ const (
 	maxSkippedDetails         = 20
 )
 
-// Options configures a read-only save reader using the isolated GPL helper.
+// Options configures a read-only save reader.
 type Options struct {
-	// DecoderPath is an absolute path to the GPL open-decoder helper. The helper
-	// receives only compressed bytes and a declared output size over a bounded
-	// stdin/stdout protocol.
-	DecoderPath string
-	// DecoderTimeout bounds each helper invocation. Zero uses 20 seconds.
-	DecoderTimeout time.Duration
 	// MaxSaveBytes bounds both compressed files and their declared decompressed
 	// sizes. Zero uses 512 MiB; values above 2 GiB are rejected.
 	MaxSaveBytes int64

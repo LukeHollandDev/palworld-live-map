@@ -1,0 +1,21 @@
+Palworld Live Map distribution notice
+Copyright 2026 Luke Holland
+
+The distributed palworld-live-map Go server contains the internal
+GPL-3.0-or-later palsav package. The combined server executable is distributed
+as a whole under GPL-3.0-or-later; a complete copy is in
+LICENSES/GPL-3.0-or-later.txt. Every container image carries the complete exact
+Corresponding Source under /usr/src/palworld-live-map and licence material
+under /licenses.
+
+Original project files remain available under the root MIT licence unless
+marked otherwise. Apache-2.0-derived save-reader files retain their licence and
+attribution under internal/savegame, and the internal decoder package carries
+its own licence and NOTICE under internal/palsav. See LICENSING.md for the
+complete component table and Corresponding Source requirements.
+
+The decoder descends from Powzix ooz through a PalworldSaveTools distribution
+that declares GPL-3.0-or-later. No affirmative licence grant has been identified
+in the original Powzix source. The downstream GPL designation does not resolve
+that upstream provenance question. No proprietary Epic or RAD Game Tools Oodle
+runtime or source is included.

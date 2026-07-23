@@ -1,0 +1,34 @@
+Palworld Live Map internal save decoder
+Copyright (C) 2026 Luke Holland
+
+The Mermaid-compatible decompressor in entropy.go and mermaid.go was ported
+and substantially modified for Go on 2026-07-23 from Powzix's ooz
+implementation, Copyright (C) 2016 Powzix, as distributed by
+deafdudecomputers/PalworldSaveTools at commit:
+
+    f35b4d740259a7a75b11cccf2b7c35f928c1ab77
+    https://github.com/deafdudecomputers/PalworldSaveTools/tree/f35b4d740259a7a75b11cccf2b7c35f928c1ab77
+
+That downstream PalworldSaveTools package declares GPL-3.0-or-later. No
+license grant has been located in the original Powzix ooz repository. The GPL
+notice in this package offers the rights held by this package's contributors; it
+does not represent or cure any missing upstream permission.
+
+The Palworld schema hints in palworld_hints.go were adapted from that same
+PalworldSaveTools revision.
+
+Portions of the container and GVAS/property reader were adapted from Palhelm's
+backend/internal/sav package at commit:
+
+    e099e8afe4823d6cf6b371e5e3938955e5a1becd
+    https://github.com/8tp/palhelm/tree/e099e8afe4823d6cf6b371e5e3938955e5a1becd/backend/internal/sav
+
+Copyright 2026 Palhelm contributors. Those portions retain their
+Apache-2.0 notice; a copy is in LICENSES/Apache-2.0.txt. Subject to the
+upstream-provenance qualification above, this package's contributors offer the
+package under GPL-3.0-or-later. Because it is compiled into palworld-live-map,
+the combined server executable is distributed under GPL-3.0-or-later.
+
+This is an unofficial compatible reader. It does not bundle the proprietary
+Oodle runtime and is not affiliated with or endorsed by Epic Games,
+RAD Game Tools, or Pocketpair.

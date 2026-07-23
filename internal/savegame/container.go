@@ -3,18 +3,14 @@
 package savegame
 
 import (
-	"bytes"
-	"compress/zlib"
-	"encoding/binary"
+	"errors"
 	"fmt"
 	"io"
 	"io/fs"
 	"os"
-)
 
-type saveDecompressor interface {
-	Decompress(src []byte, rawLen int) ([]byte, error)
-}
+	"github.com/LukeHollandDev/palworld-live-map/internal/palsav"
+)
 
 type containerHeader struct {
 	RawLen        uint32
@@ -24,91 +20,35 @@ type containerHeader struct {
 	Offset        int
 }
 
-func readContainer(data []byte, maxBytes int64, decoder saveDecompressor) ([]byte, containerHeader, error) {
-	h, err := parseContainerHeader(data)
-	if err != nil {
-		return nil, h, err
-	}
-	if int64(h.RawLen) > maxBytes {
-		return nil, h, &parseLimitError{Kind: "decompressed save bytes", Value: uint64(h.RawLen), Limit: uint64(maxBytes)}
-	}
-	bodyStart := h.Offset + 12
-	if int(h.CompressedLen) > len(data)-bodyStart {
-		return nil, h, fmt.Errorf("savegame: compressed length %d exceeds %d-byte body", h.CompressedLen, len(data)-bodyStart)
-	}
-	src := data[bodyStart : bodyStart+int(h.CompressedLen)]
-	var raw []byte
-	switch h.Magic {
-	case "PlZ":
-		if h.SaveType != 0x31 && h.SaveType != 0x32 {
-			return nil, h, fmt.Errorf("savegame: unsupported PlZ save type %#x", h.SaveType)
-		}
-		raw, err = zlibBytes(src, int64(h.RawLen))
-		if err == nil && h.SaveType == 0x32 {
-			raw, err = zlibBytes(raw, int64(h.RawLen))
-		}
-	case "PlM":
-		if h.SaveType != 0x31 {
-			return nil, h, fmt.Errorf("savegame: unsupported PlM save type %#x", h.SaveType)
-		}
-		if decoder == nil {
-			return nil, h, fmt.Errorf("savegame: PlM requires a decoder")
-		}
-		raw, err = decoder.Decompress(src, int(h.RawLen))
-	default:
-		err = fmt.Errorf("savegame: unsupported container magic %q", h.Magic)
+func readContainer(data []byte, maxBytes int64) ([]byte, containerHeader, error) {
+	raw, decodedHeader, err := palsav.DecodeContainerWithLimits(data, palsav.Limits{
+		MaxInputBytes:  maxBytes,
+		MaxOutputBytes: maxBytes,
+	})
+	header := containerHeader{
+		RawLen:        decodedHeader.RawSize,
+		CompressedLen: decodedHeader.CompressedSize,
+		Magic:         decodedHeader.Magic,
+		SaveType:      decodedHeader.SaveType,
+		Offset:        decodedHeader.Offset,
 	}
 	if err != nil {
-		return nil, h, err
-	}
-	if len(raw) != int(h.RawLen) {
-		return nil, h, fmt.Errorf("savegame: decompressed length %d, expected %d", len(raw), h.RawLen)
-	}
-	if !bytes.HasPrefix(raw, []byte("GVAS")) {
-		return nil, h, fmt.Errorf("savegame: decompressed body does not begin with GVAS")
-	}
-	return raw, h, nil
-}
-
-func parseContainerHeader(data []byte) (containerHeader, error) {
-	for _, base := range []int{0, 12} {
-		if len(data) < base+12 {
-			continue
+		var limitErr *palsav.LimitError
+		if errors.As(err, &limitErr) {
+			return nil, header, &parseLimitError{
+				Kind:  limitErr.Kind,
+				Value: limitErr.Value,
+				Limit: limitErr.Limit,
+			}
 		}
-		magic := string(data[base+8 : base+11])
-		if magic != "PlZ" && magic != "PlM" {
-			continue
-		}
-		return containerHeader{
-			RawLen:        binary.LittleEndian.Uint32(data[base:]),
-			CompressedLen: binary.LittleEndian.Uint32(data[base+4:]),
-			Magic:         magic,
-			SaveType:      data[base+11],
-			Offset:        base,
-		}, nil
+		return nil, header, fmt.Errorf("savegame: decode container: %w", err)
 	}
-	return containerHeader{}, fmt.Errorf("savegame: PlZ/PlM header not found at normal or CNK offset")
-}
-
-func zlibBytes(src []byte, rawLen int64) ([]byte, error) {
-	zr, err := zlib.NewReader(bytes.NewReader(src))
-	if err != nil {
-		return nil, fmt.Errorf("savegame: zlib: %w", err)
-	}
-	defer zr.Close()
-	b, err := io.ReadAll(io.LimitReader(zr, rawLen+1))
-	if err != nil {
-		return nil, fmt.Errorf("savegame: zlib: %w", err)
-	}
-	if int64(len(b)) > rawLen {
-		return nil, fmt.Errorf("savegame: zlib output exceeds declared raw length %d", rawLen)
-	}
-	return b, nil
+	return raw, header, nil
 }
 
 // readSave performs only read operations and rejects symlinks/non-regular files.
 // It checks size and modification time after reading to detect a torn snapshot.
-func readSave(path string, maxBytes int64, decoder saveDecompressor) ([]byte, fs.FileInfo, error) {
+func readSave(path string, maxBytes int64) ([]byte, fs.FileInfo, error) {
 	before, err := os.Lstat(path)
 	if err != nil {
 		return nil, nil, fmt.Errorf("savegame: stat save: %w", err)
@@ -138,6 +78,6 @@ func readSave(path string, maxBytes int64, decoder saveDecompressor) ([]byte, fs
 	if before.Size() != after.Size() || !before.ModTime().Equal(after.ModTime()) {
 		return nil, nil, fmt.Errorf("savegame: save changed while being read")
 	}
-	raw, _, err := readContainer(b, maxBytes, decoder)
+	raw, _, err := readContainer(b, maxBytes)
 	return raw, before, err
 }

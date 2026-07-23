@@ -14,11 +14,10 @@ import (
 // identifiers and names.
 func TestLiveSnapshotProbe(t *testing.T) {
 	snapshotDir := os.Getenv("PALWORLD_LIVE_SNAPSHOT")
-	decoderPath := os.Getenv("PALWORLD_LIVE_DECODER")
-	if snapshotDir == "" || decoderPath == "" {
-		t.Skip("set PALWORLD_LIVE_SNAPSHOT and PALWORLD_LIVE_DECODER to run")
+	if snapshotDir == "" {
+		t.Skip("set PALWORLD_LIVE_SNAPSHOT to run")
 	}
-	reader, err := NewReader(Options{DecoderPath: decoderPath, DecoderTimeout: 30 * time.Second})
+	reader, err := NewReader(Options{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -26,7 +25,7 @@ func TestLiveSnapshotProbe(t *testing.T) {
 	defer cancel()
 	snapshot, err := reader.ReadSnapshot(ctx, snapshotDir)
 	if err != nil {
-		raw, _, readErr := readSave(filepath.Join(snapshotDir, "Level.sav"), reader.maxSaveBytes, reader.decoder)
+		raw, _, readErr := readSave(filepath.Join(snapshotDir, "Level.sav"), reader.maxSaveBytes)
 		stats := newStats()
 		gvas, parseErr := parseGVAS(raw, &stats)
 		if readErr == nil && parseErr == nil {

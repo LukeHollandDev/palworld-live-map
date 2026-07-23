@@ -17,7 +17,7 @@ Only fields needed by the UI are exposed publicly. Account names, raw player IDs
 
 Player and server-metric data are refreshed using `POLL_INTERVAL`; world objects use `WORLD_POLL_INTERVAL`; the save roster uses `SAVE_POLL_INTERVAL`; server information is refreshed once per minute. A single set of background pollers serves every connected browser. Browsers fetch `/api/players` and `/api/objects` independently at their respective intervals, so unchanged world-object data is not retransmitted with every player update. The combined `/api/state` route remains available for compatibility. The last successful player, metric, world-object, and save-roster results are retained independently, with explicit availability/staleness timestamps in the public state.
 
-The save adapter selects the second-newest complete `backup/world` generation when at least two exist, or the only complete generation otherwise, and then runs a bounded selective decoder. It currently extracts roster identity, level, guild membership/name, `LastTransform.Translation`, `LastOnlineDateTime`, and typed `RecordData` capture/Paldeck aggregates. The data-source contract and extension path are detailed in [`docs/save-data.md`](docs/save-data.md).
+The save adapter selects the second-newest complete `backup/world` generation when at least two exist, or the only complete generation otherwise, and then runs the directly linked, bounded Go container decoder. Container decompression comes from `internal/palsav`; `internal/savegame` retains its bounded selective GVAS parser and projects only roster identity, level, guild membership/name, `LastTransform.Translation`, `LastOnlineDateTime`, and typed `RecordData` capture/Paldeck aggregates. The internal decoder package also exposes a generic GVAS API, but the live-map projection does not materialize arbitrary save content. The data-source contract and extension path are detailed in [`docs/save-data.md`](docs/save-data.md).
 
 Field Alpha and tower-boss locations are versioned static game data under `assets/landmarks`, not live server actors. The checked-in manifest is generated directly from an installed Palworld PAK, including exact tower actor coordinates and source provenance. The locations are returned with public configuration and share the normal `WorldObject` projection/filter pipeline.
 
@@ -50,9 +50,10 @@ Source builds are intended for development. Production deployments should use
 the container described in the main README.
 
 Clone this repository before running the build commands below. Go 1.26.5 or
-newer, Node.js 24 or newer, GNU Make, and a C++17 compiler are required. The
-build compiles the decoder helper from the source included in
-`third_party/palworld-save-decode`; no separate upstream checkout is needed.
+newer, Node.js 24 or newer, and GNU Make are required. The pure-Go save decoder
+is included under `internal/palsav` and is compiled directly into the
+server; no C++ compiler, native helper, proprietary runtime, or separate
+upstream checkout is required.
 
 ```bash
 cp .env.example .env

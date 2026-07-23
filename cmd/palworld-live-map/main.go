@@ -11,7 +11,6 @@ import (
 	"net/url"
 	"os"
 	"os/signal"
-	"path/filepath"
 	"strings"
 	"syscall"
 	"time"
@@ -56,15 +55,7 @@ func main() {
 		}
 		source = client
 		if cfg.SaveDataEnabled {
-			executable, executableErr := os.Executable()
-			if executableErr != nil {
-				logger.Error("locate bundled save decoder", "error", executableErr)
-				os.Exit(1)
-			}
-			decoderPath := filepath.Join(filepath.Dir(executable), "palworld-save-decode")
-			reader, readerErr := savegame.NewReader(savegame.Options{
-				DecoderPath: decoderPath, DecoderTimeout: cfg.SaveTimeout,
-			})
+			reader, readerErr := savegame.NewReader(savegame.Options{})
 			if readerErr != nil {
 				logger.Error("save reader setup failed", "error", readerErr)
 				os.Exit(1)

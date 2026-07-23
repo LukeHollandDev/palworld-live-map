@@ -4,15 +4,18 @@ package savegame
 
 import (
 	"encoding/binary"
-	"strings"
+	"errors"
 	"testing"
 	"time"
 )
 
-func TestNewReaderRequiresDecoder(t *testing.T) {
-	_, err := NewReader(Options{})
-	if err == nil || !strings.Contains(err.Error(), "decoder path") {
-		t.Fatalf("NewReader() error = %v", err)
+func TestNewReaderUsesInProcessDecoder(t *testing.T) {
+	reader, err := NewReader(Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if reader.maxSaveBytes != defaultMaxSaveBytes || reader.maxPlayers != defaultMaxPlayers {
+		t.Fatalf("NewReader() = %+v", reader)
 	}
 }
 
@@ -302,26 +305,45 @@ func TestPlayerProgressRejectsPartialOrMalformedAggregates(t *testing.T) {
 	}
 }
 
-type fakeDecoder struct{ raw []byte }
+func TestReadPlMContainerUsesInProcessDecoder(t *testing.T) {
+	raw := []byte("GVAS synthetic Mermaid payload")
+	stored := len(raw) - 1
+	body := []byte{
+		0x8c, 0x0a,
+		byte(stored >> 16), byte(stored >> 8), byte(stored),
+	}
+	body = append(body, raw...)
 
-func (f fakeDecoder) Decompress([]byte, int) ([]byte, error) {
-	return append([]byte(nil), f.raw...), nil
-}
-
-func TestReadPlMContainerUsesInjectedDecoder(t *testing.T) {
-	raw := []byte("GVAS synthetic")
 	w := &testWriter{}
 	w.u32(uint32(len(raw)))
-	w.u32(3)
+	w.u32(uint32(len(body)))
 	w.bytes([]byte("PlM"))
 	w.u8(0x31)
-	w.bytes([]byte{1, 2, 3})
-	got, header, err := readContainer(w.b, 1024, fakeDecoder{raw: raw})
+	w.bytes(body)
+
+	got, header, err := readContainer(w.b, 1024)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if header.Magic != "PlM" || string(got) != string(raw) {
 		t.Fatalf("header=%+v raw=%q", header, got)
+	}
+}
+
+func TestReadContainerPreservesLimitErrorContract(t *testing.T) {
+	w := &testWriter{}
+	w.u32(2048)
+	w.u32(0)
+	w.bytes([]byte("PlM"))
+	w.u8(0x31)
+
+	_, _, err := readContainer(w.b, 1024)
+	var limitErr *parseLimitError
+	if !errors.As(err, &limitErr) {
+		t.Fatalf("readContainer() error = %v, want *parseLimitError", err)
+	}
+	if limitErr.Kind != "declared output bytes" || limitErr.Value != 2048 || limitErr.Limit != 1024 {
+		t.Fatalf("readContainer() limit = %+v", limitErr)
 	}
 }
 
