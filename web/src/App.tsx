@@ -116,6 +116,7 @@ function LiveMap({ config }: { config: PublicConfig }) {
     () => new Set<PlayerStatus>(initialPreferences.enabledPlayerStatuses || DEFAULT_ENABLED_PLAYER_STATUSES)
   )
   const [hiddenIds, setHiddenIds] = useState(() => initialPreferences.hiddenIds || new Set<string>())
+  const [seenKinds, setSeenKinds] = useState(() => new Set<ItemKind>(initialPreferences.seenKinds || []))
   const [expandedGuilds, setExpandedGuilds] = useState(() => new Set<string>())
   const [expandedBases, setExpandedBases] = useState(() => new Set<string>())
   const [search, setSearch] = useState('')
@@ -128,8 +129,8 @@ function LiveMap({ config }: { config: PublicConfig }) {
   const leaderboardButtonRef = useRef<HTMLButtonElement>(null)
 
   useEffect(() => {
-    saveFilterPreferences({ activeLayerId: activeLayer.id, enabledKinds, enabledPlayerStatuses, hiddenIds })
-  }, [activeLayer.id, enabledKinds, enabledPlayerStatuses, hiddenIds])
+    saveFilterPreferences({ activeLayerId: activeLayer.id, enabledKinds, enabledPlayerStatuses, hiddenIds, seenKinds })
+  }, [activeLayer.id, enabledKinds, enabledPlayerStatuses, hiddenIds, seenKinds])
 
   const items = useMemo<MapItem[]>(() => {
     const combined: MapItem[] = [
@@ -145,6 +146,27 @@ function LiveMap({ config }: { config: PublicConfig }) {
     return Array.from(new Map(combined.map((item) => [item.id, item])).values())
   }, [config.landmarks, objectState.objects, playerState?.players])
   const itemById = useMemo(() => new Map(items.map((item) => [item.id, item])), [items])
+
+  // Reveal a category on the map the first time it has content, then remember it
+  // so a kind the user later hides is never auto-enabled again.
+  useEffect(() => {
+    const unseen: ItemKind[] = []
+    for (const item of items) {
+      if (seenKinds.has(item.kind) || unseen.includes(item.kind)) continue
+      unseen.push(item.kind)
+    }
+    if (unseen.length === 0) return
+    setEnabledKinds((current) => {
+      const next = new Set(current)
+      for (const kind of unseen) next.add(kind)
+      return next
+    })
+    setSeenKinds((current) => {
+      const next = new Set(current)
+      for (const kind of unseen) next.add(kind)
+      return next
+    })
+  }, [items, seenKinds])
   const detailedItem = detail?.kind === 'item' ? itemById.get(detail.itemId) : undefined
   const detailedGuildExists =
     detail?.kind === 'guild' &&

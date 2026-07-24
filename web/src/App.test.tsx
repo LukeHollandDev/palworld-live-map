@@ -12,7 +12,7 @@ const responses: Record<string, unknown> = {
     landmarks: [],
     landmarkCatalogue: {
       gameVersion: '1.0.1.100619',
-      generator: 'palworld-map-exporter/2',
+      generator: 'palworld-asset-exporter/3',
       decoder: 'CUE4Parse'
     }
   },
@@ -140,7 +140,7 @@ describe('App', () => {
     expect(screen.getByText('No guild membership is known for this player.')).toBeVisible()
   })
 
-  it('starts with only player status groups and Guilds expanded and enabled', async () => {
+  it('auto-enables every populated category while leaving extra sections collapsed', async () => {
     const landmarks = [
       {
         id: 'alpha-default',
@@ -218,7 +218,9 @@ describe('App', () => {
 
     for (const category of ['Companion Pals', 'Wild Pals', 'Alpha Pals', 'Tower Bosses', 'NPCs']) {
       const checkbox = within(explorer).getByRole('checkbox', { name: `Show ${category}` })
-      expect(checkbox).not.toBeChecked()
+      // Populated categories are shown on the map automatically, even though their
+      // sections stay collapsed to keep the list tidy.
+      expect(checkbox).toBeChecked()
       expect(checkbox).toBeEnabled()
       expect(within(explorer).getByRole('button', { name: `Expand ${category} section` })).toBeVisible()
     }
@@ -855,25 +857,17 @@ describe('App', () => {
 
     expect(within(explorer).getByText('Alpha Pals (1)')).toBeVisible()
     expect(within(explorer).getByText('Tower Bosses (1)')).toBeVisible()
+    // Both landmark categories are populated, so they are shown automatically while
+    // their sections stay collapsed.
     expect(within(explorer).getByRole('button', { name: 'Expand Alpha Pals section' })).toBeVisible()
     expect(within(explorer).getByRole('button', { name: 'Expand Tower Bosses section' })).toBeVisible()
-    expect(within(explorer).getByRole('checkbox', { name: 'Show Alpha Pals' })).not.toBeChecked()
-    expect(within(explorer).getByRole('checkbox', { name: 'Show Tower Bosses' })).not.toBeChecked()
-    expect(screen.queryByRole('button', { name: 'Penking · Lv 15' })).not.toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'Zoe & Grizzbolt · Lv 10' })).not.toBeInTheDocument()
-
-    await user.type(screen.getByRole('searchbox'), 'penking')
-    await user.click(within(explorer).getByRole('button', { name: 'View Penking · Lv 15' }))
-    expect(within(screen.getByRole('dialog')).getByRole('heading', { name: 'Penking' })).toBeVisible()
     expect(within(explorer).getByRole('checkbox', { name: 'Show Alpha Pals' })).toBeChecked()
-    await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Close details' }))
-    await user.click(screen.getByRole('button', { name: 'Clear search' }))
-
-    await user.click(within(explorer).getByRole('checkbox', { name: 'Show Tower Bosses' }))
-    await user.click(within(explorer).getByRole('button', { name: 'Expand Alpha Pals section' }))
-    await user.click(within(explorer).getByRole('button', { name: 'Expand Tower Bosses section' }))
+    expect(within(explorer).getByRole('checkbox', { name: 'Show Tower Bosses' })).toBeChecked()
     expect(screen.getByRole('button', { name: 'Penking · Lv 15' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Zoe & Grizzbolt · Lv 10' })).toBeInTheDocument()
+
+    await user.click(within(explorer).getByRole('button', { name: 'Expand Alpha Pals section' }))
+    await user.click(within(explorer).getByRole('button', { name: 'Expand Tower Bosses section' }))
     expect(
       screen.getByRole('button', { name: 'Penking · Lv 15' }).querySelector('[data-marker-kind="alpha-pals"]')
     ).toBeInTheDocument()
@@ -973,11 +967,11 @@ describe('App', () => {
     const explorer = screen.getByRole('complementary', { name: 'Map filters' })
     const companionVisibility = within(explorer).getByRole('checkbox', { name: 'Show Companion Pals' })
     await waitFor(() => expect(companionVisibility).toBeEnabled())
-    expect(companionVisibility).not.toBeChecked()
+    // Companions are present, so the category is shown on the map automatically.
+    expect(companionVisibility).toBeChecked()
     expect(within(explorer).getByRole('button', { name: 'Expand Companion Pals section' })).toBeVisible()
-    expect(screen.queryByRole('button', { name: 'Spark · Lv 12' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Spark · Lv 12' })).toBeInTheDocument()
 
-    await user.click(companionVisibility)
     await user.click(within(explorer).getByRole('button', { name: 'Expand Companion Pals section' }))
     expect(within(explorer).getByText('Online Players (1)')).toBeVisible()
     expect(within(explorer).getByRole('button', { name: 'View Spark · Lv 12' })).toBeVisible()
@@ -1165,7 +1159,8 @@ describe('App', () => {
     const explorer = screen.getByRole('complementary', { name: 'Map filters' })
     const wildVisibility = within(explorer).getByRole('checkbox', { name: 'Show Wild Pals' })
     await waitFor(() => expect(wildVisibility).toBeEnabled())
-    await user.click(wildVisibility)
+    // Wild Pals are present, so they are shown on the map without a manual toggle.
+    expect(wildVisibility).toBeChecked()
     await user.click(within(explorer).getByRole('button', { name: 'Expand Wild Pals section' }))
     await waitFor(() =>
       expect(screen.getAllByRole('button', { name: /Zoom to \d+ nearby map items/ }).length).toBeGreaterThan(0)

@@ -14,6 +14,9 @@ export interface FilterPreferences {
   enabledKinds?: Set<ItemKind>
   enabledPlayerStatuses?: Set<PlayerStatus>
   hiddenIds?: Set<string>
+  // Kinds that have already been auto-revealed once. Persisted so a category the
+  // user later hides is not re-enabled the next time it has content.
+  seenKinds?: Set<ItemKind>
 }
 
 function isItemKind(value: unknown): value is ItemKind {
@@ -52,6 +55,7 @@ export function loadFilterPreferences(): FilterPreferences {
       enabledPlayerStatuses: Array.isArray(value.enabledPlayerStatuses)
         ? new Set(value.enabledPlayerStatuses.filter(isPlayerStatus))
         : new Set(DEFAULT_ENABLED_PLAYER_STATUSES),
+      seenKinds: Array.isArray(value.seenKinds) ? new Set(value.seenKinds.filter(isItemKind)) : undefined,
       hiddenIds: Array.isArray(value.hiddenIds)
         ? new Set(value.hiddenIds.filter((id): id is string => typeof id === 'string').slice(0, 20_000))
         : undefined
@@ -64,7 +68,9 @@ export function loadFilterPreferences(): FilterPreferences {
   }
 }
 
-export function saveFilterPreferences(preferences: Required<FilterPreferences>) {
+export function saveFilterPreferences(
+  preferences: Required<Omit<FilterPreferences, 'seenKinds'>> & Pick<FilterPreferences, 'seenKinds'>
+) {
   try {
     window.localStorage.setItem(
       FILTER_PREFERENCES_KEY,
@@ -73,6 +79,7 @@ export function saveFilterPreferences(preferences: Required<FilterPreferences>) 
         kindsVersion: FILTER_KINDS_VERSION,
         enabledKinds: [...preferences.enabledKinds],
         enabledPlayerStatuses: [...preferences.enabledPlayerStatuses],
+        seenKinds: [...(preferences.seenKinds ?? [])],
         hiddenIds: [...preferences.hiddenIds].slice(0, 20_000)
       })
     )
