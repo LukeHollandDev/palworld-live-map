@@ -102,20 +102,21 @@ Set `ADMIN_PASSWORD`, then run `docker compose up -d`.
 
 Every supported environment option and timeout is listed below and documented in [`.env.example`](.env.example).
 
-| Variable                  | Purpose                                                           | Default  |
-| ------------------------- | ----------------------------------------------------------------- | -------- |
-| `PALWORLD_REST_URL`       | Private URL of the official Palworld REST API                     | required |
-| `PALWORLD_ADMIN_PASSWORD` | REST admin password; never sent to browsers                       | required |
-| `DEMO_MODE`               | Use fictional data and do not contact Palworld                    | `false`  |
-| `HTTP_PORT`               | Host port published by Compose                                    | `8080`   |
-| `ADDR`                    | Address the Go HTTP server listens on                             | `:8080`  |
-| `POLL_INTERVAL`           | Player and metrics refresh interval; minimum `2s`                 | `5s`     |
-| `UPSTREAM_TIMEOUT`        | Player and server-information timeout; must be below `POLL_INTERVAL` | `4s`  |
-| `WORLD_DATA_ENABLED`      | Poll bases, Pals, and NPCs                                        | `true`   |
-| `WORLD_POLL_INTERVAL`     | World-object refresh interval; minimum `5s`                       | `15s`    |
-| `WORLD_TIMEOUT`           | World-object timeout; must be below `WORLD_POLL_INTERVAL`         | `10s`    |
+| Variable                  | Purpose                                                              | Default  |
+| ------------------------- | -------------------------------------------------------------------- | -------- |
+| `PALWORLD_REST_URL`       | Private URL of the official Palworld REST API                        | required |
+| `PALWORLD_ADMIN_PASSWORD` | REST admin password; never sent to browsers                          | required |
+| `DEMO_MODE`               | Use fictional data and do not contact Palworld                       | `false`  |
+| `HTTP_PORT`               | Host port published by Compose                                       | `8080`   |
+| `ADDR`                    | Address the Go HTTP server listens on                                | `:8080`  |
+| `POLL_INTERVAL`           | Player and metrics refresh interval; minimum `2s`                    | `5s`     |
+| `UPSTREAM_TIMEOUT`        | Player and server-information timeout; must be below `POLL_INTERVAL` | `4s`     |
+| `WORLD_DATA_ENABLED`      | Poll bases, Pals, and NPCs                                           | `true`   |
+| `WORLD_POLL_INTERVAL`     | World-object refresh interval; minimum `5s`                          | `15s`    |
+| `WORLD_TIMEOUT`           | World-object timeout; must be below `WORLD_POLL_INTERVAL`            | `10s`    |
+
 ## License
 
-See the complete [component licensing table](LICENSING.md). The Go/web application is [MIT](LICENSE). The encounter catalogue's extraction sources and reproducible workflow are documented alongside the [generated manifest](assets/landmarks/README.md). Corresponding third-party license texts are included under `/licenses` in the container image.
+The Go application, web application, documentation, and other original project files are [MIT](LICENSE) unless marked otherwise. Palworld-derived map textures, screenshots, and extracted game data remain copyright Pocketpair; see the [Palworld asset provenance](assets/palworld/README.md) for extraction sources and the reproducible workflow. Inclusion in the same repository or container does not replace a component's own terms.
 
 Palworld Live Map is an independent, fan-made project. It is not affiliated with, endorsed by, or sponsored by Pocketpair, Inc. Palworld and related names and marks belong to their respective owners.
