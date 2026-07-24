@@ -17,6 +17,8 @@ import (
 
 	"github.com/LukeHollandDev/palworld-live-map/internal/config"
 	"github.com/LukeHollandDev/palworld-live-map/internal/palworld"
+	"github.com/LukeHollandDev/palworld-live-map/internal/saveroster"
+	"github.com/LukeHollandDev/palworld-live-map/internal/savesidecar"
 	webserver "github.com/LukeHollandDev/palworld-live-map/internal/server"
 )
 
@@ -39,8 +41,11 @@ func main() {
 	}
 
 	var source palworld.Source
+	var roster palworld.RosterSource
 	if cfg.DemoMode {
-		source = palworld.NewDemoSource()
+		demo := palworld.NewDemoSource()
+		source = demo
+		roster = demo
 		logger.Info("demo mode enabled; no Palworld server will be contacted")
 	} else {
 		client, clientErr := palworld.NewClient(cfg.RESTURL, cfg.AdminPassword, cfg.UpstreamTimeout, cfg.WorldTimeout)
@@ -49,8 +54,27 @@ func main() {
 			os.Exit(1)
 		}
 		source = client
+		if cfg.SaveDataEnabled {
+			reader, readerErr := savesidecar.NewReader(savesidecar.Options{BinaryPath: cfg.SaveDecoderPath})
+			if readerErr != nil {
+				logger.Error("save decoder setup failed", "error", readerErr)
+				os.Exit(1)
+			}
+			rosterSource, rosterErr := saveroster.New(saveroster.Options{
+				Root: cfg.SaveRoot, WorldID: cfg.SaveWorldID, Timeout: cfg.SaveTimeout, Reader: reader,
+				ProjectPlayerID: client.PublicPlayerID, ProjectGuildID: client.PublicGuildKey,
+			})
+			if rosterErr != nil {
+				logger.Error("save roster setup failed", "error", rosterErr)
+				os.Exit(1)
+			}
+			roster = rosterSource
+			logger.Info("save-backed player roster enabled", "pollInterval", cfg.SavePollInterval)
+		}
 	}
-	poller := palworld.NewPoller(source, cfg.PollInterval, cfg.WorldPollInterval, cfg.WorldDataEnabled, logger)
+	poller := palworld.NewPollerWithRoster(
+		source, roster, cfg.PollInterval, cfg.WorldPollInterval, cfg.SavePollInterval, cfg.WorldDataEnabled, logger,
+	)
 	app, err := webserver.New(cfg, poller)
 	if err != nil {
 		logger.Error("web server setup failed", "error", err)
