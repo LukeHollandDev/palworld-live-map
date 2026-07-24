@@ -80,7 +80,7 @@ func TestLoadRejectsInvalidManifest(t *testing.T) {
 }
 
 func testFS(data string) fstest.MapFS {
-	return fstest.MapFS{"landmarks/manifest.json": &fstest.MapFile{Data: []byte(data)}}
+	return fstest.MapFS{"palworld/landmarks/manifest.json": &fstest.MapFile{Data: []byte(data)}}
 }
 
 func testManifest(schema int, locations string) string {

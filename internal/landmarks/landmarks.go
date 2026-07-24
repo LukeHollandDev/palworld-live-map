@@ -71,7 +71,7 @@ type record struct {
 // Load validates catalogue metadata and projects each entry into the same
 // public object model used by live world actors.
 func Load(source fs.FS) (Catalogue, error) {
-	data, err := fs.ReadFile(source, "landmarks/manifest.json")
+	data, err := fs.ReadFile(source, "palworld/landmarks/manifest.json")
 	if err != nil {
 		return Catalogue{}, fmt.Errorf("read landmark manifest: %w", err)
 	}

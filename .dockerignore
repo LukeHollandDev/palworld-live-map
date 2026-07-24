@@ -13,7 +13,7 @@ coverage*
 web/dist/
 exporter/
 assets/images/
-assets/map/README.md
+assets/palworld/README.md
 **/*_test.go
 web/src/**/*.test.ts
 web/src/**/*.test.tsx

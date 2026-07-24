@@ -259,7 +259,7 @@ func TestPublicConfigUsesManifestAssetHash(t *testing.T) {
 	if !strings.Contains(body, `"kind":"alpha-pals"`) || !strings.Contains(body, `"name":"Penking"`) || !strings.Contains(body, `"id":"landmark:tower:REGION_Grass_Boss"`) {
 		t.Fatalf("config response does not include embedded encounter landmarks: %s", body)
 	}
-	if !strings.Contains(body, `"landmarkCatalogue":{"gameVersion":"1.0.1.100619","generator":"palworld-map-exporter/2"`) {
+	if !strings.Contains(body, `"landmarkCatalogue":{"gameVersion":"1.0.1.100619","generator":"palworld-asset-exporter/3"`) {
 		t.Fatalf("config response does not expose landmark provenance: %s", body)
 	}
 }

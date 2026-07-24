@@ -93,7 +93,7 @@ func New(cfg config.Config, source snapshotSource) (*Server, error) {
 	if err != nil {
 		return nil, fmt.Errorf("open embedded web assets: %w", err)
 	}
-	maps, err := fs.Sub(mapassets.Maps, "map")
+	maps, err := fs.Sub(mapassets.Maps, "palworld/maps")
 	if err != nil {
 		return nil, fmt.Errorf("open embedded map assets: %w", err)
 	}
