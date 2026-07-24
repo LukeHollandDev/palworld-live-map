@@ -46,6 +46,10 @@ export interface Player {
   guildKey?: string
   guildName?: string
   online: boolean
+  lastSeenAt?: string
+  captureTotal?: number
+  uniquePalsCaptured?: number
+  paldeckUnlocked?: number
   x: number
   y: number
   map: string
@@ -76,6 +80,10 @@ export interface MapItem {
   ownerId?: string
   level?: number
   online?: boolean
+  lastSeenAt?: string
+  captureTotal?: number
+  uniquePalsCaptured?: number
+  paldeckUnlocked?: number
   x: number
   y: number
   map: string

@@ -319,6 +319,13 @@ function coordinates(item: MapItem) {
   return `X ${Math.round(item.x)}\u00a0\u00a0Y ${Math.round(item.y)}`
 }
 
+function lastSeen(lastSeenAt?: string) {
+  if (!lastSeenAt) return undefined
+  const timestamp = new Date(lastSeenAt)
+  if (Number.isNaN(timestamp.getTime())) return undefined
+  return new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' }).format(timestamp)
+}
+
 function baseLabel(base: MapItem, guildBases: MapItem[]) {
   if (guildBases.length <= 1) return base.name
   const index = guildBases.findIndex((candidate) => candidate.id === base.id)
@@ -548,6 +555,10 @@ function ItemDetails({
   if (item.level) entries.push(['Level', item.level])
   if (item.kind === 'players') {
     entries.push(['Status', item.online === false ? 'Offline' : 'Online'])
+    entries.push(['Last seen', lastSeen(item.lastSeenAt)])
+    entries.push(['Captures', item.captureTotal?.toLocaleString()])
+    entries.push(['Unique Pals captured', item.uniquePalsCaptured?.toLocaleString()])
+    entries.push(['Paldeck unlocked', item.paldeckUnlocked?.toLocaleString()])
   }
   if (item.detail && item.kind !== 'players') {
     const detailLabel =

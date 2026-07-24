@@ -140,6 +140,66 @@ describe('App', () => {
     expect(screen.getByText('No guild membership is known for this player.')).toBeVisible()
   })
 
+  it('shows save-game progress when available and omits unknown fields', async () => {
+    const lastSeenAt = '2026-07-21T11:32:44.248Z'
+    const playerState = responses['/api/players'] as {
+      players: Array<Record<string, unknown>>
+    }
+    mockAPI((path) => {
+      if (path !== '/api/players') return responses[path]
+      return {
+        ...(responses[path] as Record<string, unknown>),
+        players: [
+          {
+            ...playerState.players[0],
+            lastSeenAt,
+            captureTotal: 4321,
+            uniquePalsCaptured: 117,
+            paldeckUnlocked: 119
+          },
+          {
+            id: 'player-legacy',
+            name: 'Legacy',
+            level: 12,
+            online: false,
+            x: 30,
+            y: 40,
+            map: 'palpagos'
+          }
+        ]
+      }
+    })
+    const user = userEvent.setup()
+    render(<App />)
+
+    const explorer = await screen.findByRole('complementary', { name: 'Map filters' })
+    await user.click(await within(explorer).findByRole('button', { name: 'View Luke · Lv 55' }))
+
+    let inspector = screen.getByRole('dialog')
+    const expectedLastSeen = new Intl.DateTimeFormat(undefined, {
+      dateStyle: 'medium',
+      timeStyle: 'short'
+    }).format(new Date(lastSeenAt))
+    for (const [label, value] of [
+      ['Last seen', expectedLastSeen],
+      ['Captures', (4321).toLocaleString()],
+      ['Unique Pals captured', (117).toLocaleString()],
+      ['Paldeck unlocked', (119).toLocaleString()]
+    ]) {
+      const term = within(inspector).getByText(label)
+      expect(term.nextElementSibling).toHaveTextContent(value)
+    }
+
+    await user.click(within(inspector).getByRole('button', { name: 'Close details' }))
+    await user.click(within(explorer).getByRole('button', { name: 'View Legacy · Lv 12' }))
+
+    inspector = screen.getByRole('dialog')
+    expect(within(inspector).getByText('Status').nextElementSibling).toHaveTextContent('Offline')
+    for (const label of ['Last seen', 'Captures', 'Unique Pals captured', 'Paldeck unlocked']) {
+      expect(within(inspector).queryByText(label)).not.toBeInTheDocument()
+    }
+  })
+
   it('auto-enables every populated category while leaving extra sections collapsed', async () => {
     const landmarks = [
       {
