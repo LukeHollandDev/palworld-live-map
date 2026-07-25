@@ -22,6 +22,7 @@ Palworld Live Map is a self-hosted website for communities running a Palworld de
 - Bases, companion Pals, wild Pals, and NPCs
 - Map filters for players, guilds, Pals, NPCs, and encounter landmarks
 - Live connection freshness, player capacity, server FPS, uptime, base count, and in-game day
+- Optional save-backed capture totals, Paldeck progress, and last-seen timestamps for REST-visible players
 - Configurable polling intervals and world-object layers
 - Demo mode with fictional moving players and world objects
 - Browser-based interface with no client mods required
@@ -114,6 +115,18 @@ Every supported environment option and timeout is listed below and documented in
 | `WORLD_DATA_ENABLED`      | Poll bases, Pals, and NPCs                                           | `true`   |
 | `WORLD_POLL_INTERVAL`     | World-object refresh interval; minimum `5s`                          | `15s`    |
 | `WORLD_TIMEOUT`           | World-object timeout; must be below `WORLD_POLL_INTERVAL`            | `10s`    |
+| `SAVE_DATA_ENABLED`       | Enrich REST-visible players from immutable save backups              | `false`  |
+| `PALWORLD_SAVE_ROOT`      | Read-only `SaveGames/0` directory                                    | `/data/palworld/saves` |
+| `PALWORLD_SAVE_WORLD_ID`  | Exact world ID when automatic discovery is ambiguous                 | empty    |
+| `PALWORLD_SAVE_DECODER`   | Absolute `savedecode` path; blank searches beside the app binary     | empty    |
+| `PALWORLD_SAVE_GAME_VERSION` | Exact version of the decoder's `player-details` preset            | `1.0.1.100619` |
+| `SAVE_POLL_INTERVAL`      | Save enrichment interval; minimum `15s`                              | `30s`    |
+| `SAVE_TIMEOUT`            | Whole-generation timeout; must be below `SAVE_POLL_INTERVAL`         | `20s`    |
+
+The current `savedecode` contract projects one player save at a time. It does
+not expose the names, levels, or guild data stored in `Level.sav`, so save-only
+records are not published as anonymous offline players. Save details are joined
+by opaque ID onto players identified by the REST API.
 
 ## License
 

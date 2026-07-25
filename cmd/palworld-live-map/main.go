@@ -55,21 +55,27 @@ func main() {
 		}
 		source = client
 		if cfg.SaveDataEnabled {
-			reader, readerErr := savesidecar.NewReader(savesidecar.Options{BinaryPath: cfg.SaveDecoderPath})
+			reader, readerErr := savesidecar.NewReader(savesidecar.Options{
+				BinaryPath: cfg.SaveDecoderPath, GameVersion: cfg.SaveGameVersion,
+			})
 			if readerErr != nil {
 				logger.Error("save decoder setup failed", "error", readerErr)
 				os.Exit(1)
 			}
 			rosterSource, rosterErr := saveroster.New(saveroster.Options{
 				Root: cfg.SaveRoot, WorldID: cfg.SaveWorldID, Timeout: cfg.SaveTimeout, Reader: reader,
-				ProjectPlayerID: client.PublicPlayerID, ProjectGuildID: client.PublicGuildKey,
+				ProjectPlayerID: client.PublicPlayerID,
 			})
 			if rosterErr != nil {
 				logger.Error("save roster setup failed", "error", rosterErr)
 				os.Exit(1)
 			}
 			roster = rosterSource
-			logger.Info("save-backed player roster enabled", "pollInterval", cfg.SavePollInterval)
+			logger.Info(
+				"save-backed player enrichment enabled",
+				"pollInterval", cfg.SavePollInterval,
+				"gameVersion", cfg.SaveGameVersion,
+			)
 		}
 	}
 	poller := palworld.NewPollerWithRoster(

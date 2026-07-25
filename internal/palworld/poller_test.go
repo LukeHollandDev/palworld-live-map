@@ -235,3 +235,24 @@ func TestMergePlayersIsDeterministicAndDoesNotMergeEmptyIDs(t *testing.T) {
 		t.Fatalf("merged players = %#v", players)
 	}
 }
+
+func TestMergePlayersUsesUnnamedSaveDetailsWithoutPublishingAnonymousPlayers(t *testing.T) {
+	captureTotal, uniqueCaptured, paldeckUnlocked := int64(321), 45, 46
+	saved := Player{
+		ID: "player:one", LastSeenAt: time.Date(2026, time.July, 25, 10, 0, 0, 0, time.UTC),
+		CaptureTotal: &captureTotal, UniquePalsCaptured: &uniqueCaptured, PaldeckUnlocked: &paldeckUnlocked,
+	}
+	if players := mergePlayers([]Player{saved}, nil); len(players) != 0 {
+		t.Fatalf("anonymous saved players were published: %#v", players)
+	}
+	players := mergePlayers(
+		[]Player{saved},
+		[]Player{{ID: "player:one", Name: "Alice", Level: 55, X: 10, Y: 20, Map: "palpagos"}},
+	)
+	if len(players) != 1 || players[0].Name != "Alice" || !players[0].Online ||
+		players[0].CaptureTotal == nil || *players[0].CaptureTotal != captureTotal ||
+		players[0].UniquePalsCaptured == nil || *players[0].UniquePalsCaptured != uniqueCaptured ||
+		players[0].PaldeckUnlocked == nil || *players[0].PaldeckUnlocked != paldeckUnlocked {
+		t.Fatalf("online player was not enriched: %#v", players)
+	}
+}

@@ -11,165 +11,189 @@ import (
 	"time"
 )
 
-func TestDecodeParsesRosterContract(t *testing.T) {
-	data, err := os.ReadFile(filepath.Join("testdata", "roster.json"))
+const testGameVersion = "1.0.1.100619"
+
+func TestDecodePlayerDerivesProgress(t *testing.T) {
+	data, err := os.ReadFile(filepath.Join("testdata", "player-details.json"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	snapshot, err := Decode(data)
+	player, err := DecodePlayer(data)
 	if err != nil {
-		t.Fatalf("Decode() error = %v", err)
+		t.Fatalf("DecodePlayer() error = %v", err)
 	}
-	want := time.Date(2026, 7, 21, 12, 0, 0, 0, time.UTC)
-	if !snapshot.SnapshotAt.Equal(want) {
-		t.Fatalf("SnapshotAt = %v, want %v", snapshot.SnapshotAt, want)
-	}
-	if len(snapshot.Players) != 2 {
-		t.Fatalf("players = %#v", snapshot.Players)
-	}
-	alice := snapshot.Players[0]
-	if alice.PlayerID != "aaaaaaaa-0000-0000-0000-000000000000" || alice.DisplayName != "Alice" || alice.Level != 56 ||
-		alice.GuildName != "Builders" || alice.X == nil || *alice.X != -184343.5 || alice.Y == nil ||
-		alice.LastSeenAt == nil || alice.CaptureTotal == nil || *alice.CaptureTotal != 513 ||
-		alice.UniquePalsCaptured == nil || *alice.UniquePalsCaptured != 140 || alice.PaldeckUnlocked == nil {
-		t.Fatalf("alice = %#v", alice)
-	}
-	bob := snapshot.Players[1]
-	if bob.X != nil || bob.Y != nil || bob.LastSeenAt != nil || bob.CaptureTotal != nil || bob.GuildID != "" {
-		t.Fatalf("bob should carry nil optionals: %#v", bob)
-	}
-	if snapshot.Stats.PlayerFiles != 2 {
-		t.Fatalf("stats = %#v", snapshot.Stats)
+	if player.PlayerID != "aaaaaaaa-0000-0000-0000-000000000000" ||
+		player.X == nil || *player.X != -184343.5 || player.Y == nil || *player.Y != 256561.11 ||
+		player.LastSeenAt == nil || !player.LastSeenAt.Equal(time.Unix(10, 0).UTC()) ||
+		player.CaptureTotal == nil || *player.CaptureTotal != 7 ||
+		player.UniquePalsCaptured == nil || *player.UniquePalsCaptured != 2 ||
+		player.PaldeckUnlocked == nil || *player.PaldeckUnlocked != 1 {
+		t.Fatalf("player = %#v", player)
 	}
 }
 
-func TestDecodeRejectsEmptyAndMalformed(t *testing.T) {
-	if _, err := Decode(nil); err == nil || !strings.Contains(err.Error(), "no output") {
-		t.Fatalf("Decode(nil) error = %v", err)
+func TestDecodePlayerRejectsMalformedAndInvalidatesAmbiguousProgress(t *testing.T) {
+	for _, data := range [][]byte{nil, []byte(`{}`), []byte(`{not-json`), []byte(`{} {}`)} {
+		if _, err := DecodePlayer(data); err == nil {
+			t.Fatalf("DecodePlayer(%q) succeeded", data)
+		}
 	}
-	if _, err := Decode([]byte("   \n")); err == nil || !strings.Contains(err.Error(), "no output") {
-		t.Fatalf("Decode(blank) error = %v", err)
-	}
-	if _, err := Decode([]byte("{not json")); err == nil || !strings.Contains(err.Error(), "decode save roster JSON") {
-		t.Fatalf("Decode(malformed) error = %v", err)
-	}
-}
-
-func TestDecodeNormalisesNilPlayers(t *testing.T) {
-	snapshot, err := Decode([]byte(`{"snapshotAt":"2026-07-21T12:00:00Z"}`))
+	player, err := DecodePlayer([]byte(`{
+		"PlayerUId":"aaaaaaaa-0000-0000-0000-000000000000",
+		"LastTransform":{"Translation":{"X":0,"Y":0,"Z":0}},
+		"RecordData":{
+			"TribeCaptureCount":-1,
+			"PalCaptureCount":[{"Key":"Lamball","Value":1},{"Key":"lamball","Value":2}],
+			"PaldeckUnlockFlag":[{"Key":"","Value":true}]
+		},
+		"LastOnlineDateTime":621355968000000000
+	}`))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if snapshot.Players == nil {
-		t.Fatal("Players should be a non-nil empty slice")
+	if player.CaptureTotal != nil || player.UniquePalsCaptured != nil || player.PaldeckUnlocked != nil {
+		t.Fatalf("invalid progress survived: %#v", player)
 	}
 }
 
-func TestReaderExecsDecoderAndDecodes(t *testing.T) {
-	fixture, err := os.ReadFile(filepath.Join("testdata", "roster.json"))
+func TestReaderUsesVersionedPlayerPresetAndSkipsDPSFiles(t *testing.T) {
+	fixture, err := os.ReadFile(filepath.Join("testdata", "player-details.json"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	// The fake decoder records the directory argument it was handed, then
-	// prints the fixture roster to stdout.
-	argFile := filepath.Join(t.TempDir(), "arg")
-	binary := writeFakeDecoder(t, "#!/bin/sh\nprintf '%s' \"$1\" > "+shellQuote(argFile)+"\ncat "+shellQuote(writeFixture(t, fixture))+"\n")
-
-	reader, err := NewReader(Options{BinaryPath: binary})
-	if err != nil {
-		t.Fatalf("NewReader() error = %v", err)
-	}
-	snapshot, err := reader.ReadSnapshot(context.Background(), "/some/generation/path")
+	argFile := filepath.Join(t.TempDir(), "arguments")
+	binary := writeFakeDecoder(t, `
+printf '%s\n' "$@" > `+shellQuote(argFile)+`
+printf '%s' `+shellQuote(string(fixture))+`
+`)
+	reader := newTestReader(t, binary, 0)
+	generation := makeSnapshot(t, "one.sav", "one_dps.sav")
+	snapshot, err := reader.ReadSnapshot(context.Background(), generation)
 	if err != nil {
 		t.Fatalf("ReadSnapshot() error = %v", err)
 	}
-	if len(snapshot.Players) != 2 || snapshot.Players[0].DisplayName != "Alice" {
+	if snapshot.Stats.PlayerFiles != 1 || snapshot.Stats.DecodeFailures != 0 || len(snapshot.Players) != 1 {
 		t.Fatalf("snapshot = %#v", snapshot)
 	}
-	gotArg, err := os.ReadFile(argFile)
+	arguments, err := os.ReadFile(argFile)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if string(gotArg) != "/some/generation/path" {
-		t.Fatalf("decoder arg = %q", gotArg)
+	got := string(arguments)
+	for _, want := range []string{"--preset", playerPresetName, "--game-version", testGameVersion, filepath.Join(generation, "Players", "one.sav")} {
+		if !strings.Contains(got, want) {
+			t.Fatalf("arguments = %q, want %q", got, want)
+		}
 	}
 }
 
-func TestReaderReportsDecoderFailureWithStderr(t *testing.T) {
-	binary := writeFakeDecoder(t, "#!/bin/sh\necho 'boom: bad save' 1>&2\nexit 3\n")
-	reader, err := NewReader(Options{BinaryPath: binary})
+func TestReaderToleratesOneFailureButRejectsAllFailures(t *testing.T) {
+	fixture, err := os.ReadFile(filepath.Join("testdata", "player-details.json"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = reader.ReadSnapshot(context.Background(), "/dir")
-	if err == nil || !strings.Contains(err.Error(), "boom: bad save") {
-		t.Fatalf("ReadSnapshot() error = %v, want stderr detail", err)
+	binary := writeFakeDecoder(t, `
+case "$5" in
+  *bad.sav) echo "bad player save" >&2; exit 1 ;;
+esac
+printf '%s' `+shellQuote(string(fixture))+`
+`)
+	reader := newTestReader(t, binary, 0)
+	snapshot, err := reader.ReadSnapshot(context.Background(), makeSnapshot(t, "bad.sav", "good.sav"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if snapshot.Stats.PlayerFiles != 2 || snapshot.Stats.DecodeFailures != 1 || len(snapshot.Players) != 1 {
+		t.Fatalf("snapshot = %#v", snapshot)
+	}
+	if _, err := reader.ReadSnapshot(context.Background(), makeSnapshot(t, "bad.sav")); err == nil || !strings.Contains(err.Error(), "failed for all") {
+		t.Fatalf("all-failed error = %v", err)
 	}
 }
 
-func TestReaderHonorsContextTimeout(t *testing.T) {
-	binary := writeFakeDecoder(t, "#!/bin/sh\nsleep 5\n")
-	reader, err := NewReader(Options{BinaryPath: binary})
-	if err != nil {
-		t.Fatal(err)
-	}
+func TestReaderHonorsContextAndOutputBounds(t *testing.T) {
+	slow := writeFakeDecoder(t, "exec sleep 5\n")
+	reader := newTestReader(t, slow, 0)
 	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
 	defer cancel()
-	started := time.Now()
-	if _, err := reader.ReadSnapshot(ctx, "/dir"); !errors.Is(err, context.DeadlineExceeded) {
-		t.Fatalf("ReadSnapshot() error = %v, want deadline exceeded", err)
+	if _, err := reader.ReadSnapshot(ctx, makeSnapshot(t, "one.sav")); !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("timeout error = %v", err)
 	}
-	if elapsed := time.Since(started); elapsed > 2*time.Second {
-		t.Fatalf("ReadSnapshot ignored timeout; elapsed %s", elapsed)
+
+	large := writeFakeDecoder(t, "head -c 4096 /dev/zero | tr '\\0' 'a'\n")
+	reader = newTestReader(t, large, 128)
+	if _, err := reader.ReadSnapshot(context.Background(), makeSnapshot(t, "one.sav")); err == nil || !strings.Contains(err.Error(), "failed for all") {
+		t.Fatalf("bounded output error = %v", err)
 	}
 }
 
-func TestReaderBoundsDecoderOutput(t *testing.T) {
-	// Emit far more than the configured cap.
-	binary := writeFakeDecoder(t, "#!/bin/sh\nhead -c 4096 /dev/zero | tr '\\0' 'a'\n")
-	reader, err := NewReader(Options{BinaryPath: binary, MaxOutputBytes: 128})
+func TestNewReaderValidatesBinaryVersionAndPreset(t *testing.T) {
+	if _, err := NewReader(Options{BinaryPath: "relative", GameVersion: testGameVersion}); err == nil || !strings.Contains(err.Error(), "absolute") {
+		t.Fatalf("relative path error = %v", err)
+	}
+	if _, err := NewReader(Options{BinaryPath: filepath.Join(t.TempDir(), "missing"), GameVersion: testGameVersion}); err == nil || !strings.Contains(err.Error(), "locate") {
+		t.Fatalf("missing binary error = %v", err)
+	}
+	binary := writeFakeDecoderWithPresets(t, `[]`, "")
+	if _, err := NewReader(Options{BinaryPath: binary, GameVersion: testGameVersion}); err == nil || !strings.Contains(err.Error(), "no player-details preset") {
+		t.Fatalf("missing preset error = %v", err)
+	}
+	binary = writeFakeDecoder(t, "")
+	if _, err := NewReader(Options{BinaryPath: binary}); err == nil || !strings.Contains(err.Error(), "game version") {
+		t.Fatalf("missing version error = %v", err)
+	}
+}
+
+func newTestReader(t *testing.T, binary string, maxOutput int64) *Reader {
+	t.Helper()
+	reader, err := NewReader(Options{BinaryPath: binary, GameVersion: testGameVersion, MaxOutputBytes: maxOutput})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := reader.ReadSnapshot(context.Background(), "/dir"); err == nil || !strings.Contains(err.Error(), "exceeds") {
-		t.Fatalf("ReadSnapshot() error = %v, want output-cap error", err)
-	}
+	return reader
 }
 
-func TestNewReaderValidatesBinary(t *testing.T) {
-	if _, err := NewReader(Options{BinaryPath: "relative/path"}); err == nil || !strings.Contains(err.Error(), "absolute") {
-		t.Fatalf("relative path error = %v", err)
+func makeSnapshot(t *testing.T, players ...string) string {
+	t.Helper()
+	path := t.TempDir()
+	if err := os.WriteFile(filepath.Join(path, "Level.sav"), []byte("level"), 0o600); err != nil {
+		t.Fatal(err)
 	}
-	if _, err := NewReader(Options{BinaryPath: filepath.Join(t.TempDir(), "missing")}); err == nil || !strings.Contains(err.Error(), "locate save decoder") {
-		t.Fatalf("missing binary error = %v", err)
+	if err := os.Mkdir(filepath.Join(path, "Players"), 0o700); err != nil {
+		t.Fatal(err)
 	}
-	dir := t.TempDir()
-	if _, err := NewReader(Options{BinaryPath: dir}); err == nil || !strings.Contains(err.Error(), "regular file") {
-		t.Fatalf("directory-as-binary error = %v", err)
+	for _, name := range players {
+		if err := os.WriteFile(filepath.Join(path, "Players", name), []byte("player"), 0o600); err != nil {
+			t.Fatal(err)
+		}
 	}
+	return path
 }
 
-func writeFakeDecoder(t *testing.T, script string) string {
+func writeFakeDecoder(t *testing.T, body string) string {
+	t.Helper()
+	presets := `[{"name":"player-details","gameVersion":"` + testGameVersion + `","saveType":"player.sav"}]`
+	return writeFakeDecoderWithPresets(t, presets, body)
+}
+
+func writeFakeDecoderWithPresets(t *testing.T, presets, body string) string {
 	t.Helper()
 	if runtime.GOOS == "windows" {
-		t.Skip("shell-script decoder stand-in is not portable to windows")
+		t.Skip("shell-script decoder stand-in is not portable to Windows")
 	}
 	path := filepath.Join(t.TempDir(), "savedecode")
+	script := `#!/bin/sh
+if [ "$1" = "--list-presets" ]; then
+  printf '%s' ` + shellQuote(presets) + `
+  exit 0
+fi
+` + body
 	if err := os.WriteFile(path, []byte(script), 0o755); err != nil {
 		t.Fatal(err)
 	}
 	return path
 }
 
-func writeFixture(t *testing.T, data []byte) string {
-	t.Helper()
-	path := filepath.Join(t.TempDir(), "fixture.json")
-	if err := os.WriteFile(path, data, 0o600); err != nil {
-		t.Fatal(err)
-	}
-	return path
-}
-
-func shellQuote(path string) string {
-	return "'" + strings.ReplaceAll(path, "'", `'\''`) + "'"
+func shellQuote(value string) string {
+	return "'" + strings.ReplaceAll(value, "'", `'\''`) + "'"
 }

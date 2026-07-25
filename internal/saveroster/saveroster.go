@@ -28,8 +28,6 @@ const (
 	maxWorldEntries      = 128
 	maxGenerationEntries = 512
 	maxPublicIDBytes     = 256
-	maxNameBytes         = 96
-	maxPlayerLevel       = 999
 )
 
 // SnapshotReader is the narrow part of the save decoder used by the adapter.
@@ -42,7 +40,7 @@ type SnapshotReader interface {
 
 // IDProjector turns a private persistent save GUID into an opaque public key.
 // Implementations must not return the input GUID or otherwise encode it in the
-// result. palworld.Client.PublicPlayerID and PublicGuildKey satisfy this API.
+// result. palworld.Client.PublicPlayerID satisfies this API.
 type IDProjector func(string) (string, bool)
 
 type Options struct {
@@ -62,7 +60,6 @@ type Options struct {
 	Reader  SnapshotReader
 
 	ProjectPlayerID IDProjector
-	ProjectGuildID  IDProjector
 }
 
 // Source implements palworld.RosterSource.
@@ -72,7 +69,6 @@ type Source struct {
 	timeout         time.Duration
 	reader          SnapshotReader
 	projectPlayerID IDProjector
-	projectGuildID  IDProjector
 }
 
 var (
@@ -102,12 +98,12 @@ func New(options Options) (*Source, error) {
 	if options.Reader == nil {
 		return nil, errors.New("save roster requires a snapshot reader")
 	}
-	if options.ProjectPlayerID == nil || options.ProjectGuildID == nil {
-		return nil, errors.New("save roster requires player and guild ID projectors")
+	if options.ProjectPlayerID == nil {
+		return nil, errors.New("save roster requires a player ID projector")
 	}
 	return &Source{
 		root: root, worldID: worldID, timeout: options.Timeout, reader: options.Reader,
-		projectPlayerID: options.ProjectPlayerID, projectGuildID: options.ProjectGuildID,
+		projectPlayerID: options.ProjectPlayerID,
 	}, nil
 }
 
@@ -413,20 +409,11 @@ func (s *Source) projectPlayers(ctx context.Context, players []savesidecar.Playe
 		if ctx.Err() != nil {
 			break
 		}
-		name := cleanName(raw.DisplayName)
 		id, ok := projectID(s.projectPlayerID, raw.PlayerID)
-		if !ok || name == "" {
+		if !ok {
 			continue
 		}
-		player := palworld.Player{
-			ID: id, Name: name, Level: sanitizeLevel(raw.Level), Online: false,
-		}
-		if raw.GuildID != "" {
-			if guildID, ok := projectID(s.projectGuildID, raw.GuildID); ok {
-				player.GuildKey = guildID
-				player.GuildName = cleanName(raw.GuildName)
-			}
-		}
+		player := palworld.Player{ID: id, Online: false}
 		if raw.X != nil && raw.Y != nil && finite(*raw.X) && finite(*raw.Y) {
 			if mapID, ok := mapdata.LayerID(*raw.X, *raw.Y); ok {
 				player.X, player.Y, player.Map = *raw.X, *raw.Y, mapID
@@ -493,38 +480,9 @@ func projectID(project IDProjector, raw string) (string, bool) {
 	return value, true
 }
 
-func cleanName(value string) string {
-	value = strings.TrimSpace(strings.Map(func(character rune) rune {
-		// Format controls include bidi overrides/isolates. Line and paragraph
-		// separators can likewise spoof otherwise single-line labels and logs.
-		if unicode.IsControl(character) || unicode.In(character, unicode.Cf, unicode.Zl, unicode.Zp) {
-			return -1
-		}
-		return character
-	}, value))
-	if len(value) <= maxNameBytes {
-		return value
-	}
-	value = value[:maxNameBytes]
-	for !utf8.ValidString(value) {
-		value = value[:len(value)-1]
-	}
-	return strings.TrimSpace(value)
-}
-
 func canonicalPrivateGUID(value string) (string, bool) {
 	value = strings.ReplaceAll(strings.ToLower(strings.TrimSpace(value)), "-", "")
 	return canonicalWorldID(value)
-}
-
-func sanitizeLevel(level int32) int {
-	if level < 0 {
-		return 0
-	}
-	if level > maxPlayerLevel {
-		return maxPlayerLevel
-	}
-	return int(level)
 }
 
 func finite(value float64) bool {

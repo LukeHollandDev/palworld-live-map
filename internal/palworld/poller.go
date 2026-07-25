@@ -358,8 +358,21 @@ func clonePlayers(players []Player) []Player {
 func mergePlayers(saved, online []Player) []Player {
 	result := make([]Player, 0, len(saved)+len(online))
 	byID := make(map[string]int, len(saved))
+	persistedByID := make(map[string]Player, len(saved))
 	for _, player := range saved {
 		player.Online = false
+		if player.ID != "" {
+			if _, duplicate := persistedByID[player.ID]; duplicate {
+				continue
+			}
+			persistedByID[player.ID] = player
+		}
+		// The refactored save reader's player-details preset intentionally has
+		// no display name, level, or guild metadata. Keep those records available
+		// for ID-based enrichment, but never publish anonymous offline markers.
+		if player.Name == "" {
+			continue
+		}
 		if player.ID != "" {
 			if _, duplicate := byID[player.ID]; duplicate {
 				continue
@@ -371,30 +384,15 @@ func mergePlayers(saved, online []Player) []Player {
 	for _, player := range online {
 		player.Online = true
 		index, found := byID[player.ID]
+		persisted, hasPersisted := persistedByID[player.ID]
 		if !found || player.ID == "" {
+			if hasPersisted {
+				player = mergePersistedPlayer(player, persisted)
+			}
 			result = append(result, player)
 			continue
 		}
-		persisted := result[index]
-		if player.GuildKey == "" {
-			player.GuildKey = persisted.GuildKey
-		}
-		if player.GuildName == "" {
-			player.GuildName = persisted.GuildName
-		}
-		if player.LastSeenAt.IsZero() {
-			player.LastSeenAt = persisted.LastSeenAt
-		}
-		if player.CaptureTotal == nil {
-			player.CaptureTotal = persisted.CaptureTotal
-		}
-		if player.UniquePalsCaptured == nil {
-			player.UniquePalsCaptured = persisted.UniquePalsCaptured
-		}
-		if player.PaldeckUnlocked == nil {
-			player.PaldeckUnlocked = persisted.PaldeckUnlocked
-		}
-		result[index] = player
+		result[index] = mergePersistedPlayer(player, persisted)
 	}
 	sort.SliceStable(result, func(i, j int) bool {
 		left, right := strings.ToLower(result[i].Name), strings.ToLower(result[j].Name)
@@ -404,6 +402,28 @@ func mergePlayers(saved, online []Player) []Player {
 		return result[i].ID < result[j].ID
 	})
 	return result
+}
+
+func mergePersistedPlayer(player, persisted Player) Player {
+	if player.GuildKey == "" {
+		player.GuildKey = persisted.GuildKey
+	}
+	if player.GuildName == "" {
+		player.GuildName = persisted.GuildName
+	}
+	if player.LastSeenAt.IsZero() {
+		player.LastSeenAt = persisted.LastSeenAt
+	}
+	if player.CaptureTotal == nil {
+		player.CaptureTotal = persisted.CaptureTotal
+	}
+	if player.UniquePalsCaptured == nil {
+		player.UniquePalsCaptured = persisted.UniquePalsCaptured
+	}
+	if player.PaldeckUnlocked == nil {
+		player.PaldeckUnlocked = persisted.PaldeckUnlocked
+	}
+	return player
 }
 
 func cloneWorldObjects(objects []WorldObject) []WorldObject {

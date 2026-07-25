@@ -30,8 +30,9 @@ func TestLoadDefaults(t *testing.T) {
 	if cfg.WorldPollInterval != 15*time.Second || cfg.WorldTimeout != 10*time.Second || !cfg.WorldDataEnabled {
 		t.Fatalf("unexpected world defaults: interval=%s timeout=%s enabled=%v", cfg.WorldPollInterval, cfg.WorldTimeout, cfg.WorldDataEnabled)
 	}
-	if cfg.SaveDataEnabled || cfg.SaveRoot != "/data/palworld/saves" || cfg.SavePollInterval != 30*time.Second || cfg.SaveTimeout != 20*time.Second {
-		t.Fatalf("unexpected save defaults: enabled=%v root=%q interval=%s timeout=%s", cfg.SaveDataEnabled, cfg.SaveRoot, cfg.SavePollInterval, cfg.SaveTimeout)
+	if cfg.SaveDataEnabled || cfg.SaveRoot != "/data/palworld/saves" || cfg.SaveGameVersion != "1.0.1.100619" ||
+		cfg.SavePollInterval != 30*time.Second || cfg.SaveTimeout != 20*time.Second {
+		t.Fatalf("unexpected save defaults: enabled=%v root=%q version=%q interval=%s timeout=%s", cfg.SaveDataEnabled, cfg.SaveRoot, cfg.SaveGameVersion, cfg.SavePollInterval, cfg.SaveTimeout)
 	}
 }
 
@@ -101,6 +102,7 @@ func TestLoadValidatesEnabledSaveReader(t *testing.T) {
 	}{
 		{name: "relative root", key: "PALWORLD_SAVE_ROOT", value: "saves", want: "absolute"},
 		{name: "relative decoder", key: "PALWORLD_SAVE_DECODER", value: "savedecode", want: "PALWORLD_SAVE_DECODER"},
+		{name: "spaced game version", key: "PALWORLD_SAVE_GAME_VERSION", value: "1.0 latest", want: "must not contain whitespace"},
 		{name: "poll too short", key: "SAVE_POLL_INTERVAL", value: "10s", want: "at least 15s"},
 		{name: "timeout", key: "SAVE_TIMEOUT", value: "30s", want: "shorter"},
 	}

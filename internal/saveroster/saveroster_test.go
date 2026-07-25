@@ -37,7 +37,7 @@ func (f *fakeSnapshotReader) ReadSnapshot(ctx context.Context, path string) (*sa
 func TestNewValidatesConfiguration(t *testing.T) {
 	valid := Options{
 		Root: t.TempDir(), Reader: &fakeSnapshotReader{},
-		ProjectPlayerID: testPlayerProjector, ProjectGuildID: testGuildProjector,
+		ProjectPlayerID: testPlayerProjector,
 	}
 	tests := []struct {
 		name   string
@@ -51,8 +51,7 @@ func TestNewValidatesConfiguration(t *testing.T) {
 		{name: "spaced world ID", mutate: func(o *Options) { o.WorldID = " " + testWorldOne }, want: "32 hexadecimal"},
 		{name: "non-hex world ID", mutate: func(o *Options) { o.WorldID = strings.Repeat("z", 32) }, want: "32 hexadecimal"},
 		{name: "missing reader", mutate: func(o *Options) { o.Reader = nil }, want: "snapshot reader"},
-		{name: "missing player projector", mutate: func(o *Options) { o.ProjectPlayerID = nil }, want: "projectors"},
-		{name: "missing guild projector", mutate: func(o *Options) { o.ProjectGuildID = nil }, want: "projectors"},
+		{name: "missing player projector", mutate: func(o *Options) { o.ProjectPlayerID = nil }, want: "projector"},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -100,7 +99,7 @@ func TestRosterUsesSecondNewestCompleteGeneration(t *testing.T) {
 
 	snapshotAt := time.Date(2026, 7, 21, 11, 0, 3, 0, time.FixedZone("local", 3600))
 	reader := &fakeSnapshotReader{snapshot: &savesidecar.Snapshot{SnapshotAt: snapshotAt}}
-	source := newTestSource(t, root, "", 0, reader, testPlayerProjector, testGuildProjector)
+	source := newTestSource(t, root, "", 0, reader, testPlayerProjector)
 	roster, err := source.Roster(context.Background())
 	if err != nil {
 		t.Fatal(err)
@@ -117,7 +116,7 @@ func TestRosterUsesOnlyCompleteGenerationAndGenerationTimeFallback(t *testing.T)
 	root := t.TempDir()
 	want := makeGeneration(t, root, testWorldOne, "2026.07.21-09.08.07")
 	reader := &fakeSnapshotReader{snapshot: &savesidecar.Snapshot{}}
-	source := newTestSource(t, root, "", 0, reader, testPlayerProjector, testGuildProjector)
+	source := newTestSource(t, root, "", 0, reader, testPlayerProjector)
 	roster, err := source.Roster(context.Background())
 	if err != nil {
 		t.Fatal(err)
@@ -137,7 +136,7 @@ func TestWorldSelectionIsStrictAndUnambiguous(t *testing.T) {
 	second := makeGeneration(t, root, strings.ToUpper(testWorldTwo), "2026.07.21-10.00.00")
 	reader := &fakeSnapshotReader{snapshot: &savesidecar.Snapshot{}}
 
-	automatic := newTestSource(t, root, "", 0, reader, testPlayerProjector, testGuildProjector)
+	automatic := newTestSource(t, root, "", 0, reader, testPlayerProjector)
 	if _, err := automatic.Roster(context.Background()); err == nil || !strings.Contains(err.Error(), "ambiguous") {
 		t.Fatalf("automatic Roster() error = %v, want ambiguity", err)
 	}
@@ -145,7 +144,7 @@ func TestWorldSelectionIsStrictAndUnambiguous(t *testing.T) {
 		t.Fatalf("decoder was called during ambiguous selection: %q", reader.paths)
 	}
 
-	explicit := newTestSource(t, root, testWorldTwo, 0, reader, testPlayerProjector, testGuildProjector)
+	explicit := newTestSource(t, root, testWorldTwo, 0, reader, testPlayerProjector)
 	if _, err := explicit.Roster(context.Background()); err != nil {
 		t.Fatalf("explicit Roster() = %v", err)
 	}
@@ -153,7 +152,7 @@ func TestWorldSelectionIsStrictAndUnambiguous(t *testing.T) {
 		t.Fatalf("decoded path = %q, want %q (other was %q)", reader.paths, second, first)
 	}
 
-	missing := newTestSource(t, root, strings.Repeat("3", 32), 0, reader, testPlayerProjector, testGuildProjector)
+	missing := newTestSource(t, root, strings.Repeat("3", 32), 0, reader, testPlayerProjector)
 	if _, err := missing.Roster(context.Background()); err == nil || !strings.Contains(err.Error(), "not found") {
 		t.Fatalf("missing explicit Roster() error = %v", err)
 	}
@@ -176,7 +175,7 @@ func TestAutomaticSelectionIgnoresInvalidWorldsAndSymlinks(t *testing.T) {
 	}
 
 	reader := &fakeSnapshotReader{snapshot: &savesidecar.Snapshot{}}
-	source := newTestSource(t, root, "", 0, reader, testPlayerProjector, testGuildProjector)
+	source := newTestSource(t, root, "", 0, reader, testPlayerProjector)
 	if _, err := source.Roster(context.Background()); err != nil {
 		t.Fatal(err)
 	}
@@ -282,18 +281,16 @@ func TestRosterProjectsAndSanitizesPlayers(t *testing.T) {
 	snapshotAt := time.Date(2026, 7, 21, 12, 0, 0, 0, time.FixedZone("server", 3600))
 	rawPlayerOne := strings.Repeat("a", 32)
 	rawPlayerTwo := strings.Repeat("b", 32)
-	rawGuild := strings.Repeat("c", 32)
 	rawCollisionOne := strings.Repeat("d", 32)
 	rawCollisionTwo := strings.Repeat("e", 32)
 	reader := &fakeSnapshotReader{snapshot: &savesidecar.Snapshot{
 		SnapshotAt: snapshotAt,
 		Players: []savesidecar.Player{
-			{PlayerID: rawPlayerOne, DisplayName: " \x00 Alice\u202e\u2066\nAdmin\u2028\u2029\t ", Level: -4, GuildID: rawGuild, GuildName: " Builders\r\n ", X: &x, Y: &y, LastSeenAt: &lastSeen, CaptureTotal: &captureTotal, UniquePalsCaptured: &uniqueCaptured, PaldeckUnlocked: &paldeckUnlocked},
-			{PlayerID: rawPlayerTwo, DisplayName: strings.Repeat("é", 60), Level: 5000, GuildID: strings.Repeat("f", 32), GuildName: "Must not survive", X: &notFinite, Y: &validY},
-			{PlayerID: strings.Repeat("1", 32), DisplayName: "\x00\n\t", Level: 50},
-			{PlayerID: strings.Repeat("2", 32), DisplayName: "Rejected ID", Level: 50},
-			{PlayerID: rawCollisionOne, DisplayName: "Collision one", Level: 50},
-			{PlayerID: rawCollisionTwo, DisplayName: "Collision two", Level: 50},
+			{PlayerID: rawPlayerOne, X: &x, Y: &y, LastSeenAt: &lastSeen, CaptureTotal: &captureTotal, UniquePalsCaptured: &uniqueCaptured, PaldeckUnlocked: &paldeckUnlocked},
+			{PlayerID: rawPlayerTwo, X: &notFinite, Y: &validY},
+			{PlayerID: strings.Repeat("2", 32)},
+			{PlayerID: rawCollisionOne},
+			{PlayerID: rawCollisionTwo},
 		},
 	}}
 	playerProjector := func(raw string) (string, bool) {
@@ -302,8 +299,6 @@ func TestRosterProjectsAndSanitizesPlayers(t *testing.T) {
 			return "player:one", true
 		case rawPlayerTwo:
 			return "player:two", true
-		case strings.Repeat("1", 32):
-			return "player:blank-name", true
 		case strings.Repeat("2", 32):
 			return "", false
 		case rawCollisionOne, rawCollisionTwo:
@@ -312,13 +307,7 @@ func TestRosterProjectsAndSanitizesPlayers(t *testing.T) {
 			return "", false
 		}
 	}
-	guildProjector := func(raw string) (string, bool) {
-		if raw == rawGuild {
-			return "guild:one", true
-		}
-		return "", false
-	}
-	source := newTestSource(t, root, "", 0, reader, playerProjector, guildProjector)
+	source := newTestSource(t, root, "", 0, reader, playerProjector)
 	roster, err := source.Roster(context.Background())
 	if err != nil {
 		t.Fatal(err)
@@ -327,14 +316,14 @@ func TestRosterProjectsAndSanitizesPlayers(t *testing.T) {
 		t.Fatalf("players = %#v, want two valid non-colliding records", roster.Players)
 	}
 	first, second := roster.Players[0], roster.Players[1]
-	if first.ID != "player:one" || first.Name != "AliceAdmin" || first.Level != 0 || first.Online ||
-		first.GuildKey != "guild:one" || first.GuildName != "Builders" ||
+	if first.ID != "player:one" || first.Name != "" || first.Level != 0 || first.Online ||
+		first.GuildKey != "" || first.GuildName != "" ||
 		first.X != x || first.Y != y || first.Map != "palpagos" || !first.LastSeenAt.Equal(lastSeen) || first.LastSeenAt.Location() != time.UTC ||
 		first.CaptureTotal == nil || *first.CaptureTotal != captureTotal || first.UniquePalsCaptured == nil || *first.UniquePalsCaptured != uniqueCaptured ||
 		first.PaldeckUnlocked == nil || *first.PaldeckUnlocked != paldeckUnlocked {
 		t.Fatalf("first projected player = %#v", first)
 	}
-	if second.ID != "player:two" || second.Level != maxPlayerLevel || len(second.Name) > maxNameBytes || !strings.HasSuffix(second.Name, "é") ||
+	if second.ID != "player:two" || second.Name != "" || second.Level != 0 ||
 		second.GuildKey != "" || second.GuildName != "" || second.Map != "" || second.X != 0 || second.Y != 0 {
 		t.Fatalf("second projected player = %#v", second)
 	}
@@ -345,7 +334,7 @@ func TestRosterProjectsAndSanitizesPlayers(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, private := range []string{rawPlayerOne, rawPlayerTwo, rawGuild, rawCollisionOne, rawCollisionTwo, "Must not survive"} {
+	for _, private := range []string{rawPlayerOne, rawPlayerTwo, rawCollisionOne, rawCollisionTwo} {
 		if strings.Contains(string(encoded), private) {
 			t.Fatalf("public players leaked private save value %q: %s", private, encoded)
 		}
@@ -438,7 +427,7 @@ func TestRosterTimeoutCoversDecoder(t *testing.T) {
 		<-ctx.Done()
 		return nil, ctx.Err()
 	}}
-	source := newTestSource(t, root, "", 10*time.Millisecond, reader, testPlayerProjector, testGuildProjector)
+	source := newTestSource(t, root, "", 10*time.Millisecond, reader, testPlayerProjector)
 	started := time.Now()
 	_, err := source.Roster(context.Background())
 	if !errors.Is(err, context.DeadlineExceeded) {
@@ -453,7 +442,7 @@ func TestRosterRejectsNilSnapshotAndNilContext(t *testing.T) {
 	root := t.TempDir()
 	makeGeneration(t, root, testWorldOne, "generation")
 	reader := &fakeSnapshotReader{}
-	source := newTestSource(t, root, "", 0, reader, testPlayerProjector, testGuildProjector)
+	source := newTestSource(t, root, "", 0, reader, testPlayerProjector)
 	if _, err := source.Roster(context.Background()); err == nil || !strings.Contains(err.Error(), "no snapshot") {
 		t.Fatalf("nil snapshot error = %v", err)
 	}
@@ -462,11 +451,11 @@ func TestRosterRejectsNilSnapshotAndNilContext(t *testing.T) {
 	}
 }
 
-func newTestSource(t *testing.T, root, worldID string, timeout time.Duration, reader SnapshotReader, player, guild IDProjector) *Source {
+func newTestSource(t *testing.T, root, worldID string, timeout time.Duration, reader SnapshotReader, player IDProjector) *Source {
 	t.Helper()
 	source, err := New(Options{
 		Root: root, WorldID: worldID, Timeout: timeout, Reader: reader,
-		ProjectPlayerID: player, ProjectGuildID: guild,
+		ProjectPlayerID: player,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -517,11 +506,4 @@ func testPlayerProjector(raw string) (string, bool) {
 		return "", false
 	}
 	return "player:test", true
-}
-
-func testGuildProjector(raw string) (string, bool) {
-	if _, ok := canonicalWorldID(raw); !ok {
-		return "", false
-	}
-	return "guild:test", true
 }

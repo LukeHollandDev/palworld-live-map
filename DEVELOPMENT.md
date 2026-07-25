@@ -17,6 +17,11 @@ Credentials, network details, and upstream identifiers are excluded from public 
 
 Player and metric data use `POLL_INTERVAL`; world objects use `WORLD_POLL_INTERVAL`; server metadata refreshes once per minute. Results are cached independently so an upstream failure does not discard the last successful snapshot.
 
+Optional save enrichment invokes the separately licensed `savedecode` binary
+with its exact versioned `player-details` preset for each player file in the
+selected immutable backup generation. The app performs bounded aggregation and
+joins those details to REST-visible players without importing decoder packages.
+
 Field Alpha and tower-boss locations are versioned data under [`assets/palworld`](assets/palworld). The frontend lives in [`web`](web) and uses React, TypeScript, Vite, Tailwind CSS, Biome, and Vitest.
 
 `DEMO_MODE=true` uses deterministic fictional data without contacting a Palworld server. It is useful for development, screenshots, and smoke tests.
@@ -32,6 +37,17 @@ make run
 ```
 
 Open <http://localhost:8080>.
+
+To exercise save enrichment from a sibling `palworld-save-reader` checkout,
+build its unchanged source into this repository's ignored local workspace:
+
+```bash
+(cd ../palworld-save-reader && go build -o ../palworld-live-map/.local/bin/savedecode ./cmd/savedecode)
+```
+
+Then set `SAVE_DATA_ENABLED=true`, `PALWORLD_SAVE_ROOT`,
+`PALWORLD_SAVE_DECODER` (to the absolute `.local/bin/savedecode` path), and the
+matching `PALWORLD_SAVE_GAME_VERSION` in `.env`.
 
 To run without a Palworld server:
 

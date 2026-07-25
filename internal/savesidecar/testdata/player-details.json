@@ -1,0 +1,42 @@
+{
+  "PlayerUId": "aaaaaaaa-0000-0000-0000-000000000000",
+  "LastTransform": {
+    "Translation": {
+      "X": -184343.5,
+      "Y": 256561.11,
+      "Z": 123
+    }
+  },
+  "RecordData": {
+    "TribeCaptureCount": 2,
+    "PalCaptureCount": [
+      {
+        "Key": "Lamball",
+        "Value": 3
+      },
+      {
+        "Key": "Cattiva",
+        "Value": 4
+      },
+      {
+        "Key": "Human",
+        "Value": 100
+      }
+    ],
+    "PaldeckUnlockFlag": [
+      {
+        "Key": "Lamball",
+        "Value": true
+      },
+      {
+        "Key": "Cattiva",
+        "Value": false
+      },
+      {
+        "Key": "Human",
+        "Value": true
+      }
+    ]
+  },
+  "LastOnlineDateTime": 621355968100000000
+}
