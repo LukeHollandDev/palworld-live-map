@@ -24,7 +24,6 @@ type Config struct {
 	SaveRoot          string
 	SaveWorldID       string
 	SaveDecoderPath   string
-	SaveGameVersion   string
 	SavePollInterval  time.Duration
 	SaveTimeout       time.Duration
 }
@@ -81,7 +80,6 @@ func Load() (Config, error) {
 		SaveRoot:          envOr("PALWORLD_SAVE_ROOT", "/data/palworld/saves"),
 		SaveWorldID:       strings.TrimSpace(os.Getenv("PALWORLD_SAVE_WORLD_ID")),
 		SaveDecoderPath:   strings.TrimSpace(os.Getenv("PALWORLD_SAVE_DECODER")),
-		SaveGameVersion:   envOr("PALWORLD_SAVE_GAME_VERSION", "1.0.1.100619"),
 		SavePollInterval:  savePollInterval,
 		SaveTimeout:       saveTimeout,
 	}
@@ -121,9 +119,6 @@ func Load() (Config, error) {
 		}
 		if cfg.SaveDecoderPath != "" && !filepath.IsAbs(cfg.SaveDecoderPath) {
 			return Config{}, errors.New("PALWORLD_SAVE_DECODER must be an absolute path when set")
-		}
-		if strings.ContainsAny(cfg.SaveGameVersion, " \t\r\n") {
-			return Config{}, errors.New("PALWORLD_SAVE_GAME_VERSION must not contain whitespace")
 		}
 		if cfg.SavePollInterval < 15*time.Second {
 			return Config{}, errors.New("SAVE_POLL_INTERVAL must be at least 15s")

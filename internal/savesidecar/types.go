@@ -1,5 +1,5 @@
 // Package savesidecar adapts the projected JSON emitted by the external
-// palworld-save-reader "savedecode" binary. The GPL decoder remains a separate
+// palworld-save-reader "palsave" binary. The GPL decoder remains a separate
 // process; this package owns the application-specific aggregation and derived
 // progress calculations.
 package savesidecar

@@ -56,7 +56,7 @@ func TestDecodePlayerRejectsMalformedAndInvalidatesAmbiguousProgress(t *testing.
 	}
 }
 
-func TestReaderUsesVersionedPlayerPresetAndSkipsDPSFiles(t *testing.T) {
+func TestReaderUsesPlayerPresetAndSkipsDPSFiles(t *testing.T) {
 	fixture, err := os.ReadFile(filepath.Join("testdata", "player-details.json"))
 	if err != nil {
 		t.Fatal(err)
@@ -80,10 +80,13 @@ printf '%s' `+shellQuote(string(fixture))+`
 		t.Fatal(err)
 	}
 	got := string(arguments)
-	for _, want := range []string{"--preset", playerPresetName, "--game-version", testGameVersion, filepath.Join(generation, "Players", "one.sav")} {
+	for _, want := range []string{"--preset", playerPresetName, filepath.Join(generation, "Players", "one.sav")} {
 		if !strings.Contains(got, want) {
 			t.Fatalf("arguments = %q, want %q", got, want)
 		}
+	}
+	if strings.Contains(got, "--game-version") {
+		t.Fatalf("arguments = %q, obsolete --game-version must not be passed", got)
 	}
 }
 
@@ -93,7 +96,7 @@ func TestReaderToleratesOneFailureButRejectsAllFailures(t *testing.T) {
 		t.Fatal(err)
 	}
 	binary := writeFakeDecoder(t, `
-case "$5" in
+case "$3" in
   *bad.sav) echo "bad player save" >&2; exit 1 ;;
 esac
 printf '%s' `+shellQuote(string(fixture))+`
@@ -127,26 +130,26 @@ func TestReaderHonorsContextAndOutputBounds(t *testing.T) {
 	}
 }
 
-func TestNewReaderValidatesBinaryVersionAndPreset(t *testing.T) {
-	if _, err := NewReader(Options{BinaryPath: "relative", GameVersion: testGameVersion}); err == nil || !strings.Contains(err.Error(), "absolute") {
+func TestNewReaderValidatesBinaryAndPreset(t *testing.T) {
+	if _, err := NewReader(Options{BinaryPath: "relative"}); err == nil || !strings.Contains(err.Error(), "absolute") {
 		t.Fatalf("relative path error = %v", err)
 	}
-	if _, err := NewReader(Options{BinaryPath: filepath.Join(t.TempDir(), "missing"), GameVersion: testGameVersion}); err == nil || !strings.Contains(err.Error(), "locate") {
+	if _, err := NewReader(Options{BinaryPath: filepath.Join(t.TempDir(), "missing")}); err == nil || !strings.Contains(err.Error(), "locate") {
 		t.Fatalf("missing binary error = %v", err)
 	}
 	binary := writeFakeDecoderWithPresets(t, `[]`, "")
-	if _, err := NewReader(Options{BinaryPath: binary, GameVersion: testGameVersion}); err == nil || !strings.Contains(err.Error(), "no player-details preset") {
+	if _, err := NewReader(Options{BinaryPath: binary}); err == nil || !strings.Contains(err.Error(), "no valid player-details preset") {
 		t.Fatalf("missing preset error = %v", err)
 	}
-	binary = writeFakeDecoder(t, "")
-	if _, err := NewReader(Options{BinaryPath: binary}); err == nil || !strings.Contains(err.Error(), "game version") {
-		t.Fatalf("missing version error = %v", err)
+	binary = writeFakeDecoderWithPresets(t, `[{"name":"player-details","gameVersion":"","saveType":"player.sav"}]`, "")
+	if _, err := NewReader(Options{BinaryPath: binary}); err == nil || !strings.Contains(err.Error(), "no valid player-details preset") {
+		t.Fatalf("missing preset provenance error = %v", err)
 	}
 }
 
 func newTestReader(t *testing.T, binary string, maxOutput int64) *Reader {
 	t.Helper()
-	reader, err := NewReader(Options{BinaryPath: binary, GameVersion: testGameVersion, MaxOutputBytes: maxOutput})
+	reader, err := NewReader(Options{BinaryPath: binary, MaxOutputBytes: maxOutput})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -181,7 +184,7 @@ func writeFakeDecoderWithPresets(t *testing.T, presets, body string) string {
 	if runtime.GOOS == "windows" {
 		t.Skip("shell-script decoder stand-in is not portable to Windows")
 	}
-	path := filepath.Join(t.TempDir(), "savedecode")
+	path := filepath.Join(t.TempDir(), "palsave")
 	script := `#!/bin/sh
 if [ "$1" = "--list-presets" ]; then
   printf '%s' ` + shellQuote(presets) + `

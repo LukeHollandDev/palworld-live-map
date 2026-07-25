@@ -118,12 +118,11 @@ Every supported environment option and timeout is listed below and documented in
 | `SAVE_DATA_ENABLED`       | Enrich REST-visible players from immutable save backups              | `false`  |
 | `PALWORLD_SAVE_ROOT`      | Read-only `SaveGames/0` directory                                    | `/data/palworld/saves` |
 | `PALWORLD_SAVE_WORLD_ID`  | Exact world ID when automatic discovery is ambiguous                 | empty    |
-| `PALWORLD_SAVE_DECODER`   | Absolute `savedecode` path; blank searches beside the app binary     | empty    |
-| `PALWORLD_SAVE_GAME_VERSION` | Exact version of the decoder's `player-details` preset            | `1.0.1.100619` |
+| `PALWORLD_SAVE_DECODER`   | Absolute `palsave` path; blank searches beside the app binary        | empty    |
 | `SAVE_POLL_INTERVAL`      | Save enrichment interval; minimum `15s`                              | `30s`    |
 | `SAVE_TIMEOUT`            | Whole-generation timeout; must be below `SAVE_POLL_INTERVAL`         | `20s`    |
 
-The current `savedecode` contract projects one player save at a time. It does
+The current `palsave` contract projects one player save at a time. It does
 not expose the names, levels, or guild data stored in `Level.sav`, so save-only
 records are not published as anonymous offline players. Save details are joined
 by opaque ID onto players identified by the REST API.

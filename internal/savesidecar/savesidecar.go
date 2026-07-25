@@ -17,7 +17,7 @@ import (
 )
 
 const (
-	defaultBinaryName           = "savedecode"
+	defaultBinaryName           = "palsave"
 	playerPresetName            = "player-details"
 	maxPlayerFiles              = 10_000
 	maxOutputBytes              = 16 << 20
@@ -28,26 +28,24 @@ const (
 
 // Options configures a Reader.
 type Options struct {
-	// BinaryPath is the absolute path to savedecode. When empty, the Reader
+	// BinaryPath is the absolute path to palsave. When empty, the Reader
 	// looks beside the running server executable.
 	BinaryPath string
-	// GameVersion selects one exact versioned player-details preset.
-	GameVersion string
 	// MaxOutputBytes overrides the per-process stdout cap. Zero uses the
 	// default.
 	MaxOutputBytes int64
 }
 
-// Reader invokes the refactored savedecode CLI once per immutable player save
-// and aggregates its versioned player-details projections.
+// Reader invokes the palsave CLI once per immutable player save and aggregates
+// its player-details projections.
 type Reader struct {
-	binary      string
-	gameVersion string
-	maxOutput   int64
+	binary    string
+	maxOutput int64
 }
 
-// NewReader resolves the executable and verifies that it advertises the exact
-// preset/version contract needed by the application.
+// NewReader resolves the executable and verifies that it advertises the
+// player-details contract needed by the application. Preset gameVersion is
+// provenance in palsave's current interface, not an invocation selector.
 func NewReader(options Options) (*Reader, error) {
 	binary := strings.TrimSpace(options.BinaryPath)
 	if binary == "" {
@@ -67,15 +65,11 @@ func NewReader(options Options) (*Reader, error) {
 	if !info.Mode().IsRegular() {
 		return nil, fmt.Errorf("save decoder is not a regular file: %s", binary)
 	}
-	gameVersion := strings.TrimSpace(options.GameVersion)
-	if gameVersion == "" {
-		return nil, errors.New("save decoder game version is required")
-	}
 	maxOutput := options.MaxOutputBytes
 	if maxOutput <= 0 {
 		maxOutput = maxOutputBytes
 	}
-	reader := &Reader{binary: binary, gameVersion: gameVersion, maxOutput: maxOutput}
+	reader := &Reader{binary: binary, maxOutput: maxOutput}
 	ctx, cancel := context.WithTimeout(context.Background(), presetProbeTimeout)
 	defer cancel()
 	data, err := reader.run(ctx, "--list-presets")
@@ -87,11 +81,13 @@ func NewReader(options Options) (*Reader, error) {
 		return nil, fmt.Errorf("decode save decoder presets: %w", err)
 	}
 	for _, candidate := range presets {
-		if candidate.Name == playerPresetName && candidate.GameVersion == gameVersion && candidate.SaveType == "player.sav" {
+		if candidate.Name == playerPresetName &&
+			candidate.SaveType == "player.sav" &&
+			strings.TrimSpace(candidate.GameVersion) != "" {
 			return reader, nil
 		}
 	}
-	return nil, fmt.Errorf("save decoder has no %s preset for Palworld %s", playerPresetName, gameVersion)
+	return nil, fmt.Errorf("save decoder has no valid %s preset for player.sav", playerPresetName)
 }
 
 func binaryNextToExecutable() (string, error) {
@@ -166,7 +162,6 @@ func (r *Reader) ReadSnapshot(ctx context.Context, dir string) (*Snapshot, error
 		data, err := r.run(
 			ctx,
 			"--preset", playerPresetName,
-			"--game-version", r.gameVersion,
 			path,
 		)
 		if err != nil {

@@ -55,9 +55,7 @@ func main() {
 		}
 		source = client
 		if cfg.SaveDataEnabled {
-			reader, readerErr := savesidecar.NewReader(savesidecar.Options{
-				BinaryPath: cfg.SaveDecoderPath, GameVersion: cfg.SaveGameVersion,
-			})
+			reader, readerErr := savesidecar.NewReader(savesidecar.Options{BinaryPath: cfg.SaveDecoderPath})
 			if readerErr != nil {
 				logger.Error("save decoder setup failed", "error", readerErr)
 				os.Exit(1)
@@ -74,7 +72,6 @@ func main() {
 			logger.Info(
 				"save-backed player enrichment enabled",
 				"pollInterval", cfg.SavePollInterval,
-				"gameVersion", cfg.SaveGameVersion,
 			)
 		}
 	}
