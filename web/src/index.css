@@ -209,7 +209,8 @@
   .filter-panel-motion {
     transition:
       transform var(--surface-motion-duration) var(--surface-motion-easing),
-      opacity var(--surface-motion-duration) var(--surface-motion-easing);
+      opacity var(--surface-motion-duration) var(--surface-motion-easing),
+      height var(--surface-motion-duration) var(--surface-motion-easing);
   }
 
   .filter-panel-motion.is-panel-open {
@@ -227,6 +228,44 @@
   }
 
   @media (max-width: 639px) {
+    .map-panel-mobile-sheet {
+      --map-panel-compact-height: min(52dvh, 480px);
+      --map-panel-expanded-height: max(var(--map-panel-compact-height), calc(100dvh - 138px));
+
+      height: var(--map-panel-compact-height);
+      transition: height var(--surface-motion-duration, 220ms)
+        var(--surface-motion-easing, cubic-bezier(0.22, 1, 0.36, 1));
+    }
+
+    .map-panel-mobile-sheet[data-map-panel-mobile-state="expanded"] {
+      height: var(--map-panel-expanded-height);
+    }
+
+    .map-panel-mobile-sheet > [data-map-panel-header] {
+      padding-top: 12px;
+    }
+
+    .map-panel-mobile-sheet[data-map-panel-measuring="true"],
+    .map-panel-mobile-sheet[data-map-panel-dragging="true"] {
+      transition-duration: 0ms;
+    }
+
+    .map-panel-mobile-sheet[data-map-panel-dragging="true"] {
+      height: var(--map-panel-drag-height);
+    }
+
+    .filter-panel-motion.map-panel-mobile-sheet {
+      transition:
+        transform var(--surface-motion-duration) var(--surface-motion-easing),
+        opacity var(--surface-motion-duration) var(--surface-motion-easing),
+        height var(--surface-motion-duration) var(--surface-motion-easing);
+    }
+
+    .filter-panel-motion.map-panel-mobile-sheet[data-map-panel-measuring="true"],
+    .filter-panel-motion.map-panel-mobile-sheet[data-map-panel-dragging="true"] {
+      transition-duration: 0ms;
+    }
+
     .surface-enter-motion {
       animation-name: inspector-up;
     }

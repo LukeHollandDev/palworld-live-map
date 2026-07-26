@@ -1,5 +1,6 @@
 import { IconX } from '@tabler/icons-react'
-import type { ComponentPropsWithoutRef, ElementType, ReactNode, Ref } from 'react'
+import type { ComponentPropsWithoutRef, ElementType, ReactNode, PointerEvent as ReactPointerEvent, Ref } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 
 type MapPanelSide = 'left' | 'right'
 type MapPanelMobileSize = 'content' | 'fixed'
@@ -7,8 +8,25 @@ type MapPanelMobileSize = 'content' | 'fixed'
 type MapPanelShellProps = Omit<ComponentPropsWithoutRef<'aside'>, 'children'> & {
   children: ReactNode
   mobileSize: MapPanelMobileSize
+  mobileSheetActive?: boolean
+  mobileSheetLabel?: string
   side: MapPanelSide
 }
+
+interface MobileSheetDrag {
+  compactHeight: number
+  currentY: number
+  expandedHeight: number
+  frameId: number | null
+  pendingHeight: number | null
+  pointerId: number
+  startExpanded: boolean
+  startHeight: number
+  startY: number
+}
+
+const MOBILE_SHEET_DRAG_THRESHOLD = 48
+const MOBILE_SHEET_MOVE_TOLERANCE = 6
 
 const panelSideClass: Record<MapPanelSide, string> = {
   left: 'left-4',
@@ -17,18 +35,282 @@ const panelSideClass: Record<MapPanelSide, string> = {
 
 const panelMobileSizeClass: Record<MapPanelMobileSize, string> = {
   content: 'max-sm:max-h-[49dvh]',
-  fixed: 'max-sm:h-[min(52dvh,480px)]'
+  fixed: 'map-panel-mobile-sheet'
 }
 
-export function MapPanelShell({ children, className = '', mobileSize, side, ...props }: MapPanelShellProps) {
+function mobileSheetHeights(shell: HTMLElement, fallbackHeight: number) {
+  const committedState = shell.dataset.mapPanelMobileState || 'compact'
+  const dragging = shell.dataset.mapPanelDragging
+  const dragHeight = shell.style.getPropertyValue('--map-panel-drag-height')
+  shell.dataset.mapPanelMeasuring = 'true'
+  delete shell.dataset.mapPanelDragging
+  shell.style.removeProperty('--map-panel-drag-height')
+  shell.dataset.mapPanelMobileState = 'compact'
+  const measuredCompactHeight = shell.getBoundingClientRect().height
+  shell.dataset.mapPanelMobileState = 'expanded'
+  const measuredExpandedHeight = shell.getBoundingClientRect().height
+  shell.dataset.mapPanelMobileState = committedState
+  if (dragging) shell.dataset.mapPanelDragging = dragging
+  if (dragHeight) shell.style.setProperty('--map-panel-drag-height', dragHeight)
+  delete shell.dataset.mapPanelMeasuring
+
+  const compactHeight = measuredCompactHeight > 0 ? measuredCompactHeight : Math.max(1, fallbackHeight)
+  return {
+    compactHeight,
+    expandedHeight: Math.max(compactHeight, measuredExpandedHeight > 0 ? measuredExpandedHeight : compactHeight)
+  }
+}
+
+function mobileSheetSnapAfterDrag(drag: MobileSheetDrag, releaseY: number, cancelled: boolean) {
+  if (cancelled) return drag.startExpanded
+  const distance = drag.startY - releaseY
+  const snapDistance = (drag.expandedHeight - drag.compactHeight) / 2
+  if (snapDistance <= 0) {
+    if (distance >= MOBILE_SHEET_DRAG_THRESHOLD) return true
+    if (distance <= -MOBILE_SHEET_DRAG_THRESHOLD) return false
+    return drag.startExpanded
+  }
+  const threshold = Math.min(MOBILE_SHEET_DRAG_THRESHOLD, snapDistance)
+  const finalHeight = Math.min(drag.expandedHeight, Math.max(drag.compactHeight, drag.startHeight + distance))
+  return drag.startExpanded
+    ? drag.expandedHeight - finalHeight < threshold
+    : finalHeight - drag.compactHeight >= threshold
+}
+
+export function MapPanelShell({
+  children,
+  className = '',
+  id,
+  mobileSheetActive = true,
+  mobileSheetLabel,
+  mobileSize,
+  side,
+  style,
+  ...props
+}: MapPanelShellProps) {
+  const shellRef = useRef<HTMLElement>(null)
+  const resizeHandleRef = useRef<HTMLButtonElement>(null)
+  const dragRef = useRef<MobileSheetDrag | null>(null)
+  const suppressClickRef = useRef(false)
+  const suppressClickTimerRef = useRef<number | null>(null)
+  const [mobileExpanded, setMobileExpanded] = useState(false)
+  const mobileSheet = mobileSize === 'fixed' && Boolean(mobileSheetLabel)
+
+  const clearSuppressClickTimer = useCallback(() => {
+    if (suppressClickTimerRef.current === null) return
+    window.clearTimeout(suppressClickTimerRef.current)
+    suppressClickTimerRef.current = null
+  }, [])
+
+  const commitMobileSheet = useCallback((expanded: boolean) => {
+    const shell = shellRef.current
+    const drag = dragRef.current
+    if (drag?.frameId !== null && drag?.frameId !== undefined) window.cancelAnimationFrame(drag.frameId)
+    dragRef.current = null
+    if (shell) {
+      shell.dataset.mapPanelMobileState = expanded ? 'expanded' : 'compact'
+      delete shell.dataset.mapPanelDragging
+      shell.style.removeProperty('--map-panel-drag-height')
+    }
+    setMobileExpanded(expanded)
+  }, [])
+
+  const resetMobileSheet = useCallback(() => {
+    const drag = dragRef.current
+    const handle = resizeHandleRef.current
+    if (drag && handle?.hasPointerCapture?.(drag.pointerId)) handle.releasePointerCapture(drag.pointerId)
+    clearSuppressClickTimer()
+    suppressClickRef.current = false
+    commitMobileSheet(false)
+  }, [clearSuppressClickTimer, commitMobileSheet])
+
+  const clearMobileSheet = useCallback(() => {
+    const drag = dragRef.current
+    const handle = resizeHandleRef.current
+    if (drag && handle?.hasPointerCapture?.(drag.pointerId)) handle.releasePointerCapture(drag.pointerId)
+    dragRef.current = null
+    clearSuppressClickTimer()
+    suppressClickRef.current = false
+    const shell = shellRef.current
+    if (shell) {
+      delete shell.dataset.mapPanelDragging
+      delete shell.dataset.mapPanelMobileState
+      shell.style.removeProperty('--map-panel-drag-height')
+    }
+    setMobileExpanded(false)
+  }, [clearSuppressClickTimer])
+
+  useEffect(() => {
+    if (!mobileSheet) clearMobileSheet()
+    else if (!mobileSheetActive) resetMobileSheet()
+  }, [clearMobileSheet, mobileSheet, mobileSheetActive, resetMobileSheet])
+
+  useEffect(() => {
+    if (!mobileSheet) return
+    const reconcileViewport = () => {
+      if (window.innerWidth >= 640) {
+        resetMobileSheet()
+        return
+      }
+      const drag = dragRef.current
+      const shell = shellRef.current
+      if (!drag || !shell) return
+      if (drag.frameId !== null) {
+        window.cancelAnimationFrame(drag.frameId)
+        drag.frameId = null
+      }
+      const currentHeight = shell.getBoundingClientRect().height
+      const { compactHeight, expandedHeight } = mobileSheetHeights(shell, currentHeight)
+      const rebasedHeight = Math.min(expandedHeight, Math.max(compactHeight, currentHeight))
+      drag.compactHeight = compactHeight
+      drag.expandedHeight = expandedHeight
+      drag.pendingHeight = null
+      drag.startHeight = rebasedHeight
+      drag.startY = drag.currentY
+      shell.style.setProperty('--map-panel-drag-height', `${rebasedHeight}px`)
+    }
+    window.addEventListener('resize', reconcileViewport)
+    window.visualViewport?.addEventListener('resize', reconcileViewport)
+    return () => {
+      window.removeEventListener('resize', reconcileViewport)
+      window.visualViewport?.removeEventListener('resize', reconcileViewport)
+    }
+  }, [mobileSheet, resetMobileSheet])
+
+  useEffect(
+    () => () => {
+      clearSuppressClickTimer()
+      const drag = dragRef.current
+      if (drag?.frameId !== null && drag?.frameId !== undefined) window.cancelAnimationFrame(drag.frameId)
+      const shell = shellRef.current
+      if (!shell) return
+      delete shell.dataset.mapPanelDragging
+      shell.style.removeProperty('--map-panel-drag-height')
+    },
+    [clearSuppressClickTimer]
+  )
+
+  const startMobileDrag = (event: ReactPointerEvent<HTMLButtonElement>) => {
+    if (window.innerWidth >= 640 || event.isPrimary === false) return
+    if (event.pointerType === 'mouse' && event.button !== 0) return
+    const shell = shellRef.current
+    if (!shell) return
+    clearSuppressClickTimer()
+    suppressClickRef.current = false
+    const measuredHeight = shell.getBoundingClientRect().height
+    const { compactHeight, expandedHeight } = mobileSheetHeights(shell, measuredHeight)
+    dragRef.current = {
+      compactHeight,
+      currentY: event.clientY,
+      expandedHeight,
+      frameId: null,
+      pendingHeight: null,
+      pointerId: event.pointerId,
+      startExpanded: mobileExpanded,
+      startHeight: measuredHeight > 0 ? measuredHeight : mobileExpanded ? expandedHeight : compactHeight,
+      startY: event.clientY
+    }
+    shell.dataset.mapPanelDragging = 'true'
+    shell.style.setProperty('--map-panel-drag-height', `${dragRef.current.startHeight}px`)
+    event.currentTarget.setPointerCapture?.(event.pointerId)
+  }
+
+  const moveMobileDrag = (event: ReactPointerEvent<HTMLButtonElement>) => {
+    const drag = dragRef.current
+    const shell = shellRef.current
+    if (!drag || !shell || event.pointerId !== drag.pointerId) return
+    event.preventDefault()
+    drag.currentY = event.clientY
+    const distance = drag.startY - event.clientY
+    if (Math.abs(distance) >= MOBILE_SHEET_MOVE_TOLERANCE) suppressClickRef.current = true
+    const height = Math.min(drag.expandedHeight, Math.max(drag.compactHeight, drag.startHeight + distance))
+    drag.pendingHeight = height
+    if (drag.frameId !== null) return
+    drag.frameId = window.requestAnimationFrame(() => {
+      if (dragRef.current !== drag || drag.pendingHeight === null) return
+      shell.style.setProperty('--map-panel-drag-height', `${drag.pendingHeight}px`)
+      drag.frameId = null
+    })
+  }
+
+  const finishMobileDrag = (event: ReactPointerEvent<HTMLButtonElement>, cancelled = false) => {
+    const drag = dragRef.current
+    if (!drag || event.pointerId !== drag.pointerId) return
+    const expanded = mobileSheetSnapAfterDrag(drag, event.clientY, cancelled)
+    if (expanded !== drag.startExpanded) suppressClickRef.current = true
+    commitMobileSheet(expanded)
+    if (event.currentTarget.hasPointerCapture?.(event.pointerId))
+      event.currentTarget.releasePointerCapture(event.pointerId)
+    if (!suppressClickRef.current) return
+    clearSuppressClickTimer()
+    suppressClickTimerRef.current = window.setTimeout(() => {
+      suppressClickRef.current = false
+      suppressClickTimerRef.current = null
+    }, 0)
+  }
+
+  const cancelLostMobileDrag = (event: ReactPointerEvent<HTMLButtonElement>) => {
+    if (!dragRef.current) return
+    finishMobileDrag(event, true)
+  }
+
+  const toggleMobileSheet = () => {
+    if (suppressClickRef.current) {
+      suppressClickRef.current = false
+      clearSuppressClickTimer()
+      return
+    }
+    commitMobileSheet(!mobileExpanded)
+  }
+
+  const resizeWithKeyboard = (event: React.KeyboardEvent<HTMLButtonElement>) => {
+    if (event.key === 'ArrowUp' || event.key === 'End') {
+      event.preventDefault()
+      commitMobileSheet(true)
+    } else if (event.key === 'ArrowDown' || event.key === 'Home') {
+      event.preventDefault()
+      commitMobileSheet(false)
+    }
+  }
+
   return (
     <aside
+      ref={shellRef}
       {...props}
+      id={id}
+      style={style}
       className={`pal-glass-panel absolute top-[78px] bottom-4 z-[24] flex w-[350px] min-h-0 flex-col overflow-hidden text-[#e5f0f2] max-sm:inset-x-0 max-sm:top-auto max-sm:bottom-0 max-sm:w-auto max-sm:border-x-0 max-sm:border-b-0 ${panelMobileSizeClass[mobileSize]} ${panelSideClass[side]} ${className}`}
       data-map-panel-shell
       data-map-panel-side={side}
       data-map-panel-mobile-size={mobileSize}
+      data-map-panel-mobile-state={mobileSheet ? (mobileExpanded ? 'expanded' : 'compact') : undefined}
     >
+      {mobileSheet && (
+        <button
+          ref={resizeHandleRef}
+          type="button"
+          className="map-panel-resize-handle absolute top-0 left-1/2 z-[3] flex h-6 w-24 -translate-x-1/2 cursor-ns-resize touch-none select-none items-center justify-center border-0 bg-transparent p-0 text-[#88abb1] sm:hidden focus-visible:outline-offset-[-3px]"
+          data-map-panel-resize-handle
+          aria-label={`Use expanded ${mobileSheetLabel} panel`}
+          aria-controls={id}
+          aria-pressed={mobileExpanded}
+          title={mobileExpanded ? `Reduce ${mobileSheetLabel} panel` : `Expand ${mobileSheetLabel} panel`}
+          onClick={toggleMobileSheet}
+          onKeyDown={resizeWithKeyboard}
+          onPointerDown={startMobileDrag}
+          onPointerMove={moveMobileDrag}
+          onPointerUp={finishMobileDrag}
+          onPointerCancel={(event) => finishMobileDrag(event, true)}
+          onLostPointerCapture={cancelLostMobileDrag}
+        >
+          <span
+            className={`block h-1 rounded-full transition-[width,background-color] duration-150 ${
+              mobileExpanded ? 'w-12 bg-[#72d7e5]' : 'w-9 bg-[#68858b]'
+            }`}
+            aria-hidden="true"
+          />
+        </button>
+      )}
       {children}
     </aside>
   )

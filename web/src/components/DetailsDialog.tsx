@@ -120,6 +120,8 @@ export function DetailsDialog({
       id={leaderboard ? 'leaderboard-panel' : undefined}
       side="right"
       mobileSize={leaderboard ? 'fixed' : 'content'}
+      mobileSheetActive={Boolean(leaderboard)}
+      mobileSheetLabel={leaderboard ? 'leaderboards' : undefined}
       className="surface-enter-motion"
       role="dialog"
       aria-modal="false"

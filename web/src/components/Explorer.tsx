@@ -305,6 +305,8 @@ export function Explorer(props: ExplorerProps) {
         id="map-filter-panel"
         side="left"
         mobileSize="fixed"
+        mobileSheetActive={props.open}
+        mobileSheetLabel="map filters"
         className={`filter-panel-motion max-sm:z-[34] ${props.open ? 'is-panel-open' : 'is-panel-closed pointer-events-none'}`}
         aria-label="Map filters"
         aria-hidden={!props.open}
@@ -402,7 +404,7 @@ export function Explorer(props: ExplorerProps) {
             </div>
 
             <div
-              className="min-h-0 flex-1 overflow-y-auto border-t border-[#caeaef]/20 px-3.5 pt-1.5 pb-3.5"
+              className="min-h-0 flex-1 overflow-y-auto overscroll-contain border-t border-[#caeaef]/20 px-3.5 pt-1.5 pb-3.5"
               aria-live="polite"
             >
               {props.search && (

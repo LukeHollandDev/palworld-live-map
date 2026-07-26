@@ -1,4 +1,4 @@
-import { cleanup, render, screen, waitFor, within } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { App } from './App'
@@ -779,18 +779,25 @@ describe('App', () => {
     const statusBar = screen.getByRole('banner')
     const filterControl = within(statusBar).getByRole('button', { name: 'Map filters' })
     const leaderboardControl = within(statusBar).getByRole('button', { name: 'Leaderboards' })
-    const expectMobilePanelShell = (panel: HTMLElement) => {
+    const expectMobilePanelShell = (panel: HTMLElement, label: string) => {
       expect(panel).toHaveAttribute('data-map-panel-shell')
       expect(panel).toHaveAttribute('data-map-panel-mobile-size', 'fixed')
+      expect(panel).toHaveAttribute('data-map-panel-mobile-state', 'compact')
       expect(panel).toHaveClass(
         'pal-glass-panel',
+        'map-panel-mobile-sheet',
         'max-sm:inset-x-0',
         'max-sm:bottom-0',
-        'max-sm:h-[min(52dvh,480px)]',
         'max-sm:w-auto',
         'max-sm:border-x-0',
         'max-sm:border-b-0'
       )
+      const resizeHandle = within(panel).getByRole('button', { name: `Use expanded ${label} panel` })
+      expect(resizeHandle).toHaveAttribute('data-map-panel-resize-handle')
+      expect(resizeHandle).toHaveAttribute('aria-controls', panel.id)
+      expect(resizeHandle).toHaveAttribute('aria-pressed', 'false')
+      expect(resizeHandle).toHaveClass('touch-none', 'sm:hidden')
+      return resizeHandle
     }
     expect(filterControl).toHaveAttribute('aria-expanded', 'false')
     expect(leaderboardControl).toHaveAttribute('aria-expanded', 'false')
@@ -799,7 +806,20 @@ describe('App', () => {
     expect(filterControl).toHaveAttribute('aria-expanded', 'true')
     const filterPanel = screen.getByRole('complementary', { name: 'Map filters' })
     expect(filterPanel).toBeVisible()
-    expectMobilePanelShell(filterPanel)
+    const filterResizeHandle = expectMobilePanelShell(filterPanel, 'map filters')
+    await user.click(filterResizeHandle)
+    expect(filterPanel).toHaveAttribute('data-map-panel-mobile-state', 'expanded')
+    expect(filterResizeHandle).toHaveAttribute('aria-pressed', 'true')
+    expect(filterResizeHandle).toHaveFocus()
+    await user.keyboard('{Enter}')
+    expect(filterPanel).toHaveAttribute('data-map-panel-mobile-state', 'compact')
+    await user.keyboard(' ')
+    expect(filterPanel).toHaveAttribute('data-map-panel-mobile-state', 'expanded')
+    fireEvent.keyDown(filterResizeHandle, { key: 'ArrowDown' })
+    expect(filterPanel).toHaveAttribute('data-map-panel-mobile-state', 'compact')
+    expect(filterResizeHandle).toHaveAttribute('aria-pressed', 'false')
+    fireEvent.keyDown(filterResizeHandle, { key: 'End' })
+    expect(filterPanel).toHaveAttribute('data-map-panel-mobile-state', 'expanded')
 
     await user.click(leaderboardControl)
     expect(filterControl).toHaveAttribute('aria-expanded', 'false')
@@ -807,13 +827,106 @@ describe('App', () => {
     expect(screen.queryByRole('complementary', { name: 'Map filters' })).not.toBeInTheDocument()
     const leaderboardPanel = screen.getByRole('dialog')
     expect(leaderboardPanel).toHaveAttribute('id', 'leaderboard-panel')
-    expectMobilePanelShell(leaderboardPanel)
+    const leaderboardResizeHandle = expectMobilePanelShell(leaderboardPanel, 'leaderboards')
+
+    fireEvent.pointerDown(leaderboardResizeHandle, {
+      button: 0,
+      clientY: 500,
+      isPrimary: true,
+      pointerId: 1,
+      pointerType: 'touch'
+    })
+    fireEvent.pointerMove(leaderboardResizeHandle, {
+      clientY: 470,
+      isPrimary: true,
+      pointerId: 1,
+      pointerType: 'touch'
+    })
+    fireEvent.pointerUp(leaderboardResizeHandle, {
+      clientY: 470,
+      isPrimary: true,
+      pointerId: 1,
+      pointerType: 'touch'
+    })
+    expect(leaderboardPanel).toHaveAttribute('data-map-panel-mobile-state', 'compact')
+
+    fireEvent.pointerDown(leaderboardResizeHandle, {
+      button: 0,
+      clientY: 500,
+      isPrimary: true,
+      pointerId: 2,
+      pointerType: 'touch'
+    })
+    fireEvent.pointerMove(leaderboardResizeHandle, {
+      clientY: 430,
+      isPrimary: true,
+      pointerId: 2,
+      pointerType: 'touch'
+    })
+    fireEvent.pointerCancel(leaderboardResizeHandle, {
+      clientY: 430,
+      isPrimary: true,
+      pointerId: 2,
+      pointerType: 'touch'
+    })
+    expect(leaderboardPanel).toHaveAttribute('data-map-panel-mobile-state', 'compact')
+
+    fireEvent.pointerDown(leaderboardResizeHandle, {
+      button: 0,
+      clientY: 500,
+      isPrimary: true,
+      pointerId: 3,
+      pointerType: 'touch'
+    })
+    fireEvent.pointerMove(leaderboardResizeHandle, {
+      clientY: 430,
+      isPrimary: true,
+      pointerId: 3,
+      pointerType: 'touch'
+    })
+    expect(leaderboardPanel).toHaveAttribute('data-map-panel-dragging', 'true')
+    fireEvent.pointerUp(leaderboardResizeHandle, {
+      clientY: 430,
+      isPrimary: true,
+      pointerId: 3,
+      pointerType: 'touch'
+    })
+    expect(leaderboardPanel).toHaveAttribute('data-map-panel-mobile-state', 'expanded')
+    expect(leaderboardPanel).not.toHaveAttribute('data-map-panel-dragging')
+    expect(leaderboardResizeHandle).toHaveAttribute('aria-pressed', 'true')
+
+    fireEvent.click(leaderboardResizeHandle)
+    expect(leaderboardPanel).toHaveAttribute('data-map-panel-mobile-state', 'expanded')
+
+    fireEvent.pointerDown(leaderboardResizeHandle, {
+      button: 0,
+      clientY: 430,
+      isPrimary: true,
+      pointerId: 4,
+      pointerType: 'touch'
+    })
+    fireEvent.pointerMove(leaderboardResizeHandle, {
+      clientY: 500,
+      isPrimary: true,
+      pointerId: 4,
+      pointerType: 'touch'
+    })
+    fireEvent.pointerUp(leaderboardResizeHandle, {
+      clientY: 500,
+      isPrimary: true,
+      pointerId: 4,
+      pointerType: 'touch'
+    })
+    expect(leaderboardPanel).toHaveAttribute('data-map-panel-mobile-state', 'compact')
+    expect(leaderboardResizeHandle).toHaveAttribute('aria-pressed', 'false')
 
     await user.click(filterControl)
     expect(filterControl).toHaveAttribute('aria-expanded', 'true')
     expect(leaderboardControl).toHaveAttribute('aria-expanded', 'false')
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
-    expect(screen.getByRole('complementary', { name: 'Map filters' })).toBeVisible()
+    const reopenedFilterPanel = screen.getByRole('complementary', { name: 'Map filters' })
+    expect(reopenedFilterPanel).toBeVisible()
+    expect(reopenedFilterPanel).toHaveAttribute('data-map-panel-mobile-state', 'compact')
 
     viewportWidth = 1024
     await user.click(leaderboardControl)
@@ -827,6 +940,22 @@ describe('App', () => {
     await waitFor(() => expect(filterControl).toHaveAttribute('aria-expanded', 'false'))
     expect(leaderboardControl).toHaveAttribute('aria-expanded', 'true')
     expect(leaderboardTitle).toHaveFocus()
+
+    const expandedLeaderboard = screen.getByRole('dialog')
+    const expandedLeaderboardHandle = within(expandedLeaderboard).getByRole('button', {
+      name: 'Use expanded leaderboards panel'
+    })
+    fireEvent.keyDown(expandedLeaderboardHandle, { key: 'End' })
+    expect(expandedLeaderboard).toHaveAttribute('data-map-panel-mobile-state', 'expanded')
+    await user.click(
+      within(expandedLeaderboard).getByRole('button', {
+        name: 'View leaderboard rank 1: Luke · Lv 55, Online'
+      })
+    )
+    const playerInspector = screen.getByRole('dialog')
+    expect(playerInspector).toHaveAttribute('data-map-panel-mobile-size', 'content')
+    expect(playerInspector).not.toHaveAttribute('data-map-panel-mobile-state')
+    expect(playerInspector.querySelector('[data-map-panel-resize-handle]')).not.toBeInTheDocument()
   })
 
   it('restores saved filter categories and the active map layer', async () => {
@@ -1061,7 +1190,7 @@ describe('App', () => {
     expect(leaderboard).toHaveClass('top-[78px]', 'bottom-4', 'w-[350px]')
     expect(explorer).toHaveClass('top-[78px]', 'bottom-4', 'w-[350px]')
     expect(leaderboard.querySelector('header[data-map-panel-header]')).toHaveClass('min-h-[78px]')
-    expect(explorer.firstElementChild).toHaveClass('min-h-[78px]')
+    expect(explorer.querySelector('[data-map-panel-header]')).toHaveClass('min-h-[78px]')
     expect(within(leaderboard).getByRole('heading', { name: 'Leaderboards' })).toBeVisible()
     expect(within(leaderboard).getByRole('heading', { name: 'Player levels' })).toBeVisible()
     expect(
@@ -1464,6 +1593,8 @@ describe('App', () => {
     const inspectorBody = inspector.querySelector('[data-details-body]')
     expect(inspectorHeader?.parentElement).toBe(inspector)
     expect(inspector).toHaveAttribute('data-map-panel-mobile-size', 'content')
+    expect(inspector).not.toHaveAttribute('data-map-panel-mobile-state')
+    expect(inspector.querySelector('[data-map-panel-resize-handle]')).not.toBeInTheDocument()
     expect(inspectorHeader).not.toHaveClass('sticky')
     expect(inspectorBody?.parentElement).toBe(inspector)
     expect(inspectorBody).toHaveClass('min-h-0', 'flex-1', 'overflow-y-auto')
