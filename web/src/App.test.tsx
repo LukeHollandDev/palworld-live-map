@@ -9,12 +9,19 @@ const responses: Record<string, unknown> = {
     worldPollIntervalMs: 60_000,
     worldDataEnabled: true,
     layers: [{ id: 'palpagos', name: 'Palpagos Islands', bounds: [100, 100, -100, -100] }],
+    catalogueUrl: '/assets/test-world-catalogue.json',
     landmarks: [],
     landmarkCatalogue: {
       gameVersion: '1.0.1.100619',
       generator: 'palworld-asset-exporter/3',
       decoder: 'CUE4Parse'
     }
+  },
+  '/assets/test-world-catalogue.json': {
+    gameVersion: '1.0.1.100619',
+    generator: 'palworld-asset-exporter/4',
+    decoder: 'CUE4Parse',
+    locations: []
   },
   '/api/players': {
     server: { name: 'Test Realm', description: 'A test server', version: 'v1.0.1.100619' },
@@ -276,7 +283,7 @@ describe('App', () => {
     expect(within(explorer).getByRole('button', { name: 'Collapse Offline Players section' })).toBeVisible()
     expect(within(explorer).getByRole('button', { name: 'Collapse Guilds section' })).toBeVisible()
 
-    for (const category of ['Companion Pals', 'Wild Pals', 'Alpha Pals', 'Tower Bosses', 'NPCs']) {
+    for (const category of ['Alpha Pals', 'Tower Bosses']) {
       const checkbox = within(explorer).getByRole('checkbox', { name: `Show ${category}` })
       // Populated categories are shown on the map automatically, even though their
       // sections stay collapsed to keep the list tidy.
@@ -284,6 +291,12 @@ describe('App', () => {
       expect(checkbox).toBeEnabled()
       expect(within(explorer).getByRole('button', { name: `Expand ${category} section` })).toBeVisible()
     }
+    for (const retiredCategory of ['Companion Pals', 'Wild Pals', 'Live NPCs']) {
+      expect(within(explorer).queryByText(new RegExp(retiredCategory, 'i'))).not.toBeInTheDocument()
+    }
+    expect(screen.queryByRole('button', { name: 'Wild Default' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'NPC Default' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Companion Default' })).not.toBeInTheDocument()
   })
 
   it('warns when the exported landmark catalogue does not match the live server version', async () => {
@@ -300,10 +313,10 @@ describe('App', () => {
 
     await screen.findByRole('heading', { name: 'Test Realm' })
     const explorer = await screen.findByRole('complementary', { name: 'Map filters' })
-    expect(within(explorer).getByText(/Landmark catalogue version mismatch:/)).toHaveTextContent(
+    expect(within(explorer).getByText(/World catalogue version mismatch:/)).toHaveTextContent(
       'locations were exported for Palworld 1.0.1.100619, but this server reports v1.0.1.100620'
     )
-    expect(within(explorer).getByText(/Landmark catalogue version mismatch:/)).toHaveTextContent('make game-assets')
+    expect(within(explorer).getByText(/World catalogue version mismatch:/)).toHaveTextContent('make game-assets')
   })
 
   it('accepts an exact numeric server release with a leading v', async () => {
@@ -320,7 +333,7 @@ describe('App', () => {
 
     await screen.findByRole('heading', { name: 'Test Realm' })
     const explorer = await screen.findByRole('complementary', { name: 'Map filters' })
-    expect(within(explorer).queryByText(/Landmark catalogue version mismatch:/)).not.toBeInTheDocument()
+    expect(within(explorer).queryByText(/World catalogue version mismatch:/)).not.toBeInTheDocument()
   })
 
   it('does not show a catalogue compatibility warning for the fictional demo version', async () => {
@@ -337,7 +350,7 @@ describe('App', () => {
 
     await screen.findByRole('heading', { name: 'Palpagos Live Demo' })
     const explorer = await screen.findByRole('complementary', { name: 'Map filters' })
-    expect(within(explorer).queryByText(/Landmark catalogue/)).not.toBeInTheDocument()
+    expect(within(explorer).queryByText(/World catalogue/)).not.toBeInTheDocument()
   })
 
   it('does not normalize differently formatted version components', async () => {
@@ -354,7 +367,7 @@ describe('App', () => {
 
     await screen.findByRole('heading', { name: 'Test Realm' })
     const explorer = await screen.findByRole('complementary', { name: 'Map filters' })
-    expect(within(explorer).getByText(/Landmark catalogue version mismatch:/)).toBeVisible()
+    expect(within(explorer).getByText(/World catalogue version mismatch:/)).toBeVisible()
   })
 
   it('warns when catalogue compatibility cannot be verified', async () => {
@@ -430,7 +443,8 @@ describe('App', () => {
     await waitFor(() => expect(screen.getByRole('heading', { name: 'Unnamed guild' })).toHaveFocus())
     await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'View guild Pal Spark · Lv 12' }))
 
-    expect(screen.getByRole('button', { name: 'Spark · Lv 12' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Spark · Lv 12' })).not.toBeInTheDocument()
+    expect(within(explorer).getByRole('button', { name: 'View Spark · Lv 12' })).toBeVisible()
     await waitFor(() => expect(screen.getByRole('heading', { name: 'Spark' })).toHaveFocus())
     expect(within(explorer).getByText('Unnamed guild')).toBeVisible()
 
@@ -653,7 +667,7 @@ describe('App', () => {
     expect(screen.queryByText('/')).not.toBeInTheDocument()
     await user.type(searchbox, 'missing')
     expect(screen.getAllByRole('button', { name: 'Clear search' })).toHaveLength(1)
-    expect(screen.getByText('No online players match “missing”.')).toBeInTheDocument()
+    expect(screen.getByText('No online players or companion Pals match “missing”.')).toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: 'Collapse map filter' }))
     await waitFor(() => expect(screen.queryByRole('complementary', { name: 'Map filters' })).not.toBeInTheDocument())
@@ -677,7 +691,7 @@ describe('App', () => {
 
     await user.keyboard('{Escape}')
     expect(screen.getByRole('searchbox')).toHaveValue('')
-    expect(within(filterPanel).getByRole('button', { name: 'Expand NPCs section' })).toBeVisible()
+    expect(within(filterPanel).getByRole('button', { name: 'Expand NPC Locations section' })).toBeVisible()
     await user.keyboard('{Escape}')
     await waitFor(() => expect(screen.getByRole('button', { name: 'Open map filters' })).toHaveFocus())
   })
@@ -708,6 +722,56 @@ describe('App', () => {
     const restoredExplorer = screen.getByRole('complementary', { name: 'Map filters' })
     expect(within(restoredExplorer).getByRole('button', { name: 'World Tree' })).toHaveAttribute('aria-pressed', 'true')
     expect(within(restoredExplorer).getByRole('checkbox', { name: 'Show Online Players' })).not.toBeChecked()
+  })
+
+  it('unchecks every filter and keeps later data hidden across reloads', async () => {
+    let objectRequests = 0
+    const base = (responses['/api/objects'] as { objects: Array<Record<string, unknown>> }).objects[0]
+    const effigy = {
+      id: 'late-effigy',
+      kind: 'effigies',
+      name: 'Late Effigy',
+      x: 15,
+      y: 25,
+      map: 'palpagos'
+    }
+    mockAPI((path) => {
+      if (path === '/api/config') {
+        return { ...(responses[path] as Record<string, unknown>), worldPollIntervalMs: 80 }
+      }
+      if (path === '/api/objects') {
+        objectRequests++
+        const objects = objectRequests === 1 ? [base] : [base, effigy]
+        return { ...(responses[path] as Record<string, unknown>), objects, total: objects.length }
+      }
+      return responses[path]
+    })
+
+    const user = userEvent.setup()
+    const firstRender = render(<App />)
+    await screen.findByRole('heading', { name: 'Test Realm' })
+    let explorer = screen.getByRole('complementary', { name: 'Map filters' })
+    await waitFor(() => expect(within(explorer).getByRole('checkbox', { name: 'Show Guilds' })).toBeChecked())
+
+    const uncheckAll = within(explorer).getByRole('button', { name: 'Uncheck all' })
+    await user.click(uncheckAll)
+    for (const checkbox of within(explorer).getAllByRole('checkbox')) expect(checkbox).not.toBeChecked()
+    expect(uncheckAll).toBeDisabled()
+    expect(screen.queryByRole('button', { name: 'Luke · Lv 55' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Home' })).not.toBeInTheDocument()
+
+    await waitFor(() => expect(objectRequests).toBeGreaterThan(1))
+    const effigyFilter = within(explorer).getByRole('checkbox', { name: 'Show Pal Effigies' })
+    expect(effigyFilter).toBeEnabled()
+    expect(effigyFilter).not.toBeChecked()
+    expect(screen.queryByRole('button', { name: 'Late Effigy' })).not.toBeInTheDocument()
+
+    firstRender.unmount()
+    render(<App />)
+    await screen.findByRole('heading', { name: 'Test Realm' })
+    explorer = screen.getByRole('complementary', { name: 'Map filters' })
+    await waitFor(() => expect(within(explorer).getByRole('checkbox', { name: 'Show Pal Effigies' })).toBeEnabled())
+    for (const checkbox of within(explorer).getAllByRole('checkbox')) expect(checkbox).not.toBeChecked()
   })
 
   it('finds online players by guild name in the explorer and on the map', async () => {
@@ -829,17 +893,19 @@ describe('App', () => {
     expect(screen.getByRole('button', { name: 'Zoe · Lv 60' })).toBeInTheDocument()
 
     const leaderboardOpener = screen.getByRole('button', { name: 'Open leaderboards' })
-    expect(within(screen.getByRole('main')).getByRole('button', { name: 'Open leaderboards' })).toBe(leaderboardOpener)
+    expect(within(screen.getByRole('banner')).getByRole('button', { name: 'Open leaderboards' })).toBe(
+      leaderboardOpener
+    )
     expect(
-      within(screen.getByRole('banner')).queryByRole('button', { name: 'Open leaderboards' })
+      within(screen.getByRole('main')).queryByRole('button', { name: 'Open leaderboards' })
     ).not.toBeInTheDocument()
-    expect(leaderboardOpener.querySelector('svg')).toHaveClass('size-6')
-    expect(leaderboardOpener).not.toHaveTextContent('Leaderboards')
-    expect(leaderboardOpener).toHaveClass('size-12')
+    expect(leaderboardOpener.querySelector('svg')).not.toBeInTheDocument()
+    expect(leaderboardOpener).toHaveTextContent('Leaderboards')
+    expect(leaderboardOpener).toHaveClass('leaderboard-header-control')
     await user.click(leaderboardOpener)
     expect(leaderboardOpener).toHaveAttribute('aria-hidden', 'true')
     expect(leaderboardOpener).toHaveAttribute('inert')
-    expect(leaderboardOpener).toHaveClass('opacity-0')
+    expect(leaderboardOpener).toHaveClass('is-leaderboard-open')
     expect(screen.queryByRole('button', { name: 'Open leaderboards' })).not.toBeInTheDocument()
     const leaderboard = screen.getByRole('dialog')
     expect(leaderboard).toHaveClass('top-[78px]', 'bottom-4', 'w-[350px]')
@@ -951,6 +1017,171 @@ describe('App', () => {
     expect(within(inspector).getByText('Rayne Syndicate Tower')).toBeVisible()
   })
 
+  it('loads the world catalogue, merges legacy landmarks, and suppresses duplicate live NPCs', async () => {
+    const legacyLandmarks = [
+      {
+        id: 'legacy-alpha',
+        kind: 'alpha-pals',
+        name: 'Legacy Alpha',
+        x: 10,
+        y: 10,
+        map: 'palpagos'
+      },
+      {
+        id: 'shared-bounty',
+        kind: 'bounties',
+        name: 'Stale Bounty',
+        level: 1,
+        x: 11,
+        y: 11,
+        map: 'palpagos'
+      }
+    ]
+    const catalogueLocations = [
+      {
+        id: 'shared-bounty',
+        kind: 'bounties',
+        name: 'Pinch',
+        detail: 'PIDF Bounty',
+        level: 57,
+        x: 12,
+        y: 12,
+        map: 'palpagos'
+      },
+      {
+        id: 'oil-rig',
+        kind: 'oil-rigs',
+        name: 'Rayne Syndicate Oil Rig',
+        level: 55,
+        x: 13,
+        y: 13,
+        map: 'palpagos'
+      },
+      {
+        id: 'watchtower',
+        kind: 'watchtowers',
+        name: 'Verdant Stream Watchtower',
+        x: 14,
+        y: 14,
+        map: 'palpagos'
+      },
+      {
+        id: 'waypoint',
+        kind: 'waypoints',
+        name: 'Small Settlement',
+        x: 15,
+        y: 15,
+        map: 'palpagos'
+      },
+      {
+        id: 'dungeon',
+        kind: 'dungeon-entrances',
+        name: 'Dungeon Entrance',
+        detail: 'Grassland',
+        x: 16,
+        y: 16,
+        map: 'palpagos'
+      },
+      {
+        id: 'effigy',
+        kind: 'effigies',
+        name: 'Lifmunk Effigy',
+        x: 17,
+        y: 17,
+        map: 'palpagos'
+      },
+      {
+        id: 'journal',
+        kind: 'journals',
+        name: "Castaway's Journal",
+        x: 18,
+        y: 18,
+        map: 'palpagos'
+      },
+      {
+        id: 'shrine-pickup',
+        kind: 'ancient-shrine-pickups',
+        name: 'Ancient Shrine Pickup',
+        x: 19,
+        y: 19,
+        map: 'palpagos'
+      },
+      {
+        id: 'static-npc',
+        kind: 'npc-locations',
+        name: 'Static Merchant',
+        detail: 'Trader',
+        x: 20,
+        y: 20,
+        map: 'palpagos'
+      }
+    ]
+    const liveNpc = {
+      id: 'live-npc',
+      kind: 'npcs',
+      name: 'Roaming Scout',
+      detail: 'Syndicate',
+      x: 21,
+      y: 21,
+      map: 'palpagos'
+    }
+    mockAPI((path) => {
+      if (path === '/api/config') {
+        return { ...(responses[path] as Record<string, unknown>), landmarks: legacyLandmarks }
+      }
+      if (path === '/assets/test-world-catalogue.json') {
+        return {
+          ...(responses[path] as Record<string, unknown>),
+          locations: catalogueLocations
+        }
+      }
+      if (path === '/api/objects') {
+        return { ...(responses[path] as Record<string, unknown>), objects: [liveNpc], total: 1 }
+      }
+      return responses[path]
+    })
+
+    const user = userEvent.setup()
+    render(<App />)
+    await screen.findByRole('heading', { name: 'Test Realm' })
+    expect(fetch).toHaveBeenCalledWith(
+      '/assets/test-world-catalogue.json',
+      expect.objectContaining({ cache: 'force-cache' })
+    )
+
+    const explorer = screen.getByRole('complementary', { name: 'Map filters' })
+    for (const title of [
+      'Bounties',
+      'Oil Rigs',
+      'Watchtowers',
+      'Waypoints',
+      'Dungeon Entrances',
+      'Pal Effigies',
+      'Journals',
+      'Ancient Shrine Pickups',
+      'NPC Locations'
+    ]) {
+      expect(within(explorer).getByText(`${title} (1)`)).toBeVisible()
+    }
+    expect(within(explorer).queryByText(/Live NPCs/)).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Legacy Alpha' })).toBeVisible()
+    expect(screen.getByRole('button', { name: 'Pinch · Lv 57' })).toBeVisible()
+    expect(screen.queryByRole('button', { name: 'Stale Bounty · Lv 1' })).not.toBeInTheDocument()
+
+    await user.click(within(explorer).getByRole('button', { name: 'Expand NPC Locations section' }))
+    expect(
+      within(explorer)
+        .getByRole('button', { name: 'View Static Merchant' })
+        .querySelector('[data-marker-kind="npc-locations"]')
+    ).toBeInTheDocument()
+    expect(within(explorer).queryByRole('button', { name: 'View Roaming Scout' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Roaming Scout' })).not.toBeInTheDocument()
+
+    await user.type(screen.getByRole('searchbox'), 'static npc')
+    expect(within(explorer).getByRole('button', { name: 'View Static Merchant' })).toBeVisible()
+    expect(within(explorer).queryByRole('button', { name: 'View Roaming Scout' })).not.toBeInTheDocument()
+  })
+
   it('collapses and expands individual filter sections', async () => {
     mockAPI()
     const user = userEvent.setup()
@@ -966,7 +1197,7 @@ describe('App', () => {
     expect(screen.getByRole('button', { name: 'View Luke · Lv 55' })).toBeInTheDocument()
   })
 
-  it('keeps companion Pals in their own map-filter category and preserves owner details', async () => {
+  it('nests companion Pals under online players and exposes them in player details', async () => {
     const playerState = responses['/api/players'] as Record<string, unknown> & {
       players: Array<Record<string, unknown>>
     }
@@ -1025,31 +1256,43 @@ describe('App', () => {
     render(<App />)
     await screen.findByRole('heading', { name: 'Test Realm' })
     const explorer = screen.getByRole('complementary', { name: 'Map filters' })
-    const companionVisibility = within(explorer).getByRole('checkbox', { name: 'Show Companion Pals' })
-    await waitFor(() => expect(companionVisibility).toBeEnabled())
-    // Companions are present, so the category is shown on the map automatically.
-    expect(companionVisibility).toBeChecked()
-    expect(within(explorer).getByRole('button', { name: 'Expand Companion Pals section' })).toBeVisible()
-    expect(screen.getByRole('button', { name: 'Spark · Lv 12' })).toBeInTheDocument()
-
-    await user.click(within(explorer).getByRole('button', { name: 'Expand Companion Pals section' }))
+    expect(within(explorer).queryByRole('checkbox', { name: 'Show Companion Pals' })).not.toBeInTheDocument()
+    expect(within(explorer).queryByRole('button', { name: /Companion Pals section/ })).not.toBeInTheDocument()
     expect(within(explorer).getByText('Online Players (1)')).toBeVisible()
-    expect(within(explorer).getByRole('button', { name: 'View Spark · Lv 12' })).toBeVisible()
-    expect(within(explorer).getByRole('button', { name: 'View Traveler' })).toBeVisible()
-    expect(within(explorer).getByRole('button', { name: 'View Drifter' })).toBeVisible()
+    const lukeCompanions = within(explorer).getByRole('group', { name: 'Companion Pals for Luke' })
+    const nestedSpark = within(lukeCompanions).getByRole('button', { name: 'View Spark · Lv 12' })
+    expect(nestedSpark).toBeVisible()
+    expect(within(lukeCompanions).queryByRole('checkbox')).not.toBeInTheDocument()
+    expect(within(explorer).queryByRole('button', { name: 'View Traveler' })).not.toBeInTheDocument()
+    expect(within(explorer).queryByRole('button', { name: 'View Drifter' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Spark · Lv 12' })).not.toBeInTheDocument()
 
-    await user.click(within(explorer).getByRole('button', { name: 'View Spark · Lv 12' }))
+    await user.click(nestedSpark)
     expect(await screen.findByRole('heading', { name: 'Spark' })).toBeVisible()
-    expect(within(screen.getByRole('dialog')).getByRole('button', { name: 'View owner Luke · Lv 55' })).toBeVisible()
+    let inspector = screen.getByRole('dialog')
+    expect(within(inspector).getByText('Species').nextElementSibling).toHaveTextContent('Sparkit')
+    expect(within(inspector).getByRole('button', { name: 'View owner Luke · Lv 55' })).toBeVisible()
+    expect(screen.queryByRole('button', { name: 'Spark · Lv 12' })).not.toBeInTheDocument()
     await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Close details' }))
 
-    await user.click(within(explorer).getByRole('checkbox', { name: 'Show Luke · Lv 55' }))
-    expect(within(explorer).getByRole('checkbox', { name: 'Show Spark · Lv 12' })).toBeChecked()
-    expect(within(explorer).getByRole('checkbox', { name: 'Show Traveler' })).toBeChecked()
-    await user.click(within(explorer).getByRole('checkbox', { name: 'Show Companion Pals' }))
-    expect(within(explorer).getByRole('checkbox', { name: 'Show Spark · Lv 12' })).not.toBeChecked()
-    expect(within(explorer).getByRole('checkbox', { name: 'Show Traveler' })).not.toBeChecked()
-    expect(within(explorer).getByRole('checkbox', { name: 'Show Drifter' })).not.toBeChecked()
+    await user.click(within(explorer).getByRole('button', { name: 'View Luke · Lv 55' }))
+    inspector = screen.getByRole('dialog')
+    expect(within(inspector).getByRole('heading', { name: 'Current companion Pals' })).toBeVisible()
+    const modalCompanion = within(inspector).getByRole('button', { name: 'View companion Pal Spark · Lv 12' })
+    expect(modalCompanion).toBeVisible()
+    await user.click(modalCompanion)
+    expect(await within(screen.getByRole('dialog')).findByRole('heading', { name: 'Spark' })).toBeVisible()
+
+    await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'View owner Luke · Lv 55' }))
+    expect(await within(screen.getByRole('dialog')).findByRole('heading', { name: 'Luke' })).toBeVisible()
+
+    await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Close details' }))
+    await user.click(within(explorer).getByRole('button', { name: 'World Tree' }))
+    expect(
+      within(within(explorer).getByRole('group', { name: 'Companion Pals for Robin' })).getByRole('button', {
+        name: 'View Traveler'
+      })
+    ).toBeVisible()
   })
 
   it('uses a non-modal inspector and removes individual markers from the tab order', async () => {
@@ -1202,9 +1445,9 @@ describe('App', () => {
 
   it('clusters dense map markers and caps long explorer categories', async () => {
     const objects = Array.from({ length: 1_000 }, (_, index) => ({
-      id: `wild-${index}`,
-      kind: 'wild-pals',
-      name: `Wild Pal ${index.toString().padStart(4, '0')}`,
+      id: `effigy-${index}`,
+      kind: 'effigies',
+      name: `Pal Effigy ${index.toString().padStart(4, '0')}`,
       x: -90 + (index % 40) * 4.5,
       y: -90 + Math.floor(index / 40) * 7.2,
       map: 'palpagos'
@@ -1217,15 +1460,14 @@ describe('App', () => {
     render(<App />)
     await screen.findByRole('heading', { name: 'Test Realm' })
     const explorer = screen.getByRole('complementary', { name: 'Map filters' })
-    const wildVisibility = within(explorer).getByRole('checkbox', { name: 'Show Wild Pals' })
-    await waitFor(() => expect(wildVisibility).toBeEnabled())
-    // Wild Pals are present, so they are shown on the map without a manual toggle.
-    expect(wildVisibility).toBeChecked()
-    await user.click(within(explorer).getByRole('button', { name: 'Expand Wild Pals section' }))
+    const effigyVisibility = within(explorer).getByRole('checkbox', { name: 'Show Pal Effigies' })
+    await waitFor(() => expect(effigyVisibility).toBeEnabled())
+    expect(effigyVisibility).toBeChecked()
+    await user.click(within(explorer).getByRole('button', { name: 'Expand Pal Effigies section' }))
     await waitFor(() =>
       expect(screen.getAllByRole('button', { name: /Zoom to \d+ nearby map items/ }).length).toBeGreaterThan(0)
     )
-    expect(screen.getByText('Search to inspect 750 more wild pals.')).toBeVisible()
+    expect(screen.getByText('Search to inspect 750 more pal effigies.')).toBeVisible()
   })
 
   it('keeps Pals outside base perimeters inside an explicit guild or fallback group', async () => {
@@ -1300,7 +1542,7 @@ describe('App', () => {
     expect(within(fallback).getByRole('button', { name: 'View Drifter' })).toBeVisible()
   })
 
-  it('caps companion Pals in their independent filter category', async () => {
+  it('caps companion Pals nested under their online player', async () => {
     const companions = Array.from({ length: 300 }, (_, index) => ({
       id: `companion-${index}`,
       kind: 'companions',
@@ -1323,7 +1565,8 @@ describe('App', () => {
 
     const explorer = screen.getByRole('complementary', { name: 'Map filters' })
     expect(within(explorer).getAllByRole('button', { name: /View Companion \d+/ })).toHaveLength(250)
-    expect(within(explorer).getByText('50 more matches. Refine your search to inspect them.')).toBeVisible()
+    expect(within(explorer).getByText('50 more companion matches. Refine your search to inspect them.')).toBeVisible()
+    expect(within(explorer).queryByRole('checkbox', { name: 'Show Companion Pals' })).not.toBeInTheDocument()
   })
 
   it('caps assigned Pals when a broad search expands every base', async () => {

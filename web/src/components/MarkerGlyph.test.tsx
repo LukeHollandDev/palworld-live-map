@@ -57,4 +57,32 @@ describe('MarkerGlyph', () => {
     expect(players[1]).toHaveClass('player-offline')
     expect(players[1]).toHaveAttribute('data-player-status', 'offline')
   })
+
+  it('gives every world-catalogue category its own glyph, including static NPC locations', () => {
+    const catalogueKinds = [
+      'bounties',
+      'oil-rigs',
+      'watchtowers',
+      'waypoints',
+      'dungeon-entrances',
+      'effigies',
+      'journals',
+      'ancient-shrine-pickups',
+      'npc-locations'
+    ] as const
+    const { container } = render(
+      <>
+        {catalogueKinds.map((kind) => (
+          <MarkerGlyph key={kind} kind={kind} />
+        ))}
+        <MarkerGlyph kind="npcs" />
+      </>
+    )
+    const pathFor = (kind: string) =>
+      container.querySelector(`[data-marker-kind="${kind}"] .marker-glyph-fill`)?.getAttribute('d')
+    const cataloguePaths = catalogueKinds.map(pathFor)
+
+    expect(new Set(cataloguePaths).size).toBe(catalogueKinds.length)
+    expect(pathFor('npc-locations')).not.toBe(pathFor('npcs'))
+  })
 })

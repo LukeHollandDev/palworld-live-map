@@ -263,10 +263,13 @@ func TestPublicConfigUsesManifestAssetHash(t *testing.T) {
 	if !strings.Contains(body, `/assets/map/palpagos.jpg?v=`) || strings.Contains(body, `?v=8192`) {
 		t.Fatalf("config response does not use manifest asset hash: %s", body)
 	}
+	if !strings.Contains(body, `"catalogueUrl":"/api/catalogue?v=`+service.worldCatalogue.ContentHash+`"`) {
+		t.Fatalf("config response does not use world catalogue content hash: %s", body)
+	}
 	if !strings.Contains(body, `"kind":"alpha-pals"`) || !strings.Contains(body, `"name":"Penking"`) || !strings.Contains(body, `"id":"landmark:tower:REGION_Grass_Boss"`) {
 		t.Fatalf("config response does not include embedded encounter landmarks: %s", body)
 	}
-	if !strings.Contains(body, `"landmarkCatalogue":{"gameVersion":"1.0.1.100619","generator":"palworld-asset-exporter/3"`) {
+	if !strings.Contains(body, `"landmarkCatalogue":{"gameVersion":"1.0.1.100619","generator":"palworld-asset-exporter/4"`) {
 		t.Fatalf("config response does not expose landmark provenance: %s", body)
 	}
 }
@@ -319,6 +322,100 @@ func TestServerServesOnlyKnownEmbeddedMapArtwork(t *testing.T) {
 		if response.Code != http.StatusNotFound {
 			t.Fatalf("%s status = %d", path, response.Code)
 		}
+	}
+}
+
+func TestServerServesVersionedWorldCatalogue(t *testing.T) {
+	service, err := New(testConfig(), fixedSnapshot{})
+	if err != nil {
+		t.Fatalf("New() error = %v", err)
+	}
+	if service.catalogueURL != "/api/catalogue?v="+service.worldCatalogue.ContentHash {
+		t.Fatalf("catalogue URL = %q", service.catalogueURL)
+	}
+
+	unversioned := httptest.NewRecorder()
+	service.Handler().ServeHTTP(unversioned, httptest.NewRequest(http.MethodGet, "/api/catalogue", nil))
+	if unversioned.Code != http.StatusOK ||
+		unversioned.Header().Get("Content-Type") != "application/json" ||
+		unversioned.Header().Get("Cache-Control") != "no-cache" ||
+		unversioned.Header().Get("ETag") == "" {
+		t.Fatalf(
+			"unversioned catalogue = status %d, type %q, cache %q, etag %q",
+			unversioned.Code,
+			unversioned.Header().Get("Content-Type"),
+			unversioned.Header().Get("Cache-Control"),
+			unversioned.Header().Get("ETag"),
+		)
+	}
+	var public map[string]json.RawMessage
+	if err := json.Unmarshal(unversioned.Body.Bytes(), &public); err != nil {
+		t.Fatal(err)
+	}
+	if len(public) != 4 ||
+		public["gameVersion"] == nil ||
+		public["generator"] == nil ||
+		public["decoder"] == nil ||
+		public["locations"] == nil {
+		t.Fatalf("catalogue response fields = %v", public)
+	}
+	if !strings.Contains(unversioned.Body.String(), `"id":"catalogue:`) ||
+		!strings.Contains(unversioned.Body.String(), `"kind":"bounties"`) ||
+		strings.Contains(unversioned.Body.String(), `"sourcePackage"`) {
+		t.Fatalf("unexpected catalogue projection: %s", unversioned.Body.String())
+	}
+
+	versioned := httptest.NewRecorder()
+	service.Handler().ServeHTTP(versioned, httptest.NewRequest(http.MethodGet, service.catalogueURL, nil))
+	if versioned.Code != http.StatusOK ||
+		!strings.Contains(versioned.Header().Get("Cache-Control"), "immutable") {
+		t.Fatalf(
+			"versioned catalogue = status %d, cache %q",
+			versioned.Code, versioned.Header().Get("Cache-Control"),
+		)
+	}
+
+	wrongVersion := httptest.NewRecorder()
+	service.Handler().ServeHTTP(
+		wrongVersion,
+		httptest.NewRequest(http.MethodGet, "/api/catalogue?v=wrong", nil),
+	)
+	if wrongVersion.Header().Get("Cache-Control") != "no-cache" {
+		t.Fatalf("wrong-version catalogue cache policy = %q", wrongVersion.Header().Get("Cache-Control"))
+	}
+
+	notModifiedRequest := httptest.NewRequest(http.MethodGet, service.catalogueURL, nil)
+	notModifiedRequest.Header.Set("If-None-Match", versioned.Header().Get("ETag"))
+	notModified := httptest.NewRecorder()
+	service.Handler().ServeHTTP(notModified, notModifiedRequest)
+	if notModified.Code != http.StatusNotModified || notModified.Body.Len() != 0 {
+		t.Fatalf("conditional catalogue = status %d, body %q", notModified.Code, notModified.Body.String())
+	}
+
+	gzipRequest := httptest.NewRequest(http.MethodGet, service.catalogueURL, nil)
+	gzipRequest.Header.Set("Accept-Encoding", "gzip")
+	compressed := httptest.NewRecorder()
+	service.Handler().ServeHTTP(compressed, gzipRequest)
+	if compressed.Header().Get("Content-Encoding") != "gzip" ||
+		compressed.Header().Get("Vary") != "Accept-Encoding" {
+		t.Fatalf(
+			"catalogue gzip headers = encoding %q, vary %q",
+			compressed.Header().Get("Content-Encoding"), compressed.Header().Get("Vary"),
+		)
+	}
+	reader, err := gzip.NewReader(compressed.Body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	decompressed, err := io.ReadAll(reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := reader.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(decompressed), `"locations":[`) {
+		t.Fatalf("decompressed catalogue = %s", decompressed)
 	}
 }
 

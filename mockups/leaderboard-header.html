@@ -1,0 +1,586 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Leaderboard header attachment mockups</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        --cyan: #5bd7e8;
+        --gold: #e9c978;
+        --panel: rgba(7, 16, 21, 0.92);
+        --panel-hover: rgba(21, 44, 51, 0.97);
+        --border: rgba(184, 224, 231, 0.26);
+        --border-bright: rgba(91, 215, 232, 0.7);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        min-height: 100%;
+        margin: 0;
+      }
+
+      body {
+        background: #070d11;
+        color: #eef8f9;
+      }
+
+      button {
+        font: inherit;
+      }
+
+      .page {
+        min-height: 100vh;
+        padding: 28px;
+        background:
+          radial-gradient(circle at 50% -20%, rgba(47, 157, 183, 0.16), transparent 36rem),
+          #080e12;
+      }
+
+      .intro {
+        display: flex;
+        align-items: end;
+        justify-content: space-between;
+        width: min(100%, 1240px);
+        margin: 0 auto 18px;
+        gap: 24px;
+      }
+
+      .eyebrow {
+        margin: 0 0 6px;
+        color: #68ccdb;
+        font-size: 11px;
+        font-weight: 800;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+      }
+
+      h1 {
+        margin: 0;
+        font-size: clamp(22px, 3vw, 34px);
+        letter-spacing: -0.025em;
+      }
+
+      .intro-copy {
+        max-width: 650px;
+        margin: 8px 0 0;
+        color: #91a6ac;
+        font-size: 14px;
+        line-height: 1.55;
+      }
+
+      .switcher {
+        display: flex;
+        gap: 6px;
+        padding: 5px;
+        border: 1px solid rgba(185, 224, 231, 0.17);
+        background: rgba(9, 17, 21, 0.86);
+      }
+
+      .switcher button {
+        min-width: 42px;
+        height: 34px;
+        border: 1px solid transparent;
+        background: transparent;
+        color: #83989f;
+        cursor: pointer;
+        font-size: 12px;
+        font-weight: 800;
+        letter-spacing: 0.08em;
+      }
+
+      .switcher button:hover,
+      .switcher button:focus-visible {
+        color: white;
+      }
+
+      .switcher button[aria-pressed="true"] {
+        border-color: rgba(91, 215, 232, 0.34);
+        background: rgba(33, 63, 71, 0.75);
+        color: #dffbff;
+      }
+
+      .stage {
+        position: relative;
+        width: min(100%, 1500px);
+        height: min(620px, calc(100vh - 190px));
+        min-height: 450px;
+        margin: 0 auto;
+        overflow: hidden;
+        border: 1px solid rgba(188, 223, 230, 0.2);
+        background:
+          linear-gradient(119deg, transparent 0 42%, rgba(32, 167, 198, 0.28) 42.1%, rgba(20, 86, 113, 0.19) 63%, transparent 80%),
+          radial-gradient(ellipse at 70% 28%, rgba(15, 109, 140, 0.34), transparent 33%),
+          linear-gradient(155deg, #07131c 0%, #0c1f2c 48%, #0b1116 100%);
+        box-shadow: 0 26px 70px rgba(0, 0, 0, 0.42);
+      }
+
+      .stage::before,
+      .stage::after {
+        position: absolute;
+        width: 4px;
+        height: 4px;
+        border-radius: 50%;
+        background: #d5f4f6;
+        box-shadow:
+          91px 43px 0 -1px rgba(213, 244, 246, 0.44),
+          214px 141px 0 -1px rgba(213, 244, 246, 0.42),
+          430px 52px 0 -1px rgba(213, 244, 246, 0.36),
+          618px 182px 0 -1px rgba(213, 244, 246, 0.35),
+          792px 64px 0 -1px rgba(213, 244, 246, 0.35),
+          1010px 156px 0 -1px rgba(213, 244, 246, 0.4);
+        content: "";
+        opacity: 0.55;
+      }
+
+      .stage::before {
+        top: 180px;
+        left: 30px;
+      }
+
+      .stage::after {
+        right: 120px;
+        bottom: 120px;
+        transform: rotate(182deg);
+      }
+
+      .header-shell {
+        position: absolute;
+        inset: 12px 22px auto;
+        z-index: 2;
+        filter: drop-shadow(0 13px 20px rgba(0, 0, 0, 0.34));
+      }
+
+      .header {
+        position: relative;
+        display: grid;
+        height: 86px;
+        grid-template-columns: minmax(0, 1fr) clamp(390px, 30vw, 570px) minmax(0, 1fr);
+        border: 1px solid var(--border);
+        background: rgba(6, 14, 18, 0.91);
+        backdrop-filter: blur(18px) saturate(125%);
+      }
+
+      .metric-group {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+      }
+
+      .metric {
+        display: grid;
+        place-content: center;
+        gap: 8px;
+        min-width: 0;
+        text-align: center;
+      }
+
+      .metric + .metric {
+        border-left: 1px solid rgba(255, 255, 255, 0.08);
+      }
+
+      .metric-name {
+        overflow: hidden;
+        color: #829da4;
+        font-size: 13px;
+        font-weight: 750;
+        letter-spacing: 0.13em;
+        text-overflow: ellipsis;
+        text-transform: uppercase;
+        white-space: nowrap;
+      }
+
+      .metric-value {
+        color: #e7f5f6;
+        font-size: 18px;
+        font-weight: 650;
+      }
+
+      .green {
+        color: #8fe0c2;
+      }
+
+      .blue {
+        color: #8edceb;
+      }
+
+      .mint {
+        color: #a7dfcf;
+      }
+
+      .purple {
+        color: #c5c0ee;
+      }
+
+      .gold {
+        color: #e3c894;
+      }
+
+      .identity {
+        position: relative;
+        z-index: 2;
+        display: grid;
+        place-content: center;
+        min-width: 0;
+        padding: 0 24px;
+        border-right: 1px solid rgba(255, 255, 255, 0.1);
+        border-left: 1px solid rgba(255, 255, 255, 0.1);
+        text-align: center;
+      }
+
+      .server-name {
+        overflow: hidden;
+        margin: 0;
+        color: #f1fbfc;
+        font-size: 27px;
+        font-weight: 780;
+        letter-spacing: 0.025em;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .server-description {
+        overflow: hidden;
+        margin: 3px 0 0;
+        color: #a5b7bc;
+        font-size: 15px;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .leaderboard {
+        --tab-depth: 34px;
+        position: absolute;
+        top: calc(100% - 1px);
+        right: -1px;
+        left: -1px;
+        display: grid;
+        width: auto;
+        height: var(--tab-depth);
+        place-items: center;
+        padding: 0 0 2px;
+        border: 0;
+        background: transparent;
+        color: #d4e3e5;
+        cursor: pointer;
+        filter: drop-shadow(0 8px 12px rgba(0, 0, 0, 0.42));
+      }
+
+      .leaderboard::before,
+      .leaderboard::after {
+        position: absolute;
+        inset: 0;
+        content: "";
+        clip-path: polygon(0 0, 100% 0, 96% 100%, 4% 100%);
+      }
+
+      .leaderboard::before {
+        background: var(--border);
+      }
+
+      .leaderboard::after {
+        inset: 1px;
+        background: var(--panel);
+      }
+
+      .leaderboard:hover::before,
+      .leaderboard:focus-visible::before {
+        background: var(--border-bright);
+      }
+
+      .leaderboard:hover::after,
+      .leaderboard:focus-visible::after {
+        background: var(--panel-hover);
+      }
+
+      .leaderboard:focus-visible {
+        outline: 2px solid var(--cyan);
+        outline-offset: 3px;
+      }
+
+      .tab-label {
+        position: relative;
+        z-index: 1;
+        font-size: 11px;
+        font-weight: 750;
+        letter-spacing: 0.16em;
+        line-height: 1;
+        text-transform: uppercase;
+        transform: translateY(-1px);
+      }
+
+      .leaderboard[data-variant="b"] {
+        color: #e3c894;
+      }
+
+      .leaderboard[data-variant="b"]::before,
+      .leaderboard[data-variant="b"]::after {
+        clip-path: polygon(0 0, 100% 0, 96% 100%, 4% 100%);
+      }
+
+      .leaderboard[data-variant="c"] {
+        color: #d8e6e8;
+      }
+
+      .leaderboard[data-variant="c"]::before,
+      .leaderboard[data-variant="c"]::after {
+        clip-path: polygon(0 0, 100% 0, 96% 100%, 4% 100%);
+      }
+
+      .leaderboard[data-variant="c"] .tab-label {
+        font-size: 12px;
+        font-weight: 650;
+        letter-spacing: 0.055em;
+        text-transform: none;
+      }
+
+      .crosshair {
+        position: absolute;
+        top: 100px;
+        bottom: 0;
+        left: 50%;
+        z-index: 1;
+        width: 1px;
+        background: linear-gradient(rgba(91, 215, 232, 0.24), transparent 72%);
+        pointer-events: none;
+      }
+
+      .crosshair::before {
+        position: absolute;
+        top: 72px;
+        left: 50%;
+        padding: 5px 7px;
+        border: 1px solid rgba(91, 215, 232, 0.18);
+        background: rgba(5, 12, 16, 0.66);
+        color: rgba(142, 220, 235, 0.68);
+        content: "center axis";
+        font-size: 9px;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        transform: translateX(-50%);
+        white-space: nowrap;
+      }
+
+      .annotation {
+        position: absolute;
+        top: 173px;
+        left: 50%;
+        z-index: 3;
+        width: min(340px, calc(100% - 44px));
+        padding: 14px 16px;
+        border: 1px solid rgba(179, 220, 227, 0.18);
+        background: rgba(6, 13, 17, 0.82);
+        color: #a3b6bb;
+        font-size: 12px;
+        line-height: 1.55;
+        text-align: center;
+        transform: translateX(-50%);
+        backdrop-filter: blur(10px);
+      }
+
+      .annotation strong {
+        display: block;
+        margin-bottom: 3px;
+        color: #e8f4f5;
+        font-size: 13px;
+      }
+
+      .annotation [data-copy] {
+        display: none;
+      }
+
+      .annotation [data-copy].active {
+        display: block;
+      }
+
+      .caption {
+        position: absolute;
+        right: 20px;
+        bottom: 18px;
+        color: rgba(183, 206, 211, 0.62);
+        font-size: 10px;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+      }
+
+      @media (max-width: 920px) {
+        .page {
+          padding: 16px;
+        }
+
+        .intro {
+          display: block;
+        }
+
+        .switcher {
+          width: max-content;
+          margin-top: 14px;
+        }
+
+        .stage {
+          height: 510px;
+        }
+
+        .header-shell {
+          inset: 10px 10px auto;
+        }
+
+        .header {
+          height: 104px;
+          grid-template-columns: 1fr;
+          grid-template-rows: 42px 62px;
+        }
+
+        .identity {
+          grid-row: 1;
+          border: 0;
+          border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .server-name {
+          font-size: 18px;
+        }
+
+        .server-description {
+          display: none;
+        }
+
+        .metric-group {
+          grid-row: 2;
+        }
+
+        .metric-group.left {
+          grid-column: 1;
+        }
+
+        .metric-group.right {
+          display: none;
+        }
+
+        .metric-name {
+          font-size: 10px;
+        }
+
+        .metric-value {
+          font-size: 14px;
+        }
+
+        .annotation {
+          top: 184px;
+        }
+
+        .crosshair {
+          top: 114px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="page">
+      <section class="intro">
+        <div>
+          <p class="eyebrow">Header attachment study</p>
+          <h1>Leaderboard button placement</h1>
+          <p class="intro-copy">
+            Each option is physically attached to the bottom edge of the header and centered on the server identity
+            column. Every treatment spans the full “The Chaos” section and uses a text label without an icon.
+          </p>
+        </div>
+        <nav class="switcher" aria-label="Choose a leaderboard button mockup">
+          <button type="button" data-choice="a" aria-pressed="true">A</button>
+          <button type="button" data-choice="b" aria-pressed="false">B</button>
+          <button type="button" data-choice="c" aria-pressed="false">C</button>
+        </nav>
+      </section>
+
+      <section class="stage" aria-label="Leaderboard header preview">
+        <div class="header-shell">
+          <div class="header">
+            <div class="metric-group left">
+              <div class="metric">
+                <span class="metric-name">Live</span>
+                <span class="metric-value green">5s ago</span>
+              </div>
+              <div class="metric">
+                <span class="metric-name">Players</span>
+                <span class="metric-value blue">3/20</span>
+              </div>
+              <div class="metric">
+                <span class="metric-name">Server FPS</span>
+                <span class="metric-value mint">55</span>
+              </div>
+            </div>
+
+            <div class="identity">
+              <p class="server-name">The Chaos</p>
+              <p class="server-description">Official Palworld server of The Chaos.</p>
+              <button class="leaderboard" type="button" data-variant="a" aria-label="Open leaderboards">
+                <span class="tab-label">Leaderboards</span>
+              </button>
+            </div>
+
+            <div class="metric-group right">
+              <div class="metric">
+                <span class="metric-name">Uptime</span>
+                <span class="metric-value purple">3h 28m</span>
+              </div>
+              <div class="metric">
+                <span class="metric-name">Bases</span>
+                <span class="metric-value gold">19</span>
+              </div>
+              <div class="metric">
+                <span class="metric-name">Day</span>
+                <span class="metric-value gold">684</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="crosshair" aria-hidden="true"></div>
+        <aside class="annotation" aria-live="polite">
+          <div data-copy="a" class="active">
+            <strong>A — “Leaderboards”</strong>
+            Short and direct. Uppercase lettering matches the metric labels without overpowering the server name.
+          </div>
+          <div data-copy="b">
+            <strong>B — “Server rankings”</strong>
+            More descriptive and uses the existing warm ranking accent, but is slightly less consistent with the
+            dialog title.
+          </div>
+          <div data-copy="c">
+            <strong>C — “View leaderboards”</strong>
+            Reads most clearly as an action. Sentence case is friendlier, though less consistent with the status bar.
+          </div>
+        </aside>
+        <span class="caption">Click A, B, or C to compare</span>
+      </section>
+    </main>
+
+    <script>
+      const leaderboard = document.querySelector(".leaderboard");
+      const label = leaderboard.querySelector(".tab-label");
+      const choices = document.querySelectorAll("[data-choice]");
+      const copies = document.querySelectorAll("[data-copy]");
+      const labels = {
+        a: "Leaderboards",
+        b: "Server rankings",
+        c: "View leaderboards",
+      };
+
+      choices.forEach((choice) => {
+        choice.addEventListener("click", () => {
+          const variant = choice.dataset.choice;
+          leaderboard.dataset.variant = variant;
+          label.textContent = labels[variant];
+          choices.forEach((button) => button.setAttribute("aria-pressed", String(button === choice)));
+          copies.forEach((copy) => copy.classList.toggle("active", copy.dataset.copy === variant));
+        });
+      });
+    </script>
+  </body>
+</html>

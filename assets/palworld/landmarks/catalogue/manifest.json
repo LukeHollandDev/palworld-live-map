@@ -1,0 +1,137 @@
+{
+  "schemaVersion": 1,
+  "gameVersion": "1.0.1.100619",
+  "generator": "palworld-asset-exporter/4",
+  "decoder": "CUE4Parse/1.2.2.202607",
+  "mappings": {
+    "file": "mappings.usmap",
+    "bytes": 2321933,
+    "sha256": "241c45de9d5b55b246cd4b39d62b9209faf7758ce0637e1f7a545aa0f75f71f0"
+  },
+  "paks": [
+    {
+      "file": "Pal-Windows.pak",
+      "bytes": 40526106335,
+      "sha256": "fe2d7b8548d5be0649b6bb3e49aadc79529c2e7d138baaacece3a3563a864227"
+    }
+  ],
+  "sources": [
+    {
+      "object": "Pal/Config/DefaultGame.ini",
+      "purpose": "Palworld ProjectVersion used for catalogue compatibility"
+    },
+    {
+      "object": "Pal/Content/Pal/DataTable/UI/DT_BossSpawnerLoactionData.DT_BossSpawnerLoactionData",
+      "purpose": "Bounty and oil-rig IDs, levels, and coordinates"
+    },
+    {
+      "object": "Pal/Content/Pal/DataTable/Character/DT_PalHumanParameter.DT_PalHumanParameter",
+      "purpose": "Bounty human-name text IDs"
+    },
+    {
+      "object": "Pal/Content/L10N/en/Pal/DataTable/Text/DT_HumanNameText_Common.DT_HumanNameText_Common",
+      "purpose": "English Bounty display names"
+    },
+    {
+      "object": "Pal/Content/L10N/en/Pal/DataTable/Text/DT_WorldMap_Common_Text_Common.DT_WorldMap_Common_Text_Common",
+      "purpose": "English oil-rig display names"
+    },
+    {
+      "object": "Pal/Content/Pal/DataTable/Character/DT_PalBossNPCIcon.DT_PalBossNPCIcon",
+      "purpose": "Bounty portrait texture references"
+    },
+    {
+      "object": "Pal/Content/Pal/Maps/MainWorld_5/PL_MainWorld5.PL_MainWorld5",
+      "purpose": "Persistent navigation, dungeon, Journal, Shrine, and NPC placements"
+    },
+    {
+      "object": "Pal/Content/L10N/en/Pal/DataTable/Text/DT_MapRespawnPointInfoText.DT_MapRespawnPointInfoText",
+      "purpose": "English watchtower and waypoint display names"
+    },
+    {
+      "object": "Pal/Content/Pal/Maps/MainWorld_5/PL_MainWorld5/_Generated_/*.umap",
+      "purpose": "Generated Effigy, Journal, Shrine, and fixed NPC placements"
+    },
+    {
+      "object": "Pal/Content/L10N/en/Pal/DataTable/Text/DT_PalNameText_Common.DT_PalNameText_Common",
+      "purpose": "English Effigy Pal names"
+    },
+    {
+      "object": "Pal/Content/L10N/en/Pal/DataTable/Text/DT_NoteDescText.DT_NoteDescText",
+      "purpose": "English Journal titles and preview text"
+    },
+    {
+      "object": "Pal/Content/Pal/DataTable/NoteData/DT_NoteTextureDataTable.DT_NoteTextureDataTable",
+      "purpose": "Journal texture references"
+    },
+    {
+      "object": "Pal/Content/Pal/DataTable/Item/DT_ItemPickupDataTable.DT_ItemPickupDataTable",
+      "purpose": "Ancient Shrine reward item IDs and counts"
+    },
+    {
+      "object": "Pal/Content/Pal/DataTable/Item/DT_ItemDataTable.DT_ItemDataTable",
+      "purpose": "Reward icon IDs"
+    },
+    {
+      "object": "Pal/Content/L10N/en/Pal/DataTable/Text/DT_ItemNameText_Common.DT_ItemNameText_Common",
+      "purpose": "English reward item names"
+    },
+    {
+      "object": "Pal/Content/Pal/DataTable/Item/DT_ItemIconDataTable.DT_ItemIconDataTable",
+      "purpose": "Reward texture references"
+    },
+    {
+      "object": "Pal/Content/Pal/DataTable/Character/DT_UniqueNPC.DT_UniqueNPC",
+      "purpose": "Fixed NPC identity and name-text IDs"
+    },
+    {
+      "object": "Pal/Content/L10N/en/Pal/DataTable/Text/DT_UniqueNPCText_Common.DT_UniqueNPCText_Common",
+      "purpose": "English fixed NPC display names"
+    }
+  ],
+  "scan": {
+    "persistentPackage": "Pal/Content/Pal/Maps/MainWorld_5/PL_MainWorld5.PL_MainWorld5",
+    "worldPartitionPrefix": "Pal/Content/Pal/Maps/MainWorld_5/PL_MainWorld5/_Generated_/*.umap",
+    "worldPartitionPackages": 9977,
+    "npcExclusions": [
+      {
+        "reason": "Blueprint template export (not a placed actor)",
+        "count": 25
+      },
+      {
+        "reason": "non-character reward or emote spawner",
+        "count": 30
+      },
+      {
+        "reason": "unconfigured spawner (no UniqueName)",
+        "count": 25
+      }
+    ]
+  },
+  "datasets": [
+    {
+      "id": "encounter-additions",
+      "file": "encounter-additions.json",
+      "count": 36,
+      "sha256": "eeb1906170253c7e395385707241b4a07bc6d6c1a946d9317dd07b29f0751069"
+    },
+    {
+      "id": "navigation",
+      "file": "navigation.json",
+      "count": 344,
+      "sha256": "e028d877902bddfd96baad2921ab087b60b7bbe33ec5b27e7fe4e26136a8c611"
+    },
+    {
+      "id": "collectibles",
+      "file": "collectibles.json",
+      "count": 577,
+      "sha256": "1c8216b375e937545a6ae4bbcc28a5a2b703ed17051e9e161a2d5a1e2aa2bab1"
+    },
+    {
+      "id": "npc-locations",
+      "file": "npc-locations.json",
+      "count": 90,
+      "sha256": "5f9db83e2c997fad6d0e440825529f61e3485c65b3caaeb01a68ce30fc636ca6"
+    }
+  ]
+}

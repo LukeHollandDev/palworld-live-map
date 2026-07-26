@@ -23,6 +23,7 @@ import (
 	"github.com/LukeHollandDev/palworld-live-map/internal/landmarks"
 	"github.com/LukeHollandDev/palworld-live-map/internal/mapdata"
 	"github.com/LukeHollandDev/palworld-live-map/internal/palworld"
+	"github.com/LukeHollandDev/palworld-live-map/internal/worldcatalogue"
 	"github.com/LukeHollandDev/palworld-live-map/web"
 )
 
@@ -41,6 +42,8 @@ type Server struct {
 	layers            []mapLayer
 	landmarks         []palworld.WorldObject
 	landmarkCatalogue landmarks.Metadata
+	worldCatalogue    worldcatalogue.Catalogue
+	catalogueURL      string
 	handler           http.Handler
 }
 
@@ -105,6 +108,10 @@ func New(cfg config.Config, source snapshotSource) (*Server, error) {
 	if err != nil {
 		return nil, fmt.Errorf("load embedded landmarks: %w", err)
 	}
+	worldCatalogue, err := worldcatalogue.Load(mapassets.Catalogue)
+	if err != nil {
+		return nil, fmt.Errorf("load embedded world catalogue: %w", err)
+	}
 
 	s := &Server{
 		settings: serverSettings{
@@ -113,6 +120,8 @@ func New(cfg config.Config, source snapshotSource) (*Server, error) {
 		},
 		source: source, assets: webAssets, maps: maps, mapFiles: mapFiles, layers: layers,
 		landmarks: landmarkCatalogue.Locations, landmarkCatalogue: landmarkCatalogue.Metadata,
+		worldCatalogue: worldCatalogue,
+		catalogueURL:   "/api/catalogue?v=" + worldCatalogue.ContentHash,
 	}
 	s.handler = s.securityHeaders(s.routes())
 	return s, nil
@@ -126,6 +135,7 @@ func (s *Server) routes() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /-/health", s.health)
 	mux.HandleFunc("GET /api/config", s.publicConfig)
+	mux.HandleFunc("GET /api/catalogue", s.catalogue)
 	mux.HandleFunc("GET /api/players", s.players)
 	mux.HandleFunc("GET /api/objects", s.objects)
 	mux.HandleFunc("GET /api/state", s.state)
@@ -146,9 +156,26 @@ func (s *Server) publicConfig(w http.ResponseWriter, r *http.Request) {
 		"worldPollIntervalMs": s.settings.worldPollInterval.Milliseconds(),
 		"worldDataEnabled":    s.settings.worldDataEnabled,
 		"layers":              s.layers,
+		"catalogueUrl":        s.catalogueURL,
 		"landmarks":           s.landmarks,
 		"landmarkCatalogue":   s.landmarkCatalogue,
 	})
+}
+
+func (s *Server) catalogue(w http.ResponseWriter, r *http.Request) {
+	cacheControl := "no-cache"
+	if r.URL.Query().Get("v") == s.worldCatalogue.ContentHash {
+		cacheControl = "public, max-age=31536000, immutable"
+	}
+	etag := fmt.Sprintf(`W/"%s"`, s.worldCatalogue.ContentHash)
+	w.Header().Set("ETag", etag)
+	w.Header().Set("Cache-Control", cacheControl)
+	w.Header().Set("Vary", "Accept-Encoding")
+	if matchesETag(r.Header.Get("If-None-Match"), etag) {
+		w.WriteHeader(http.StatusNotModified)
+		return
+	}
+	writeJSONWithCache(w, r, http.StatusOK, s.worldCatalogue, cacheControl)
 }
 
 func loadMapLayers(maps fs.FS) ([]mapLayer, map[string]mapFile, error) {
@@ -329,8 +356,12 @@ func (s *Server) securityHeaders(next http.Handler) http.Handler {
 }
 
 func writeJSON(w http.ResponseWriter, r *http.Request, status int, value any) {
+	writeJSONWithCache(w, r, status, value, "no-store")
+}
+
+func writeJSONWithCache(w http.ResponseWriter, r *http.Request, status int, value any, cacheControl string) {
 	w.Header().Set("Content-Type", "application/json")
-	w.Header().Set("Cache-Control", "no-store")
+	w.Header().Set("Cache-Control", cacheControl)
 	w.Header().Set("Vary", "Accept-Encoding")
 	var writer io.Writer = w
 	if acceptsGzip(r.Header.Get("Accept-Encoding")) {
@@ -343,6 +374,16 @@ func writeJSON(w http.ResponseWriter, r *http.Request, status int, value any) {
 	}
 	w.WriteHeader(status)
 	_ = json.NewEncoder(writer).Encode(value)
+}
+
+func matchesETag(header, etag string) bool {
+	for _, candidate := range strings.Split(header, ",") {
+		candidate = strings.TrimSpace(candidate)
+		if candidate == "*" || candidate == etag {
+			return true
+		}
+	}
+	return false
 }
 
 func acceptsGzip(value string) bool {

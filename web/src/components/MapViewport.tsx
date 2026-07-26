@@ -133,7 +133,13 @@ export const MapViewport = forwardRef<MapViewportHandle, MapViewportProps>(funct
   const current = useMemo(() => {
     const layerItems: MapItem[] = []
     const baseNames = new Map<string, string>()
+    const companionSearchTextByOwnerId = new Map<string, string[]>()
     for (const item of items) {
+      if (item.kind === 'companions' && item.ownerId) {
+        const ownerTerms = companionSearchTextByOwnerId.get(item.ownerId) || []
+        ownerTerms.push(itemSearchText(item))
+        companionSearchTextByOwnerId.set(item.ownerId, ownerTerms)
+      }
       if (item.map !== activeLayer.id) continue
       layerItems.push(item)
       if (item.kind === 'bases') {
@@ -141,17 +147,23 @@ export const MapViewport = forwardRef<MapViewportHandle, MapViewportProps>(funct
         if (item.baseId) baseNames.set(item.baseId, item.name)
       }
     }
-    return { items: layerItems, baseNames }
+    return { items: layerItems, baseNames, companionSearchTextByOwnerId }
   }, [activeLayer.id, items])
   const visibleItems = useMemo(() => {
     const query = search.trim().toLowerCase()
     return current.items.filter((item) => {
+      if (item.kind === 'companions') return false
       if (!enabledKinds.has(item.kind) || hiddenIds.has(item.id)) return false
       if (item.kind === 'players' && !enabledPlayerStatuses.has(item.online === false ? 'offline' : 'online'))
         return false
       if (!query) return true
-      const baseName = item.kind === 'workers' && item.baseId ? current.baseNames.get(item.baseId) || '' : ''
-      return itemSearchText(item, baseName).includes(query)
+      const relatedText =
+        item.kind === 'workers' && item.baseId
+          ? current.baseNames.get(item.baseId) || ''
+          : item.kind === 'players'
+            ? (current.companionSearchTextByOwnerId.get(item.id) || []).join(' ')
+            : ''
+      return itemSearchText(item, relatedText).includes(query)
     })
   }, [current, enabledKinds, enabledPlayerStatuses, hiddenIds, search])
 

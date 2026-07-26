@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react'
 import { buildGuildDetails, type GuildDetails as GuildDetailsModel } from '../lib/guilds'
 import { LEADERBOARDS, type LeaderboardId, leaderboardById } from '../lib/leaderboards'
 import { kindLabel } from '../lib/map'
-import type { MapItem, MapLayer } from '../types'
+import type { ItemKind, MapItem, MapLayer } from '../types'
 import { MarkerGlyph } from './MarkerGlyph'
 
 export type Detail =
@@ -11,6 +11,25 @@ export type Detail =
   | { kind: 'leaderboard'; leaderboardId: LeaderboardId }
 
 const DETAIL_WORKER_LIMIT = 250
+const DETAIL_LABELS: Record<ItemKind, string> = {
+  players: 'Details',
+  bases: 'Description',
+  workers: 'Species',
+  companions: 'Species',
+  'wild-pals': 'Species',
+  'alpha-pals': 'Encounter',
+  bosses: 'Encounter',
+  bounties: 'Encounter',
+  'oil-rigs': 'Facility',
+  watchtowers: 'Location',
+  waypoints: 'Location',
+  'dungeon-entrances': 'Location',
+  effigies: 'Type',
+  journals: 'Type',
+  'ancient-shrine-pickups': 'Pickup',
+  'npc-locations': 'Type',
+  npcs: 'Type'
+}
 
 interface DetailsDialogProps {
   detail: Detail | null
@@ -561,15 +580,7 @@ function ItemDetails({
     entries.push(['Paldeck unlocked', item.paldeckUnlocked?.toLocaleString()])
   }
   if (item.detail && item.kind !== 'players') {
-    const detailLabel =
-      item.kind === 'bases'
-        ? 'Description'
-        : item.kind === 'npcs'
-          ? 'Type'
-          : item.kind === 'bosses' || item.kind === 'alpha-pals'
-            ? 'Encounter'
-            : 'Species'
-    entries.push([detailLabel, item.detail])
+    entries.push([DETAIL_LABELS[item.kind], item.detail])
   }
   if (item.kind === 'bases') entries.push(['Assigned Pals', relatedPals.length])
   entries.push(['Region', layers.find((layer) => layer.id === item.map)?.name || item.map])

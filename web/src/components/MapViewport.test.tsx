@@ -425,6 +425,71 @@ describe('MapViewport zoom controls', () => {
 })
 
 describe('MapViewport marker stacking', () => {
+  it('keeps companion Pals off the map and searches them through their exact owner', () => {
+    installViewportMocks()
+    const items: MapItem[] = [
+      { id: 'player-luke', kind: 'players', name: 'Luke', x: 0, y: 0, map: layer.id },
+      { id: 'player-robin', kind: 'players', name: 'Robin', x: 10, y: 10, map: layer.id },
+      {
+        id: 'companion-spark',
+        kind: 'companions',
+        name: 'Spark',
+        ownerId: 'player-luke',
+        x: 1,
+        y: 1,
+        map: layer.id
+      },
+      {
+        id: 'companion-lookalike',
+        kind: 'companions',
+        name: 'Suffix',
+        ownerId: 'player-luke-suffix',
+        x: 2,
+        y: 2,
+        map: layer.id
+      }
+    ]
+    const props = {
+      activeLayer: layer,
+      items,
+      enabledKinds: new Set<ItemKind>(['players', 'companions']),
+      enabledPlayerStatuses: new Set(['online', 'offline'] as const),
+      hiddenIds: new Set<string>(),
+      onShowItem: () => undefined,
+      inspectorOpen: false
+    }
+    const { rerender } = render(
+      <MapViewport {...props} search="">
+        {null}
+      </MapViewport>
+    )
+
+    expect(screen.getByRole('button', { name: 'Luke' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Robin' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Spark' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Suffix' })).not.toBeInTheDocument()
+
+    rerender(
+      <MapViewport {...props} search="Spark">
+        {null}
+      </MapViewport>
+    )
+
+    expect(screen.getByRole('button', { name: 'Luke' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Robin' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Spark' })).not.toBeInTheDocument()
+
+    rerender(
+      <MapViewport {...props} search="Suffix">
+        {null}
+      </MapViewport>
+    )
+
+    expect(screen.queryByRole('button', { name: 'Luke' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Robin' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Suffix' })).not.toBeInTheDocument()
+  })
+
   it('keeps category precedence at one coordinate and raises the selected marker above it', () => {
     installViewportMocks()
     const items: MapItem[] = [

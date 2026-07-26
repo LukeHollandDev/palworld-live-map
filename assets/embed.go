@@ -13,3 +13,6 @@ var Maps embed.FS
 //
 //go:embed palworld/landmarks/manifest.json
 var Landmarks embed.FS
+
+//go:embed palworld/landmarks/catalogue/*.json
+var Catalogue embed.FS

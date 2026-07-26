@@ -3,9 +3,33 @@ import { ALL_KINDS, type ItemKind, type PlayerStatus } from '../types'
 const FILTER_PREFERENCES_KEY = 'palworld-live-map.filters.v1'
 const ZOOM_PREFERENCES_KEY = 'palworld-live-map.zoom.v1'
 const LANDMARK_KINDS_VERSION = 2
-const FILTER_KINDS_VERSION = 3
+const DEFAULT_FILTER_KINDS_VERSION = 3
+const FILTER_KINDS_VERSION = 5
 const KINDS_ADDED_IN_VERSION_2: ItemKind[] = ['alpha-pals', 'bosses']
+const KINDS_ADDED_IN_VERSION_4: ItemKind[] = [
+  'bounties',
+  'oil-rigs',
+  'watchtowers',
+  'waypoints',
+  'dungeon-entrances',
+  'effigies',
+  'journals',
+  'ancient-shrine-pickups',
+  'npc-locations'
+]
+const KINDS_AVAILABLE_IN_VERSION_2: ItemKind[] = [
+  'players',
+  'bases',
+  'workers',
+  'companions',
+  'wild-pals',
+  ...KINDS_ADDED_IN_VERSION_2,
+  'npcs'
+]
 
+const RETIRED_FILTER_KINDS = new Set<ItemKind>(['companions', 'wild-pals', 'npcs'])
+
+export const FILTERABLE_KINDS = ALL_KINDS.filter((kind) => !RETIRED_FILTER_KINDS.has(kind))
 export const DEFAULT_ENABLED_KINDS = ['players', 'bases', 'workers'] as const satisfies readonly ItemKind[]
 export const DEFAULT_ENABLED_PLAYER_STATUSES = ['online', 'offline'] as const satisfies readonly PlayerStatus[]
 
@@ -41,13 +65,18 @@ export function loadFilterPreferences(): FilterPreferences {
     if (enabledKinds && kindsVersion < LANDMARK_KINDS_VERSION) {
       for (const kind of KINDS_ADDED_IN_VERSION_2) enabledKinds.add(kind)
     }
+    if (enabledKinds && kindsVersion < FILTER_KINDS_VERSION) {
+      for (const kind of KINDS_ADDED_IN_VERSION_4) enabledKinds.add(kind)
+    }
     if (
       enabledKinds &&
-      kindsVersion < FILTER_KINDS_VERSION &&
-      enabledKinds.size === ALL_KINDS.length &&
-      ALL_KINDS.every((kind) => enabledKinds?.has(kind))
+      kindsVersion < DEFAULT_FILTER_KINDS_VERSION &&
+      KINDS_AVAILABLE_IN_VERSION_2.every((kind) => enabledKinds?.has(kind))
     ) {
       enabledKinds = new Set(DEFAULT_ENABLED_KINDS)
+    }
+    if (enabledKinds) {
+      enabledKinds = new Set([...enabledKinds].filter((kind) => !RETIRED_FILTER_KINDS.has(kind)))
     }
     return {
       activeLayerId: typeof value.activeLayerId === 'string' ? value.activeLayerId : undefined,
@@ -77,7 +106,7 @@ export function saveFilterPreferences(
       JSON.stringify({
         activeLayerId: preferences.activeLayerId,
         kindsVersion: FILTER_KINDS_VERSION,
-        enabledKinds: [...preferences.enabledKinds],
+        enabledKinds: [...preferences.enabledKinds].filter((kind) => !RETIRED_FILTER_KINDS.has(kind)),
         enabledPlayerStatuses: [...preferences.enabledPlayerStatuses],
         seenKinds: [...(preferences.seenKinds ?? [])],
         hiddenIds: [...preferences.hiddenIds].slice(0, 20_000)

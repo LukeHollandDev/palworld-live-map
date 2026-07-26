@@ -3,7 +3,6 @@ using System.Text.Json.Serialization;
 using CUE4Parse.FileProvider;
 using CUE4Parse.UE4.Assets.Exports;
 using CUE4Parse.UE4.Objects.Core.Math;
-using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
 internal static class LandmarkExporter
@@ -21,15 +20,15 @@ internal static class LandmarkExporter
     private static readonly LandmarkSource[] Sources =
     [
         new(GameVersionExtractor.SourcePath, "Palworld ProjectVersion used for catalogue compatibility"),
-        new(ObjectPath(BossSpawnerPackage), "Field Alpha spawner IDs, levels, and coordinates"),
-        new(ObjectPath(MonsterParameterPackage), "Alpha and tower Pal names and elements"),
-        new(ObjectPath(PalNamePackage), "English encounter display names"),
-        new(ObjectPath(RegionNamePackage), "English tower display names"),
+        new(GameAssetReader.ObjectPath(BossSpawnerPackage), "Field Alpha spawner IDs, levels, and coordinates"),
+        new(GameAssetReader.ObjectPath(MonsterParameterPackage), "Alpha and tower Pal names and elements"),
+        new(GameAssetReader.ObjectPath(PalNamePackage), "English encounter display names"),
+        new(GameAssetReader.ObjectPath(RegionNamePackage), "English tower display names"),
         new($"{BossManagerPackage}.Default__BP_PalBossBattleManager_C", "Tower BossType to normal-difficulty Pal and level"),
-        new(ObjectPath(MainWorldPackage), "Placed tower actors and root-component coordinates")
+        new(GameAssetReader.ObjectPath(MainWorldPackage), "Placed tower actors and root-component coordinates")
     ];
 
-    public static void Export(
+    public static LandmarkExtraction Export(
         DefaultFileProvider provider,
         string outputDirectory,
         string gameVersion,
@@ -40,10 +39,12 @@ internal static class LandmarkExporter
     {
         Console.WriteLine("Extracting encounter landmarks from game data...");
 
-        var monsterRows = LoadRows(provider, MonsterParameterPackage);
-        var palNameRows = LoadRows(provider, PalNamePackage);
-        var alphaLocations = ExtractAlphas(provider, monsterRows, palNameRows);
-        var towerLocations = ExtractTowers(provider, monsterRows, palNameRows);
+        var bossRows = GameAssetReader.LoadRows(provider, BossSpawnerPackage);
+        var monsterRows = GameAssetReader.LoadRows(provider, MonsterParameterPackage);
+        var palNameRows = GameAssetReader.LoadRows(provider, PalNamePackage);
+        var mainWorldExports = GameAssetReader.LoadExports(provider, MainWorldPackage);
+        var alphaLocations = ExtractAlphas(bossRows, monsterRows, palNameRows);
+        var towerLocations = ExtractTowers(provider, mainWorldExports, monsterRows, palNameRows);
 
         var locations = alphaLocations
             .Concat(towerLocations)
@@ -69,14 +70,14 @@ internal static class LandmarkExporter
             DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
         }) + Environment.NewLine);
         Console.WriteLine($"Staged landmark manifest.json ({alphaLocations.Count} Alphas, {towerLocations.Count} towers)");
+        return new LandmarkExtraction(bossRows, mainWorldExports);
     }
 
     private static List<LandmarkLocation> ExtractAlphas(
-        DefaultFileProvider provider,
+        JObject bossRows,
         JObject monsterRows,
         JObject palNameRows)
     {
-        var bossRows = LoadRows(provider, BossSpawnerPackage);
         var locations = new List<LandmarkLocation>(ExpectedAlphaCount);
         var spawnerIds = new List<string>(ExpectedAlphaCount);
 
@@ -117,12 +118,12 @@ internal static class LandmarkExporter
 
     private static List<LandmarkLocation> ExtractTowers(
         DefaultFileProvider provider,
+        UObject[] levelObjects,
         JObject monsterRows,
         JObject palNameRows)
     {
-        var regionRows = LoadRows(provider, RegionNamePackage);
+        var regionRows = GameAssetReader.LoadRows(provider, RegionNamePackage);
         var bossParameters = LoadBossParameters(provider);
-        var levelObjects = provider.LoadPackage(MainWorldPackage).GetExports().ToArray();
         var towerActors = levelObjects
             .Where(item => item.Class?.Name.ToString() is "BP_PalBossTower_C" or "BP_PalBossTower_LastBoss_C")
             .ToArray();
@@ -141,7 +142,7 @@ internal static class LandmarkExporter
         foreach (var actor in towerActors.OrderBy(item => item.Name, StringComparer.Ordinal))
         {
             var context = $"tower actor {actor.Name}";
-            var actorJson = SerializeObject(actor);
+            var actorJson = GameAssetReader.SerializeObject(actor);
             var properties = LandmarkShaper.RequireObject(actorJson["Properties"], $"{context}.Properties");
             var bossType = LandmarkShaper.NormalizeEnum(LandmarkShaper.RequireString(properties["BossType"], $"{context}.BossType"));
             if (!seenBossTypes.Add(bossType))
@@ -189,7 +190,7 @@ internal static class LandmarkExporter
                 $"Expected one Default__BP_PalBossBattleManager_C export in {BossManagerPackage}, found {managers.Length}.");
         }
 
-        var manager = SerializeObject(managers[0]);
+        var manager = GameAssetReader.SerializeObject(managers[0]);
         var properties = LandmarkShaper.RequireObject(manager["Properties"], "Default__BP_PalBossBattleManager_C.Properties");
         var bossInfoMap = LandmarkShaper.RequireArray(properties["BossInfoMap"], "Default__BP_PalBossBattleManager_C.BossInfoMap");
         var result = new Dictionary<string, BossParameter>(StringComparer.Ordinal);
@@ -222,31 +223,9 @@ internal static class LandmarkExporter
         return result;
     }
 
-    private static JObject LoadRows(DefaultFileProvider provider, string packagePath)
-    {
-        var tables = provider.LoadPackage(packagePath).GetExports()
-            .Where(item => (item.Class?.Name.ToString() ?? string.Empty).Contains("DataTable", StringComparison.Ordinal))
-            .ToArray();
-        if (tables.Length != 1)
-        {
-            throw new InvalidOperationException($"Expected one DataTable export in {packagePath}, found {tables.Length}.");
-        }
-
-        var table = SerializeObject(tables[0]);
-        return LandmarkShaper.RequireObject(table["Rows"], $"{packagePath}.Rows");
-    }
-
-    private static JObject SerializeObject(UObject value) =>
-        JObject.Parse(JsonConvert.SerializeObject(value));
-
-    private static string ObjectPath(string packagePath)
-    {
-        var name = packagePath[(packagePath.LastIndexOf('/') + 1)..];
-        return $"{packagePath}.{name}";
-    }
-
 }
 
+internal sealed record LandmarkExtraction(JObject BossRows, UObject[] MainWorldExports);
 internal sealed record LandmarkSource(string Object, string Purpose);
 
 internal sealed record LandmarkLocation(

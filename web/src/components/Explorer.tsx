@@ -36,6 +36,7 @@ interface ExplorerProps {
   expandedBases: Set<string>
   objectNotice: string | null
   onSearchChange: (value: string) => void
+  onUncheckAll: () => void
   onToggleKinds: (kinds: ItemKind[], visible: boolean) => void
   onTogglePlayerStatus: (status: PlayerStatus, visible: boolean) => void
   onToggleItems: (ids: string[], visible: boolean) => void
@@ -84,19 +85,39 @@ function Checkbox({
 }
 
 type PlayerCategoryGroup = 'online-players' | 'offline-players'
-type CategoryGroup = PlayerCategoryGroup | Exclude<ItemKind, 'players' | 'workers'>
+type CategoryGroup =
+  | PlayerCategoryGroup
+  | Exclude<ItemKind, 'players' | 'workers' | 'companions' | 'wild-pals' | 'npcs'>
 type NonPlayerCategoryGroup = Exclude<CategoryGroup, PlayerCategoryGroup>
 
 const GROUP_KINDS: Record<NonPlayerCategoryGroup, ItemKind[]> = {
   bases: ['bases', 'workers'],
-  companions: ['companions'],
-  'wild-pals': ['wild-pals'],
   'alpha-pals': ['alpha-pals'],
   bosses: ['bosses'],
-  npcs: ['npcs']
+  bounties: ['bounties'],
+  'oil-rigs': ['oil-rigs'],
+  watchtowers: ['watchtowers'],
+  waypoints: ['waypoints'],
+  'dungeon-entrances': ['dungeon-entrances'],
+  effigies: ['effigies'],
+  journals: ['journals'],
+  'ancient-shrine-pickups': ['ancient-shrine-pickups'],
+  'npc-locations': ['npc-locations']
 }
 
-const DEFAULT_COLLAPSED_GROUPS: CategoryGroup[] = ['companions', 'wild-pals', 'alpha-pals', 'bosses', 'npcs']
+const DEFAULT_COLLAPSED_GROUPS: CategoryGroup[] = [
+  'alpha-pals',
+  'bosses',
+  'bounties',
+  'oil-rigs',
+  'watchtowers',
+  'waypoints',
+  'dungeon-entrances',
+  'effigies',
+  'journals',
+  'ancient-shrine-pickups',
+  'npc-locations'
+]
 
 const INITIAL_CATEGORY_ITEMS = 250
 
@@ -234,11 +255,26 @@ export function Explorer(props: ExplorerProps) {
       'wild-pals': [],
       'alpha-pals': [],
       bosses: [],
+      bounties: [],
+      'oil-rigs': [],
+      watchtowers: [],
+      waypoints: [],
+      'dungeon-entrances': [],
+      effigies: [],
+      journals: [],
+      'ancient-shrine-pickups': [],
+      'npc-locations': [],
       npcs: []
     }
     const baseById = new Map<string, MapItem>()
     const workersByBaseId = new Map<string, MapItem[]>()
+    const companionsByOwnerId = new Map<string, MapItem[]>()
     for (const item of props.items) {
+      if (item.kind === 'companions' && item.ownerId) {
+        const ownerCompanions = companionsByOwnerId.get(item.ownerId) || []
+        ownerCompanions.push(item)
+        companionsByOwnerId.set(item.ownerId, ownerCompanions)
+      }
       if (item.map !== props.activeLayer.id) continue
       byKind[item.kind].push(item)
       if (item.kind === 'bases') {
@@ -252,7 +288,15 @@ export function Explorer(props: ExplorerProps) {
       baseWorkers.push(worker)
       workersByBaseId.set(worker.baseId, baseWorkers)
     }
-    return { byKind, baseById, workersByBaseId }
+    for (const companions of companionsByOwnerId.values()) {
+      companions.sort(
+        (left, right) =>
+          left.name.localeCompare(right.name) ||
+          (left.level || 0) - (right.level || 0) ||
+          left.id.localeCompare(right.id)
+      )
+    }
+    return { byKind, baseById, workersByBaseId, companionsByOwnerId }
   }, [props.activeLayer.id, props.items])
 
   const query = props.search.trim().toLowerCase()
@@ -343,13 +387,13 @@ export function Explorer(props: ExplorerProps) {
                 </svg>
               </span>
               <label className="sr-only" htmlFor="map-search">
-                Search players, bases, Pals and bosses
+                Search map locations and live objects
               </label>
               <input
                 id="map-search"
                 ref={props.searchInputRef}
                 type="search"
-                aria-label="Search players, bases, Pals and bosses"
+                aria-label="Search map locations and live objects"
                 aria-keyshortcuts="/"
                 placeholder="Filter map results…"
                 autoComplete="off"
@@ -400,6 +444,16 @@ export function Explorer(props: ExplorerProps) {
                 )
               })}
             </fieldset>
+            <div className="mx-3.5 mb-2 flex shrink-0 justify-end">
+              <button
+                type="button"
+                className="pal-interactive min-h-7 cursor-pointer border border-[#8bb7bd]/25 bg-[#26363b]/55 px-2.5 text-[11px] text-[#b7cdd1] transition-colors hover:border-[#7fd7e3]/50 hover:text-[#e5f8fa] disabled:cursor-default disabled:opacity-40"
+                disabled={props.enabledKinds.size === 0}
+                onClick={props.onUncheckAll}
+              >
+                Uncheck all
+              </button>
+            </div>
 
             <div
               className="min-h-0 flex-1 overflow-y-auto border-t border-[#caeaef]/20 px-3.5 pt-1.5 pb-3.5"
@@ -410,13 +464,11 @@ export function Explorer(props: ExplorerProps) {
                   Results for <strong className="font-medium text-[#9ec1c7]">“{props.search}”</strong>
                 </p>
               )}
-              <SimpleCategory
+              <PlayerCategory
                 {...props}
-                group="online-players"
-                title="Online Players"
-                items={onlinePlayers}
+                players={onlinePlayers}
+                companionsByOwnerId={index.companionsByOwnerId}
                 matches={matches}
-                empty="No players are currently online in this region."
                 expanded={searching || !collapsedGroups.has('online-players')}
                 onToggleExpanded={() => toggleCategory('online-players')}
               />
@@ -441,26 +493,6 @@ export function Explorer(props: ExplorerProps) {
               />
               <SimpleCategory
                 {...props}
-                group="companions"
-                title="Companion Pals"
-                items={index.byKind.companions}
-                matches={matches}
-                empty="No companion Pals are currently loaded."
-                expanded={searching || !collapsedGroups.has('companions')}
-                onToggleExpanded={() => toggleCategory('companions')}
-              />
-              <SimpleCategory
-                {...props}
-                group="wild-pals"
-                title="Wild Pals"
-                items={index.byKind['wild-pals']}
-                matches={matches}
-                empty="No wild Pals are currently loaded."
-                expanded={searching || !collapsedGroups.has('wild-pals')}
-                onToggleExpanded={() => toggleCategory('wild-pals')}
-              />
-              <SimpleCategory
-                {...props}
                 group="alpha-pals"
                 title="Alpha Pals"
                 items={index.byKind['alpha-pals']}
@@ -481,13 +513,93 @@ export function Explorer(props: ExplorerProps) {
               />
               <SimpleCategory
                 {...props}
-                group="npcs"
-                title="NPCs"
-                items={index.byKind.npcs}
+                group="bounties"
+                title="Bounties"
+                items={index.byKind.bounties}
                 matches={matches}
-                empty="No NPCs are currently loaded."
-                expanded={searching || !collapsedGroups.has('npcs')}
-                onToggleExpanded={() => toggleCategory('npcs')}
+                empty="No Bounty locations are loaded for this region."
+                expanded={searching || !collapsedGroups.has('bounties')}
+                onToggleExpanded={() => toggleCategory('bounties')}
+              />
+              <SimpleCategory
+                {...props}
+                group="oil-rigs"
+                title="Oil Rigs"
+                items={index.byKind['oil-rigs']}
+                matches={matches}
+                empty="No Oil Rig locations are loaded for this region."
+                expanded={searching || !collapsedGroups.has('oil-rigs')}
+                onToggleExpanded={() => toggleCategory('oil-rigs')}
+              />
+              <SimpleCategory
+                {...props}
+                group="watchtowers"
+                title="Watchtowers"
+                items={index.byKind.watchtowers}
+                matches={matches}
+                empty="No Watchtower locations are loaded for this region."
+                expanded={searching || !collapsedGroups.has('watchtowers')}
+                onToggleExpanded={() => toggleCategory('watchtowers')}
+              />
+              <SimpleCategory
+                {...props}
+                group="waypoints"
+                title="Waypoints"
+                items={index.byKind.waypoints}
+                matches={matches}
+                empty="No Waypoint locations are loaded for this region."
+                expanded={searching || !collapsedGroups.has('waypoints')}
+                onToggleExpanded={() => toggleCategory('waypoints')}
+              />
+              <SimpleCategory
+                {...props}
+                group="dungeon-entrances"
+                title="Dungeon Entrances"
+                items={index.byKind['dungeon-entrances']}
+                matches={matches}
+                empty="No Dungeon Entrance locations are loaded for this region."
+                expanded={searching || !collapsedGroups.has('dungeon-entrances')}
+                onToggleExpanded={() => toggleCategory('dungeon-entrances')}
+              />
+              <SimpleCategory
+                {...props}
+                group="effigies"
+                title="Pal Effigies"
+                items={index.byKind.effigies}
+                matches={matches}
+                empty="No Pal Effigy locations are loaded for this region."
+                expanded={searching || !collapsedGroups.has('effigies')}
+                onToggleExpanded={() => toggleCategory('effigies')}
+              />
+              <SimpleCategory
+                {...props}
+                group="journals"
+                title="Journals"
+                items={index.byKind.journals}
+                matches={matches}
+                empty="No Journal locations are loaded for this region."
+                expanded={searching || !collapsedGroups.has('journals')}
+                onToggleExpanded={() => toggleCategory('journals')}
+              />
+              <SimpleCategory
+                {...props}
+                group="ancient-shrine-pickups"
+                title="Ancient Shrine Pickups"
+                items={index.byKind['ancient-shrine-pickups']}
+                matches={matches}
+                empty="No Ancient Shrine pickups are loaded for this region."
+                expanded={searching || !collapsedGroups.has('ancient-shrine-pickups')}
+                onToggleExpanded={() => toggleCategory('ancient-shrine-pickups')}
+              />
+              <SimpleCategory
+                {...props}
+                group="npc-locations"
+                title="NPC Locations"
+                items={index.byKind['npc-locations']}
+                matches={matches}
+                empty="No static NPC locations are loaded for this region."
+                expanded={searching || !collapsedGroups.has('npc-locations')}
+                onToggleExpanded={() => toggleCategory('npc-locations')}
               />
             </div>
 
@@ -574,6 +686,103 @@ function CategoryHeader({
   )
 }
 
+function PlayerCategory({
+  players,
+  companionsByOwnerId,
+  matches,
+  expanded,
+  onToggleExpanded,
+  ...props
+}: ExplorerProps & {
+  players: MapItem[]
+  companionsByOwnerId: Map<string, MapItem[]>
+  matches: (item: MapItem) => boolean
+  expanded: boolean
+  onToggleExpanded: () => void
+}) {
+  const rows = players
+    .map((player) => {
+      const companions = companionsByOwnerId.get(player.id) || []
+      const playerMatches = matches(player)
+      return {
+        player,
+        companions: playerMatches ? companions : companions.filter(matches),
+        visible: playerMatches || companions.some(matches)
+      }
+    })
+    .filter((row) => row.visible)
+    .sort(
+      (left, right) =>
+        left.player.name.localeCompare(right.player.name) || left.player.id.localeCompare(right.player.id)
+    )
+
+  let companionBudget = INITIAL_CATEGORY_ITEMS
+  const renderedRows = rows.map((row) => {
+    const companions = row.companions.slice(0, companionBudget)
+    companionBudget -= companions.length
+    return { ...row, companions }
+  })
+  const visibleCompanionCount = rows.reduce((total, row) => total + row.companions.length, 0)
+  const renderedCompanionCount = renderedRows.reduce((total, row) => total + row.companions.length, 0)
+  const omittedCompanions = visibleCompanionCount - renderedCompanionCount
+  const contentId = useId()
+
+  return (
+    <section className="border-b border-white/7 py-0.5 last:border-b-0">
+      <CategoryHeader
+        {...props}
+        group="online-players"
+        title="Online Players"
+        items={players}
+        expanded={expanded}
+        onToggleExpanded={onToggleExpanded}
+        controls={contentId}
+      />
+      <div id={contentId} className="grid gap-px pl-1.5" hidden={!expanded}>
+        {rows.length === 0 ? (
+          <p className="my-1.5 pl-5 text-[11px] text-[#778187]">
+            {players.length > 0 && props.search.trim()
+              ? `No online players or companion Pals match “${props.search.trim()}”.`
+              : 'No players are currently online in this region.'}
+          </p>
+        ) : (
+          renderedRows.map(({ player, companions }) => (
+            <div key={player.id}>
+              <ObjectRow
+                item={player}
+                meta={[player.level ? `Lv ${player.level}` : '', player.guildName || ''].filter(Boolean).join(' · ')}
+                {...props}
+              />
+              {companions.length > 0 ? (
+                <fieldset className="m-0 ml-8 grid min-w-0 gap-px border-0 border-l border-[#64d7e7]/25 p-0 pl-1.5">
+                  <legend className="sr-only">Companion Pals for {player.name}</legend>
+                  {companions.map((companion) => (
+                    <ItemButton
+                      key={companion.id}
+                      item={companion}
+                      meta={[companion.detail || '', companion.level ? `Lv ${companion.level}` : '']
+                        .filter(Boolean)
+                        .join(' · ')}
+                      onFocus={props.onFocusItem}
+                    />
+                  ))}
+                </fieldset>
+              ) : null}
+            </div>
+          ))
+        )}
+        {omittedCompanions > 0 ? (
+          <p className="my-1 ml-5 border-l-2 border-[#64d7e7]/40 px-2 py-1.5 text-[11px] text-[#9ec1c7]">
+            {props.search.trim()
+              ? `${omittedCompanions} more companion matches. Refine your search to inspect them.`
+              : `${omittedCompanions} more companion Pals are omitted. Use search to inspect them.`}
+          </p>
+        ) : null}
+      </div>
+    </section>
+  )
+}
+
 function SimpleCategory({
   group,
   title,
@@ -607,7 +816,7 @@ function SimpleCategory({
                   ? [item.level ? `Lv ${item.level}` : '', item.guildName || ''].filter(Boolean).join(' · ')
                   : item.level
                     ? `Lv ${item.level}`
-                    : item.kind === 'npcs'
+                    : item.kind === 'npcs' || item.kind === 'npc-locations'
                       ? item.detail
                       : undefined
               }

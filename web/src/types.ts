@@ -1,4 +1,21 @@
-export type ItemKind = 'players' | 'bases' | 'workers' | 'companions' | 'wild-pals' | 'alpha-pals' | 'bosses' | 'npcs'
+export type ItemKind =
+  | 'players'
+  | 'bases'
+  | 'workers'
+  | 'companions'
+  | 'wild-pals'
+  | 'alpha-pals'
+  | 'bosses'
+  | 'bounties'
+  | 'oil-rigs'
+  | 'watchtowers'
+  | 'waypoints'
+  | 'dungeon-entrances'
+  | 'effigies'
+  | 'journals'
+  | 'ancient-shrine-pickups'
+  | 'npc-locations'
+  | 'npcs'
 export type PlayerStatus = 'online' | 'offline'
 
 export interface MapLayer {
@@ -13,6 +30,7 @@ export interface PublicConfig {
   worldPollIntervalMs: number
   worldDataEnabled: boolean
   layers: MapLayer[]
+  catalogueUrl: string
   landmarks: WorldObject[]
   landmarkCatalogue: LandmarkCatalogue
 }
@@ -21,6 +39,10 @@ export interface LandmarkCatalogue {
   gameVersion: string
   generator: string
   decoder: string
+}
+
+export interface WorldCatalogue extends LandmarkCatalogue {
+  locations: WorldObject[]
 }
 
 export interface ServerInfo {
@@ -121,6 +143,15 @@ export const ALL_KINDS: ItemKind[] = [
   'wild-pals',
   'alpha-pals',
   'bosses',
+  'bounties',
+  'oil-rigs',
+  'watchtowers',
+  'waypoints',
+  'dungeon-entrances',
+  'effigies',
+  'journals',
+  'ancient-shrine-pickups',
+  'npc-locations',
   'npcs'
 ]
 

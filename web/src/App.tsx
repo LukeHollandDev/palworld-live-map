@@ -10,6 +10,7 @@ import type { LeaderboardId } from './lib/leaderboards'
 import {
   DEFAULT_ENABLED_KINDS,
   DEFAULT_ENABLED_PLAYER_STATUSES,
+  FILTERABLE_KINDS,
   loadFilterPreferences,
   saveFilterPreferences
 } from './lib/preferences'
@@ -21,17 +22,9 @@ import {
   type ObjectState,
   type PlayerState,
   type PlayerStatus,
-  type PublicConfig
+  type PublicConfig,
+  type WorldCatalogue
 } from './types'
-
-// Trophy icon from Primer Octicons (MIT): https://primer.style/octicons/icon/trophy-24/
-function LeaderboardIcon() {
-  return (
-    <svg className="size-6" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-      <path d="M5.09 10.121A5.251 5.251 0 0 1 1 5V3.75C1 2.784 1.784 2 2.75 2h2.364c.236-.586.81-1 1.48-1h10.812c.67 0 1.244.414 1.48 1h2.489c.966 0 1.75.784 1.75 1.75V5a5.252 5.252 0 0 1-4.219 5.149 7.01 7.01 0 0 1-4.644 5.478l.231 3.003.034.031c.079.065.303.203.836.282.838.124 1.637.81 1.637 1.807v.75h2.25a.75.75 0 0 1 0 1.5H4.75a.75.75 0 0 1 0-1.5H7v-.75c0-.996.8-1.683 1.637-1.807.533-.08.757-.217.836-.282l.034-.031.231-3.003A7.012 7.012 0 0 1 5.09 10.12ZM6.5 2.594V9a5.5 5.5 0 1 0 11 0V2.594a.094.094 0 0 0-.094-.094H6.594a.094.094 0 0 0-.094.094Zm4.717 13.363-.215 2.793-.001.021-.003.043a1.212 1.212 0 0 1-.022.147c-.05.237-.194.567-.553.86-.348.286-.853.5-1.566.605a.478.478 0 0 0-.274.136.264.264 0 0 0-.083.188v.75h7v-.75a.264.264 0 0 0-.083-.188.478.478 0 0 0-.274-.136c-.713-.105-1.218-.32-1.567-.604-.358-.294-.502-.624-.552-.86a1.22 1.22 0 0 1-.025-.19l-.001-.022-.215-2.793a7.069 7.069 0 0 1-1.566 0ZM19 8.578A3.751 3.751 0 0 0 21.625 5V3.75a.25.25 0 0 0-.25-.25H19ZM5 3.5H2.75a.25.25 0 0 0-.25.25V5A3.752 3.752 0 0 0 5 8.537Z" />
-    </svg>
-  )
-}
 
 function releaseVersionParts(version: string | undefined) {
   const match = version?.trim().match(/^v?(\d+(?:\.\d+){2,3})$/i)
@@ -61,7 +54,28 @@ export function App() {
       try {
         const response = await fetch('/api/config', { cache: 'no-store', signal: controller.signal })
         if (!response.ok) throw new Error(`/api/config returned ${response.status}`)
-        setConfig((await response.json()) as PublicConfig)
+        const nextConfig = (await response.json()) as PublicConfig
+        const catalogueResponse = await fetch(nextConfig.catalogueUrl, {
+          cache: 'force-cache',
+          signal: controller.signal
+        })
+        if (!catalogueResponse.ok) throw new Error(`${nextConfig.catalogueUrl} returned ${catalogueResponse.status}`)
+        const catalogue = (await catalogueResponse.json()) as WorldCatalogue
+        const locations = Array.from(
+          new Map(
+            [...(nextConfig.landmarks || []), ...(catalogue.locations || [])].map((location) => [location.id, location])
+          ).values()
+        )
+        setConfig({
+          ...nextConfig,
+          landmarks: locations,
+          landmarkCatalogue: {
+            gameVersion: catalogue.gameVersion,
+            generator: catalogue.generator,
+            decoder: catalogue.decoder
+          }
+        })
+        setConfigError(false)
       } catch {
         if (!controller.signal.aborted) setConfigError(true)
       }
@@ -135,7 +149,7 @@ function LiveMap({ config }: { config: PublicConfig }) {
   const items = useMemo<MapItem[]>(() => {
     const combined: MapItem[] = [
       ...(config.landmarks || []),
-      ...(objectState.objects || []),
+      ...(objectState.objects || []).filter((item) => item.kind !== 'wild-pals' && item.kind !== 'npcs'),
       ...(playerState?.players || []).map((player) => ({
         ...player,
         kind: 'players' as const,
@@ -145,13 +159,14 @@ function LiveMap({ config }: { config: PublicConfig }) {
     ]
     return Array.from(new Map(combined.map((item) => [item.id, item])).values())
   }, [config.landmarks, objectState.objects, playerState?.players])
+  const presentedItems = useMemo(() => items.filter((item) => item.kind !== 'companions'), [items])
   const itemById = useMemo(() => new Map(items.map((item) => [item.id, item])), [items])
 
   // Reveal a category on the map the first time it has content, then remember it
   // so a kind the user later hides is never auto-enabled again.
   useEffect(() => {
     const unseen: ItemKind[] = []
-    for (const item of items) {
+    for (const item of presentedItems) {
       if (seenKinds.has(item.kind) || unseen.includes(item.kind)) continue
       unseen.push(item.kind)
     }
@@ -166,8 +181,12 @@ function LiveMap({ config }: { config: PublicConfig }) {
       for (const kind of unseen) next.add(kind)
       return next
     })
-  }, [items, seenKinds])
+  }, [presentedItems, seenKinds])
   const detailedItem = detail?.kind === 'item' ? itemById.get(detail.itemId) : undefined
+  const detailedItemLayerId =
+    detailedItem?.kind === 'companions' && detailedItem.ownerId
+      ? itemById.get(detailedItem.ownerId)?.map || detailedItem.map
+      : detailedItem?.map
   const detailedGuildExists =
     detail?.kind === 'guild' &&
     items.some(
@@ -193,10 +212,10 @@ function LiveMap({ config }: { config: PublicConfig }) {
   useEffect(() => {
     if (!detail) return
     if (detail.kind === 'leaderboard') return
-    if (detail.kind === 'guild' ? detailedGuildExists : detailedItem?.map === activeLayer.id) return
+    if (detail.kind === 'guild' ? detailedGuildExists : detailedItemLayerId === activeLayer.id) return
     setDetail(null)
     mapRef.current?.clearSelection()
-  }, [activeLayer.id, detail, detailedGuildExists, detailedItem])
+  }, [activeLayer.id, detail, detailedGuildExists, detailedItemLayerId])
 
   useEffect(() => {
     const pending = pendingFocusRef.current
@@ -235,6 +254,18 @@ function LiveMap({ config }: { config: PublicConfig }) {
   }
 
   const focusItem = (item: MapItem, focus: HTMLElement) => {
+    if (item.kind === 'companions') {
+      pendingFocusRef.current = null
+      setReturnFocus(focus)
+      setDetail({ kind: 'item', itemId: item.id })
+      const owner = item.ownerId ? itemById.get(item.ownerId) : undefined
+      const targetLayerId = owner?.map || item.map
+      if (targetLayerId !== activeLayer.id) {
+        const layer = config.layers.find((candidate) => candidate.id === targetLayerId)
+        if (layer) setActiveLayer(layer)
+      }
+      return
+    }
     setEnabledKinds((current) => {
       const next = new Set(current)
       if (item.kind === 'workers') {
@@ -318,6 +349,16 @@ function LiveMap({ config }: { config: PublicConfig }) {
     })
   }
 
+  const uncheckAll = () => {
+    setEnabledKinds(new Set())
+    setEnabledPlayerStatuses(new Set())
+    setSeenKinds((current) => {
+      const next = new Set(current)
+      for (const kind of FILTERABLE_KINDS) next.add(kind)
+      return next
+    })
+  }
+
   const toggleSetValue = (setter: React.Dispatch<React.SetStateAction<Set<string>>>, id: string) => {
     setter((current) => {
       const next = new Set(current)
@@ -351,20 +392,20 @@ function LiveMap({ config }: { config: PublicConfig }) {
     objectNotice = `World objects are using the last successful snapshot.${retainedLimitNotice}`
   else if (objectState.truncated || objectState.lastError === 'object-limit')
     objectNotice = `Showing ${objectState.objects.length.toLocaleString()} of ${objectState.total.toLocaleString()} world objects; this snapshot reached the configured limit.`
-  else if (!objectState.available) objectNotice = 'Loading bases, Pals and NPCs…'
+  else if (!objectState.available) objectNotice = 'Loading guild bases and Pal relationships…'
 
   const catalogueCompatibility = playerState
     ? landmarkCatalogueCompatibility(config.landmarkCatalogue.gameVersion, playerState.server.version)
     : 'compatible'
   if (catalogueCompatibility === 'mismatch') {
-    const catalogueNotice = `Landmark catalogue version mismatch: locations were exported for Palworld ${config.landmarkCatalogue.gameVersion}, but this server reports ${playerState?.server.version}. Alpha Pal and Tower Boss locations may be outdated; regenerate them with make game-assets.`
+    const catalogueNotice = `World catalogue version mismatch: locations were exported for Palworld ${config.landmarkCatalogue.gameVersion}, but this server reports ${playerState?.server.version}. Static locations may be outdated; regenerate them with make game-assets.`
     objectNotice = objectNotice ? `${objectNotice} ${catalogueNotice}` : catalogueNotice
   } else if (catalogueCompatibility === 'unverifiable') {
     const reportedVersion = playerState?.server.version?.trim()
     const reason = reportedVersion
       ? `the server reports an unrecognised version (${reportedVersion})`
       : 'the server did not report a version'
-    const catalogueNotice = `Landmark catalogue compatibility could not be verified because ${reason}. Alpha Pal and Tower Boss locations may be outdated; regenerate them with make game-assets after confirming the installed game version.`
+    const catalogueNotice = `World catalogue compatibility could not be verified because ${reason}. Static locations may be outdated; regenerate them with make game-assets after confirming the installed game version.`
     objectNotice = objectNotice ? `${objectNotice} ${catalogueNotice}` : catalogueNotice
   }
 
@@ -381,6 +422,7 @@ function LiveMap({ config }: { config: PublicConfig }) {
     expandedBases,
     objectNotice,
     onSearchChange: setSearch,
+    onUncheckAll: uncheckAll,
     onToggleKinds: toggleKinds,
     onTogglePlayerStatus: togglePlayerStatus,
     onToggleItems: toggleItems,
@@ -399,7 +441,13 @@ function LiveMap({ config }: { config: PublicConfig }) {
 
   return (
     <div className="relative h-dvh overflow-hidden bg-[#171a1d] text-[#f4f5f5]">
-      <StatusBar playerState={playerState} offline={Boolean(players.error)} />
+      <StatusBar
+        playerState={playerState}
+        offline={Boolean(players.error)}
+        leaderboardButtonRef={leaderboardButtonRef}
+        leaderboardOpen={detail?.kind === 'leaderboard'}
+        onOpenLeaderboards={(focus) => showLeaderboard('player-level', focus)}
+      />
       <main className="absolute inset-0 overflow-hidden bg-[#0d161e]">
         <Explorer {...explorerProps} open={filtersOpen} onOpen={() => setFiltersOpen(true)} />
         <div className="relative size-full min-h-0 min-w-0 overflow-hidden">
@@ -414,26 +462,6 @@ function LiveMap({ config }: { config: PublicConfig }) {
             onShowItem={showItem}
             inspectorOpen={Boolean(detail)}
           >
-            <button
-              ref={leaderboardButtonRef}
-              type="button"
-              className={`pal-glass-control absolute top-[78px] z-20 grid size-12 cursor-pointer place-items-center text-[#dceef0] transition-[right,border-color,background-color,opacity,transform] focus-visible:outline-none max-sm:top-[88px] max-sm:size-11 ${
-                detail?.kind === 'leaderboard'
-                  ? 'pointer-events-none right-4 translate-y-1 opacity-0 max-sm:right-3'
-                  : detail
-                    ? 'right-[382px] max-[1180px]:hidden'
-                    : 'right-4 max-sm:right-3'
-              }`}
-              aria-label="Open leaderboards"
-              aria-haspopup="dialog"
-              aria-expanded={detail?.kind === 'leaderboard'}
-              aria-hidden={detail?.kind === 'leaderboard'}
-              inert={detail?.kind === 'leaderboard'}
-              title="Leaderboards"
-              onClick={(event) => showLeaderboard('player-level', event.currentTarget)}
-            >
-              <LeaderboardIcon />
-            </button>
             <ProjectLinks hidden={Boolean(detail)} />
             <DetailsDialog
               detail={detail}

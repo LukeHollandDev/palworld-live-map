@@ -5,13 +5,22 @@ export const MAX_ZOOM_RATIO = 96
 
 const MARKER_STACK_ORDER: Record<ItemKind, number> = {
   'wild-pals': 10,
-  npcs: 20,
-  workers: 30,
-  companions: 40,
-  'alpha-pals': 50,
-  bosses: 60,
-  bases: 70,
-  players: 80
+  'dungeon-entrances': 15,
+  effigies: 20,
+  journals: 25,
+  'ancient-shrine-pickups': 30,
+  'npc-locations': 35,
+  npcs: 40,
+  workers: 45,
+  companions: 50,
+  waypoints: 55,
+  watchtowers: 60,
+  'alpha-pals': 65,
+  bounties: 70,
+  bosses: 75,
+  'oil-rigs': 80,
+  bases: 85,
+  players: 90
 }
 
 const ITEM_KIND_SEARCH_TERMS: Record<ItemKind, string> = {
@@ -22,7 +31,16 @@ const ITEM_KIND_SEARCH_TERMS: Record<ItemKind, string> = {
   'wild-pals': 'wild pal wild pals',
   'alpha-pals': 'alpha pal alpha pals field alpha field alphas',
   bosses: 'tower boss tower bosses biome boss biome bosses',
-  npcs: 'npc npcs non-player character non-player characters'
+  bounties: 'bounty bounties human boss human bosses wanted target wanted targets',
+  'oil-rigs': 'oil rig oil rigs raid zone raid zones',
+  watchtowers: 'watchtower watchtowers fast travel fast-travel',
+  waypoints: 'waypoint waypoints fast travel fast-travel great eagle statue great eagle statues',
+  'dungeon-entrances': 'dungeon entrance dungeon entrances cave caves',
+  effigies: 'effigy effigies lifmunk effigy lifmunk effigies relic relics',
+  journals: 'journal journals note notes diary diaries castaway',
+  'ancient-shrine-pickups': 'ancient shrine pickup pickups schematic schematics item pickup',
+  'npc-locations': 'npc location npc locations static npc static npcs non-player character trader merchant dealer',
+  npcs: 'live npc live npcs spawned npc spawned npcs non-player character non-player characters'
 }
 
 export interface Point {
@@ -128,6 +146,15 @@ export function kindLabel(kind: MapItem['kind']): string {
       'wild-pals': 'Wild Pal',
       'alpha-pals': 'Alpha Pal',
       bosses: 'Tower boss',
+      bounties: 'Bounty',
+      'oil-rigs': 'Oil rig',
+      watchtowers: 'Watchtower',
+      waypoints: 'Waypoint',
+      'dungeon-entrances': 'Dungeon entrance',
+      effigies: 'Pal Effigy',
+      journals: 'Journal',
+      'ancient-shrine-pickups': 'Ancient Shrine pickup',
+      'npc-locations': 'NPC location',
       npcs: 'NPC'
     } as const
   )[kind]

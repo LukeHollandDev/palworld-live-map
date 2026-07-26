@@ -82,6 +82,92 @@
     color: white;
   }
 
+  .leaderboard-header-control {
+    position: absolute;
+    top: calc(100% - 1px);
+    left: 50%;
+    z-index: 3;
+    display: grid;
+    width: clamp(300px, 25vw, 360px);
+    height: 34px;
+    place-items: center;
+    padding: 0 0 2px;
+    border: 0;
+    background: transparent;
+    color: #d4e3e5;
+    cursor: pointer;
+    filter: drop-shadow(0 8px 12px rgb(0 0 0 / 42%));
+    transform: translateX(-50%);
+    transition:
+      color 160ms ease,
+      opacity 160ms ease,
+      transform 160ms ease;
+  }
+
+  .leaderboard-header-control::before,
+  .leaderboard-header-control::after {
+    position: absolute;
+    inset: 0;
+    clip-path: polygon(0 0, 100% 0, 96% 100%, 4% 100%);
+    content: "";
+    transition: background-color 160ms ease;
+  }
+
+  .leaderboard-header-control::before {
+    background: var(--pal-glass-border);
+  }
+
+  .leaderboard-header-control::after {
+    inset: 1px;
+    background: var(--pal-glass-surface);
+    backdrop-filter: blur(14px) saturate(125%);
+  }
+
+  .leaderboard-header-control > span {
+    position: relative;
+    z-index: 1;
+    font-size: 11px;
+    font-weight: 750;
+    letter-spacing: 0.16em;
+    line-height: 1;
+    text-transform: uppercase;
+    transform: translateY(-1px);
+  }
+
+  .leaderboard-header-control:hover,
+  .leaderboard-header-control:focus-visible {
+    color: white;
+  }
+
+  .leaderboard-header-control:hover::before,
+  .leaderboard-header-control:focus-visible::before {
+    background: var(--pal-glass-border-strong);
+  }
+
+  .leaderboard-header-control:hover::after,
+  .leaderboard-header-control:focus-visible::after {
+    background: rgb(35 47 52 / 96%);
+  }
+
+  .leaderboard-header-control.is-leaderboard-open {
+    pointer-events: none;
+    opacity: 0;
+    transform: translate(-50%, 4px);
+  }
+
+  @media (width < 48rem) {
+    .leaderboard-header-control {
+      right: -1px;
+      left: -1px;
+      width: auto;
+      transform: none;
+    }
+
+    .leaderboard-header-control.is-leaderboard-open {
+      transform: translateY(4px);
+    }
+  }
+
   .pal-glass-inset {
     border: 1px solid rgb(205 231 235 / 16%);
     background: var(--pal-glass-inset);
@@ -298,6 +384,42 @@
 
   .marker-glyph.kind-bosses {
     --marker-glyph-color: #e36b72;
+  }
+
+  .marker-glyph.kind-bounties {
+    --marker-glyph-color: #ef8354;
+  }
+
+  .marker-glyph.kind-oil-rigs {
+    --marker-glyph-color: #7eb5d6;
+  }
+
+  .marker-glyph.kind-watchtowers {
+    --marker-glyph-color: #8ecae6;
+  }
+
+  .marker-glyph.kind-waypoints {
+    --marker-glyph-color: #4cc9c0;
+  }
+
+  .marker-glyph.kind-dungeon-entrances {
+    --marker-glyph-color: #8f78d1;
+  }
+
+  .marker-glyph.kind-effigies {
+    --marker-glyph-color: #8fd17f;
+  }
+
+  .marker-glyph.kind-journals {
+    --marker-glyph-color: #d7a95c;
+  }
+
+  .marker-glyph.kind-ancient-shrine-pickups {
+    --marker-glyph-color: #d78bd7;
+  }
+
+  .marker-glyph.kind-npc-locations {
+    --marker-glyph-color: #9fb6c3;
   }
 
   .marker-glyph.kind-players.player-online {

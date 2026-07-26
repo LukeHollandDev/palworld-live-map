@@ -1,0 +1,1110 @@
+<!DOCTYPE html>
+<html lang="en" data-focus="all">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="dark">
+    <title>Palworld Live Map — Icon library comparison</title>
+    <script src="https://code.iconify.design/iconify-icon/3.0.0/iconify-icon.min.js"></script>
+    <style>
+      :root {
+        --bg: #0b1115;
+        --panel: rgb(23 31 36 / 88%);
+        --panel-strong: #151e23;
+        --line: rgb(201 238 244 / 14%);
+        --line-strong: rgb(201 238 244 / 28%);
+        --text: #eef8f9;
+        --muted: #91a5aa;
+        --subtle: #60757b;
+        --cyan: #70d8e7;
+        --cyan-soft: rgb(112 216 231 / 12%);
+        --green: #78d5a0;
+        --orange: #e5b477;
+        --icon-size: 24px;
+        font-family:
+          Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        color: var(--text);
+        background: var(--bg);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html {
+        scroll-behavior: smooth;
+      }
+
+      body {
+        min-width: 320px;
+        margin: 0;
+        background:
+          radial-gradient(circle at 20% -10%, rgb(50 128 143 / 18%), transparent 34rem),
+          radial-gradient(circle at 90% 16%, rgb(94 72 142 / 12%), transparent 30rem),
+          linear-gradient(180deg, #10171b 0, var(--bg) 42rem);
+      }
+
+      button,
+      a {
+        font: inherit;
+      }
+
+      a {
+        color: #a7eaf3;
+      }
+
+      button:focus-visible,
+      a:focus-visible {
+        outline: 2px solid var(--cyan);
+        outline-offset: 3px;
+      }
+
+      .shell {
+        width: min(1480px, calc(100% - 32px));
+        margin: 0 auto;
+        padding: 52px 0 80px;
+      }
+
+      .hero {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(280px, 410px);
+        gap: 28px;
+        align-items: end;
+        padding-bottom: 30px;
+        border-bottom: 1px solid var(--line);
+      }
+
+      .eyebrow {
+        margin: 0 0 11px;
+        color: var(--cyan);
+        font: 700 11px/1.2 ui-monospace, SFMono-Regular, Menlo, monospace;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+      }
+
+      h1,
+      h2,
+      h3,
+      p {
+        margin-top: 0;
+      }
+
+      h1 {
+        max-width: 820px;
+        margin-bottom: 16px;
+        font-size: clamp(36px, 5vw, 66px);
+        line-height: 0.98;
+        letter-spacing: -0.045em;
+      }
+
+      .lede {
+        max-width: 780px;
+        margin-bottom: 0;
+        color: #afc1c5;
+        font-size: clamp(15px, 1.7vw, 18px);
+        line-height: 1.65;
+      }
+
+      .recommendation {
+        position: relative;
+        overflow: hidden;
+        padding: 22px;
+        border: 1px solid rgb(112 216 231 / 30%);
+        background:
+          linear-gradient(135deg, rgb(112 216 231 / 10%), transparent 70%),
+          var(--panel);
+        box-shadow: 0 24px 70px rgb(0 0 0 / 28%);
+      }
+
+      .recommendation::before {
+        position: absolute;
+        inset: 0 auto 0 0;
+        width: 3px;
+        background: var(--cyan);
+        content: "";
+      }
+
+      .recommendation .tag,
+      .library-card .tag {
+        display: inline-flex;
+        min-height: 23px;
+        align-items: center;
+        padding: 0 8px;
+        border: 1px solid rgb(112 216 231 / 28%);
+        border-radius: 99px;
+        color: #baf5fc;
+        background: rgb(112 216 231 / 9%);
+        font-size: 10px;
+        font-weight: 800;
+        letter-spacing: 0.09em;
+        text-transform: uppercase;
+      }
+
+      .recommendation h2 {
+        margin: 14px 0 9px;
+        font-size: 24px;
+        letter-spacing: -0.02em;
+      }
+
+      .recommendation p {
+        margin-bottom: 0;
+        color: #9db2b7;
+        font-size: 13px;
+        line-height: 1.6;
+      }
+
+      .stat-strip {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-top: 22px;
+      }
+
+      .stat {
+        padding: 8px 10px;
+        border: 1px solid var(--line);
+        color: #9eb2b7;
+        background: rgb(255 255 255 / 2%);
+        font: 600 11px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+      }
+
+      .section {
+        padding-top: 46px;
+      }
+
+      .section-heading {
+        display: flex;
+        gap: 24px;
+        align-items: end;
+        justify-content: space-between;
+        margin-bottom: 18px;
+      }
+
+      .section-heading h2 {
+        margin-bottom: 7px;
+        font-size: 28px;
+        letter-spacing: -0.025em;
+      }
+
+      .section-heading p {
+        max-width: 730px;
+        margin-bottom: 0;
+        color: var(--muted);
+        font-size: 13px;
+        line-height: 1.55;
+      }
+
+      .library-cards {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 12px;
+      }
+
+      .library-card {
+        min-width: 0;
+        padding: 20px;
+        border: 1px solid var(--line);
+        background: var(--panel);
+      }
+
+      .library-card.recommended {
+        border-color: rgb(112 216 231 / 38%);
+        box-shadow: inset 0 2px var(--cyan);
+      }
+
+      .library-title {
+        display: flex;
+        gap: 12px;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 11px;
+      }
+
+      .library-title h3 {
+        margin: 0;
+        font-size: 19px;
+      }
+
+      .library-card p {
+        min-height: 64px;
+        margin-bottom: 17px;
+        color: #93a7ac;
+        font-size: 12px;
+        line-height: 1.55;
+      }
+
+      .library-facts {
+        display: grid;
+        grid-template-columns: auto 1fr;
+        gap: 7px 12px;
+        margin: 0;
+        font-size: 11px;
+      }
+
+      .library-facts dt {
+        color: #657a80;
+      }
+
+      .library-facts dd {
+        min-width: 0;
+        margin: 0;
+        overflow: hidden;
+        color: #c9d9dc;
+        text-align: right;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .toolbar {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+        justify-content: space-between;
+        margin: 20px 0 12px;
+        padding: 10px;
+        border: 1px solid var(--line);
+        background: rgb(15 23 27 / 78%);
+        backdrop-filter: blur(16px);
+      }
+
+      .segmented {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 4px;
+      }
+
+      .segmented-label {
+        display: grid;
+        min-height: 34px;
+        place-items: center;
+        padding: 0 8px 0 4px;
+        color: #62777c;
+        font: 700 10px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      .segmented button {
+        min-height: 34px;
+        cursor: pointer;
+        border: 1px solid transparent;
+        padding: 0 11px;
+        color: #8fa4a9;
+        background: transparent;
+        font-size: 11px;
+      }
+
+      .segmented button:hover {
+        color: var(--text);
+        background: rgb(255 255 255 / 4%);
+      }
+
+      .segmented button[aria-pressed="true"] {
+        border-color: rgb(112 216 231 / 25%);
+        color: #c8f7fc;
+        background: var(--cyan-soft);
+      }
+
+      .comparison-wrap {
+        overflow-x: auto;
+        border: 1px solid var(--line-strong);
+        background: rgb(11 17 21 / 72%);
+        box-shadow: 0 30px 100px rgb(0 0 0 / 22%);
+      }
+
+      .comparison-grid {
+        display: grid;
+        min-width: 940px;
+        grid-template-columns: minmax(210px, 1.18fr) repeat(4, minmax(155px, 1fr));
+      }
+
+      html:not([data-focus="all"]) .comparison-grid {
+        min-width: 610px;
+        grid-template-columns: minmax(210px, 1.18fr) repeat(2, minmax(175px, 1fr));
+      }
+
+      html[data-focus="lucide"] .library-cell.tabler,
+      html[data-focus="lucide"] .library-cell.phosphor,
+      html[data-focus="tabler"] .library-cell.lucide,
+      html[data-focus="tabler"] .library-cell.phosphor,
+      html[data-focus="phosphor"] .library-cell.lucide,
+      html[data-focus="phosphor"] .library-cell.tabler {
+        display: none;
+      }
+
+      .grid-cell {
+        min-width: 0;
+        border-right: 1px solid var(--line);
+        border-bottom: 1px solid var(--line);
+      }
+
+      .grid-cell:nth-last-child(-n + 5) {
+        border-bottom: 0;
+      }
+
+      .grid-head {
+        position: sticky;
+        top: 0;
+        z-index: 2;
+        display: flex;
+        min-height: 68px;
+        flex-direction: column;
+        justify-content: center;
+        padding: 12px 15px;
+        background: rgb(19 28 33 / 96%);
+        box-shadow: 0 1px var(--line-strong);
+        backdrop-filter: blur(18px);
+      }
+
+      .grid-head strong {
+        font-size: 13px;
+      }
+
+      .grid-head span {
+        margin-top: 4px;
+        color: #667b81;
+        font: 600 10px/1.2 ui-monospace, SFMono-Regular, Menlo, monospace;
+      }
+
+      .grid-head.recommended {
+        background:
+          linear-gradient(180deg, rgb(112 216 231 / 10%), transparent),
+          rgb(19 28 33 / 96%);
+      }
+
+      .row-label {
+        display: grid;
+        min-height: 86px;
+        grid-template-columns: 33px minmax(0, 1fr);
+        gap: 12px;
+        align-items: center;
+        padding: 13px 15px;
+        background: rgb(255 255 255 / 1.5%);
+      }
+
+      .row-number {
+        color: #4f6267;
+        font: 700 10px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+      }
+
+      .row-label strong {
+        display: block;
+        margin-bottom: 4px;
+        font-size: 13px;
+      }
+
+      .row-label span:last-child {
+        display: block;
+        overflow: hidden;
+        color: #62777d;
+        font: 10px/1.3 ui-monospace, SFMono-Regular, Menlo, monospace;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .icon-cell {
+        display: grid;
+        min-height: 86px;
+        grid-template-columns: 48px minmax(0, 1fr);
+        gap: 11px;
+        align-items: center;
+        padding: 12px 13px;
+        transition: background 120ms ease;
+      }
+
+      .icon-cell:hover {
+        background: rgb(112 216 231 / 4%);
+      }
+
+      .icon-cell.tabler {
+        background-color: rgb(112 216 231 / 2.5%);
+      }
+
+      .marker-stage,
+      .control-stage {
+        display: grid;
+        width: 46px;
+        height: 46px;
+        flex: none;
+        place-items: center;
+        border: 1px solid rgb(202 239 245 / 12%);
+        border-radius: 50%;
+        color: var(--marker-color, #a6edf5);
+        background:
+          radial-gradient(circle, rgb(24 37 43 / 96%) 0 56%, rgb(5 10 13 / 86%) 57% 72%, transparent 73%);
+      }
+
+      .control-stage {
+        border-radius: 3px;
+        background: linear-gradient(145deg, #1d2a30, #11191d);
+      }
+
+      .marker-stage iconify-icon,
+      .control-stage iconify-icon {
+        display: inline-block;
+        width: var(--icon-size);
+        height: var(--icon-size);
+        font-size: var(--icon-size);
+        filter: drop-shadow(0 1px 1px rgb(0 0 0 / 75%));
+      }
+
+      .marker-stage.current {
+        background: transparent;
+      }
+
+      .current-marker {
+        display: block;
+        width: var(--icon-size);
+        height: var(--icon-size);
+        overflow: visible;
+      }
+
+      .current-marker .outline {
+        fill: none;
+        stroke: rgb(8 18 24 / 72%);
+        stroke-linejoin: round;
+        stroke-width: 6;
+      }
+
+      .current-marker .fill {
+        fill: var(--marker-color);
+        stroke: #f1ffff;
+        stroke-linejoin: round;
+        stroke-width: 2;
+      }
+
+      .current-ui {
+        display: block;
+        width: var(--icon-size);
+        height: var(--icon-size);
+        color: #a9eaf2;
+      }
+
+      .current-text-icon {
+        color: #dffbff;
+        font-size: var(--icon-size);
+        font-weight: 400;
+        line-height: 1;
+      }
+
+      .icon-meta {
+        min-width: 0;
+      }
+
+      .icon-name {
+        display: block;
+        overflow: hidden;
+        color: #c4d4d7;
+        font: 600 10px/1.35 ui-monospace, SFMono-Regular, Menlo, monospace;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .icon-note {
+        display: block;
+        margin-top: 5px;
+        color: #5d7176;
+        font-size: 10px;
+        line-height: 1.3;
+      }
+
+      .recommended-label {
+        color: var(--cyan);
+      }
+
+      .callouts {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 12px;
+        margin-top: 14px;
+      }
+
+      .callout {
+        padding: 18px;
+        border: 1px solid var(--line);
+        background: var(--panel);
+      }
+
+      .callout strong {
+        display: block;
+        margin-bottom: 8px;
+        color: #dbeaec;
+        font-size: 13px;
+      }
+
+      .callout p {
+        margin: 0;
+        color: #82979c;
+        font-size: 12px;
+        line-height: 1.55;
+      }
+
+      .footnote {
+        margin-top: 20px;
+        padding: 16px 18px;
+        border-left: 2px solid var(--orange);
+        color: #8fa1a5;
+        background: rgb(229 180 119 / 6%);
+        font-size: 12px;
+        line-height: 1.6;
+      }
+
+      footer {
+        display: flex;
+        gap: 20px;
+        justify-content: space-between;
+        margin-top: 42px;
+        padding-top: 18px;
+        border-top: 1px solid var(--line);
+        color: #5f7378;
+        font-size: 11px;
+        line-height: 1.5;
+      }
+
+      @media (max-width: 900px) {
+        .hero {
+          grid-template-columns: 1fr;
+        }
+
+        .library-cards,
+        .callouts {
+          grid-template-columns: 1fr;
+        }
+
+        .library-card p {
+          min-height: auto;
+        }
+
+        .section-heading {
+          display: block;
+        }
+
+        .section-heading p {
+          margin-top: 6px;
+        }
+      }
+
+      @media (max-width: 560px) {
+        .shell {
+          width: min(100% - 20px, 1480px);
+          padding-top: 30px;
+        }
+
+        h1 {
+          font-size: 39px;
+        }
+
+        .toolbar {
+          align-items: flex-start;
+          flex-direction: column;
+        }
+
+        footer {
+          flex-direction: column;
+        }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        html {
+          scroll-behavior: auto;
+        }
+
+        * {
+          transition-duration: 0.01ms !important;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="shell">
+      <header class="hero">
+        <div>
+          <p class="eyebrow">Design decision artifact · 26 July 2026</p>
+          <h1>Icon library replacement study</h1>
+          <p class="lede">
+            A direct comparison of every custom map glyph and interface icon currently used by Palworld Live Map.
+            The proposed icons are real assets from each library, shown in the app’s dark-map treatment and category
+            colours.
+          </p>
+          <div class="stat-strip" role="group" aria-label="Comparison scope">
+            <span class="stat">17 map markers</span>
+            <span class="stat">9 UI controls</span>
+            <span class="stat">3 free libraries</span>
+            <span class="stat">78 mapped alternatives</span>
+          </div>
+        </div>
+        <aside class="recommendation">
+          <span class="tag">Recommended starting point</span>
+          <h2>Tabler Icons</h2>
+          <p>
+            It has the most convincing semantic matches for the map-specific categories while retaining the crisp
+            technical style of the current interface. Use the React package with named imports, and preserve the
+            current dark marker halo for map legibility.
+          </p>
+        </aside>
+      </header>
+
+      <section class="section" aria-labelledby="libraries-title">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">Shortlist</p>
+            <h2 id="libraries-title">Free, production-ready choices</h2>
+          </div>
+          <p>
+            Counts and licences were checked against each project’s official site/repository. “Phosphor assets”
+            includes its six visual weights; it represents roughly 1,500 icon concepts rather than 9,072 unique
+            concepts.
+          </p>
+        </div>
+        <div class="library-cards">
+          <article class="library-card">
+            <div class="library-title">
+              <h3>Lucide</h3>
+              <span class="tag">ISC</span>
+            </div>
+            <p>
+              The smallest and most familiar option. Clean, restrained outlines and excellent tree-shaking, but more
+              specialist Palworld categories require generic substitutions.
+            </p>
+            <dl class="library-facts">
+              <dt>Published set</dt>
+              <dd>1,756 icons</dd>
+              <dt>React package</dt>
+              <dd>lucide-react</dd>
+              <dt>Source</dt>
+              <dd><a href="https://lucide.dev/" target="_blank" rel="noreferrer">lucide.dev</a></dd>
+            </dl>
+          </article>
+          <article class="library-card recommended">
+            <div class="library-title">
+              <h3>Tabler Icons</h3>
+              <span class="tag">MIT · best fit</span>
+            </div>
+            <p>
+              The broadest useful map vocabulary in the shortlist: warehouse, factory, tower, arch, monument and
+              user-pin are all first-class icons rather than compromises.
+            </p>
+            <dl class="library-facts">
+              <dt>Published set</dt>
+              <dd>6,166 icons</dd>
+              <dt>React package</dt>
+              <dd>@tabler/icons-react</dd>
+              <dt>Source</dt>
+              <dd><a href="https://tabler.io/icons" target="_blank" rel="noreferrer">tabler.io/icons</a></dd>
+            </dl>
+          </article>
+          <article class="library-card">
+            <div class="library-title">
+              <h3>Phosphor</h3>
+              <span class="tag">MIT</span>
+            </div>
+            <p>
+              The most expressive family and the only choice here with six weights. Bold icons survive small marker
+              sizes especially well, although a few map landmarks remain generic.
+            </p>
+            <dl class="library-facts">
+              <dt>Published set</dt>
+              <dd>9,072 assets</dd>
+              <dt>React package</dt>
+              <dd>@phosphor-icons/react</dd>
+              <dt>Source</dt>
+              <dd><a href="https://phosphoricons.com/" target="_blank" rel="noreferrer">phosphoricons.com</a></dd>
+            </dl>
+          </article>
+        </div>
+      </section>
+
+      <section class="section" aria-labelledby="markers-title">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">1:1 replacements</p>
+            <h2 id="markers-title">Map marker glyphs</h2>
+          </div>
+          <p>
+            The first column reproduces the current SVG path. Alternatives sit inside a subtle dark halo because a
+            bare line icon loses contrast over a detailed map image.
+          </p>
+        </div>
+        <div class="toolbar" role="group" aria-label="Marker comparison controls">
+          <div class="segmented" data-control="library">
+            <span class="segmented-label">Columns</span>
+            <button type="button" data-value="all" aria-pressed="true">All</button>
+            <button type="button" data-value="lucide" aria-pressed="false">Lucide</button>
+            <button type="button" data-value="tabler" aria-pressed="false">Tabler</button>
+            <button type="button" data-value="phosphor" aria-pressed="false">Phosphor</button>
+          </div>
+          <div class="segmented" data-control="size">
+            <span class="segmented-label">Preview</span>
+            <button type="button" data-value="20" aria-pressed="false">20 px</button>
+            <button type="button" data-value="24" aria-pressed="true">24 px</button>
+            <button type="button" data-value="32" aria-pressed="false">32 px</button>
+          </div>
+        </div>
+        <div class="comparison-wrap">
+          <div class="comparison-grid" id="marker-grid"></div>
+        </div>
+        <div class="callouts">
+          <div class="callout">
+            <strong>Tabler wins on landmark specificity</strong>
+            <p>Building Warehouse, Building Factory, Tower, Building Arch and Building Monument are unusually strong matches.</p>
+          </div>
+          <div class="callout">
+            <strong>Phosphor wins at the smallest scale</strong>
+            <p>The bold weight remains readable at 20px without increasing a global stroke width or editing paths.</p>
+          </div>
+          <div class="callout">
+            <strong>Two categories still need product judgement</strong>
+            <p>Companion Pal and Ancient Shrine pickup have no literal library icon; heart-handshake and sparkle are semantic stand-ins.</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="section" aria-labelledby="controls-title">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">1:1 replacements</p>
+            <h2 id="controls-title">Interface and control icons</h2>
+          </div>
+          <p>
+            Replacing these from the same chosen library removes the current mixture of hand-drawn SVG, Heroicons,
+            Octicons and text glyphs.
+          </p>
+        </div>
+        <div class="comparison-wrap">
+          <div class="comparison-grid" id="control-grid"></div>
+        </div>
+        <p class="footnote">
+          This gallery uses Iconify’s official web component only to make the standalone comparison easy to review;
+          it fetches the selected SVG data at runtime. A production change should import named React components
+          directly from the chosen library, so the app has no Iconify runtime or third-party API dependency.
+        </p>
+      </section>
+
+      <footer>
+        <span>Prepared for Palworld Live Map · no application code or dependencies changed</span>
+        <span>Current glyphs sourced from <code>MarkerGlyph.tsx</code> and the existing component SVGs</span>
+      </footer>
+    </main>
+
+    <script>
+      const libraries = [
+        { key: "current", title: "Existing", detail: "Current project artwork" },
+        { key: "lucide", title: "Lucide", detail: "ISC · regular outline" },
+        { key: "tabler", title: "Tabler", detail: "MIT · recommended", recommended: true },
+        { key: "phosphor", title: "Phosphor", detail: "MIT · bold weight" }
+      ];
+
+      const markerPaths = {
+        players: "M10 3 17 10 10 17 3 10Z",
+        bases: "M4 3h12q1 0 1 1v12q0 1-1 1H4q-1 0-1-1V4q0-1 1-1Z",
+        workers: "M10 3 17 10 10 17 3 10Z",
+        companions: "M17 10a7 7 0 1 1-14 0 7 7 0 0 1 14 0Z",
+        "wild-pals": "M17 10a7 7 0 1 1-14 0 7 7 0 0 1 14 0Z",
+        "alpha-pals": "M10 2.5 12.1 6.5 16.7 5.5 14.5 9.6 17.5 13 12.9 12.2 10 17 7.1 12.2 2.5 13 5.5 9.6 3.3 5.5 7.9 6.5Z",
+        bosses: "M10 2.5 16.5 5.2 15.5 13.4 10 17.5 4.5 13.4 3.5 5.2Z",
+        bounties: "M10 2.5 16 5.5v4.8c0 3.5-2.4 5.8-6 7.2-3.6-1.4-6-3.7-6-7.2V5.5Z",
+        "oil-rigs": "M4 17V8h3V4h6v4h3v9H4Zm5-9h2V6H9Z",
+        watchtowers: "M7 3h6l-1 4 3 10H5L8 7Z",
+        waypoints: "M10 2.5A5.5 5.5 0 0 1 15.5 8c0 4-5.5 9.5-5.5 9.5S4.5 12 4.5 8A5.5 5.5 0 0 1 10 2.5Z",
+        "dungeon-entrances": "M4 17V9a6 6 0 0 1 12 0v8h-4V9a2 2 0 0 0-4 0v8Z",
+        effigies: "M10 2.5 13 6l-1.5 3 3.5 8H5l3.5-8L7 6Z",
+        journals: "M3 4.5q3.5-1.5 7 1.5v11q-3.5-3-7-1.5Zm14 0q-3.5-1.5-7 1.5v11q3.5-3 7-1.5Z",
+        "ancient-shrine-pickups": "M10 2 12 7.5 18 10 12 12.5 10 18 8 12.5 2 10 8 7.5Z",
+        "npc-locations": "M10 2.5 17 6.5v7L10 17.5 3 13.5v-7Z",
+        npcs: "M10 3 17 17H3Z"
+      };
+
+      const markers = [
+        {
+          key: "players",
+          label: "Player",
+          color: "#65c783",
+          lucide: "user-round",
+          tabler: "user",
+          phosphor: "user-bold"
+        },
+        {
+          key: "bases",
+          label: "Base",
+          color: "#f2a65a",
+          lucide: "warehouse",
+          tabler: "building-warehouse",
+          phosphor: "warehouse-bold"
+        },
+        {
+          key: "workers",
+          label: "Base worker",
+          color: "#65c783",
+          lucide: "hammer",
+          tabler: "hammer",
+          phosphor: "hammer-bold"
+        },
+        {
+          key: "companions",
+          label: "Companion Pal",
+          color: "#ad7fea",
+          lucide: "heart-handshake",
+          tabler: "heart-handshake",
+          phosphor: "hand-heart-bold"
+        },
+        {
+          key: "wild-pals",
+          label: "Wild Pal",
+          color: "#55c7bd",
+          lucide: "paw-print",
+          tabler: "paw",
+          phosphor: "paw-print-bold"
+        },
+        {
+          key: "alpha-pals",
+          label: "Alpha Pal",
+          color: "#e9c65f",
+          lucide: "crown",
+          tabler: "crown",
+          phosphor: "crown-bold"
+        },
+        {
+          key: "bosses",
+          label: "Tower boss",
+          color: "#e36b72",
+          lucide: "skull",
+          tabler: "skull",
+          phosphor: "skull-bold"
+        },
+        {
+          key: "bounties",
+          label: "Bounty",
+          color: "#ef8354",
+          lucide: "crosshair",
+          tabler: "target",
+          phosphor: "crosshair-bold"
+        },
+        {
+          key: "oil-rigs",
+          label: "Oil rig",
+          color: "#7eb5d6",
+          lucide: "factory",
+          tabler: "building-factory-2",
+          phosphor: "factory-bold"
+        },
+        {
+          key: "watchtowers",
+          label: "Watchtower",
+          color: "#8ecae6",
+          lucide: "tower-control",
+          tabler: "tower",
+          phosphor: "binoculars-bold"
+        },
+        {
+          key: "waypoints",
+          label: "Waypoint",
+          color: "#4cc9c0",
+          lucide: "map-pin",
+          tabler: "map-pin",
+          phosphor: "map-pin-bold"
+        },
+        {
+          key: "dungeon-entrances",
+          label: "Dungeon entrance",
+          color: "#8f78d1",
+          lucide: "door-open",
+          tabler: "building-arch",
+          phosphor: "door-open-bold"
+        },
+        {
+          key: "effigies",
+          label: "Pal Effigy",
+          color: "#8fd17f",
+          lucide: "landmark",
+          tabler: "building-monument",
+          phosphor: "church-bold"
+        },
+        {
+          key: "journals",
+          label: "Journal",
+          color: "#d7a95c",
+          lucide: "book-open-text",
+          tabler: "notebook",
+          phosphor: "book-open-text-bold"
+        },
+        {
+          key: "ancient-shrine-pickups",
+          label: "Ancient Shrine pickup",
+          color: "#d78bd7",
+          lucide: "sparkle",
+          tabler: "sparkle",
+          phosphor: "sparkle-bold"
+        },
+        {
+          key: "npc-locations",
+          label: "NPC location",
+          color: "#9fb6c3",
+          lucide: "map-pinned",
+          tabler: "user-pin",
+          phosphor: "map-pin-area-bold"
+        },
+        {
+          key: "npcs",
+          label: "NPC",
+          color: "#c9ced1",
+          lucide: "person-standing",
+          tabler: "message-2",
+          phosphor: "person-bold"
+        }
+      ];
+
+      const controls = [
+        { key: "trophy", label: "Leaderboards", lucide: "trophy", tabler: "trophy", phosphor: "trophy-bold" },
+        { key: "filter", label: "Open filters", lucide: "funnel", tabler: "filter", phosphor: "funnel-bold" },
+        { key: "search", label: "Search", lucide: "search", tabler: "search", phosphor: "magnifying-glass-bold" },
+        { key: "close", label: "Close / clear", lucide: "x", tabler: "x", phosphor: "x-bold" },
+        { key: "chevron", label: "Expand section", lucide: "chevron-right", tabler: "chevron-right", phosphor: "caret-right-bold" },
+        { key: "position", label: "Map coordinates", lucide: "crosshair", tabler: "crosshair", phosphor: "crosshair-bold" },
+        { key: "minus", label: "Zoom out", lucide: "minus", tabler: "minus", phosphor: "minus-bold" },
+        { key: "plus", label: "Zoom in", lucide: "plus", tabler: "plus", phosphor: "plus-bold" },
+        { key: "github", label: "GitHub", lucide: "github", tabler: "brand-github", phosphor: "github-logo-bold" }
+      ];
+
+      const uiSvg = {
+        trophy: `<svg class="current-ui" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M5.09 10.121A5.251 5.251 0 0 1 1 5V3.75C1 2.784 1.784 2 2.75 2h2.364c.236-.586.81-1 1.48-1h10.812c.67 0 1.244.414 1.48 1h2.489c.966 0 1.75.784 1.75 1.75V5a5.252 5.252 0 0 1-4.219 5.149 7.01 7.01 0 0 1-4.644 5.478l.231 3.003.034.031c.079.065.303.203.836.282.838.124 1.637.81 1.637 1.807v.75h2.25a.75.75 0 0 1 0 1.5H4.75a.75.75 0 0 1 0-1.5H7v-.75c0-.996.8-1.683 1.637-1.807.533-.08.757-.217.836-.282l.034-.031.231-3.003A7.012 7.012 0 0 1 5.09 10.12ZM6.5 2.594V9a5.5 5.5 0 1 0 11 0V2.594a.094.094 0 0 0-.094-.094H6.594a.094.094 0 0 0-.094.094Zm4.717 13.363-.215 2.793-.001.021-.003.043a1.212 1.212 0 0 1-.022.147c-.05.237-.194.567-.553.86-.348.286-.853.5-1.566.605a.478.478 0 0 0-.274.136.264.264 0 0 0-.083.188v.75h7v-.75a.264.264 0 0 0-.083-.188.478.478 0 0 0-.274-.136c-.713-.105-1.218-.32-1.567-.604-.358-.294-.502-.624-.552-.86a1.22 1.22 0 0 1-.025-.19l-.001-.022-.215-2.793a7.069 7.069 0 0 1-1.566 0ZM19 8.578A3.751 3.751 0 0 0 21.625 5V3.75a.25.25 0 0 0-.25-.25H19ZM5 3.5H2.75a.25.25 0 0 0-.25.25V5A3.752 3.752 0 0 0 5 8.537Z"/></svg>`,
+        filter: `<svg class="current-ui" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3c2.755 0 5.455.232 8.083.678A1.112 1.112 0 0 1 21 4.774v1.044c0 .597-.237 1.169-.659 1.591l-5.432 5.432a2.25 2.25 0 0 0-.659 1.591v2.927c0 .853-.482 1.632-1.244 2.013L9.75 21v-6.568c0-.597-.237-1.169-.659-1.591L3.659 7.409A2.25 2.25 0 0 1 3 5.818V4.774c0-.54.384-1.006.917-1.096A48.5 48.5 0 0 1 12 3Z"/></svg>`,
+        search: `<svg class="current-ui" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><circle cx="8.5" cy="8.5" r="4.75"/><path d="m12 12 4 4"/></svg>`,
+        close: `<span class="current-text-icon" aria-hidden="true">×</span>`,
+        chevron: `<svg class="current-ui" viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="m7 4 6 6-6 6" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
+        position: `<svg class="current-ui" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><circle cx="10" cy="10" r="3.25"/><path d="M10 2v3M10 15v3M2 10h3M15 10h3"/></svg>`,
+        minus: `<span class="current-text-icon" aria-hidden="true">−</span>`,
+        plus: `<span class="current-text-icon" aria-hidden="true">+</span>`,
+        github: `<svg class="current-ui" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 22v-3.9c0-1 .1-1.4-.5-2 2.8-.3 5.7-1.4 5.7-6.2a4.8 4.8 0 0 0-1.3-3.4 4.5 4.5 0 0 0-.1-3.4s-1-.3-3.5 1.3a12 12 0 0 0-6.4 0C6.5 2.8 5.4 3.1 5.4 3.1a4.5 4.5 0 0 0-.1 3.4A4.8 4.8 0 0 0 4 9.9c0 4.8 2.9 5.9 5.7 6.2-.5.5-.6 1.1-.6 2V22"/><path d="M9.1 19c-2.9.9-2.9-1.5-4.1-2"/></svg>`
+      };
+
+      const prefixes = { lucide: "lucide", tabler: "tabler", phosphor: "ph" };
+
+      function escapeHtml(value) {
+        return String(value)
+          .replaceAll("&", "&amp;")
+          .replaceAll("<", "&lt;")
+          .replaceAll(">", "&gt;")
+          .replaceAll('"', "&quot;")
+          .replaceAll("'", "&#039;");
+      }
+
+      function gridHeader() {
+        return [
+          `<div class="grid-cell grid-head"><strong>Category</strong><span>Current ItemKind</span></div>`,
+          ...libraries.map((library) => {
+            const classes = [
+              "grid-cell",
+              "grid-head",
+              "library-cell",
+              library.key,
+              library.recommended ? "recommended" : ""
+            ].join(" ");
+            return `<div class="${classes}"><strong>${library.title}</strong><span>${library.detail}</span></div>`;
+          })
+        ].join("");
+      }
+
+      function markerCurrent(item) {
+        const path = escapeHtml(markerPaths[item.key]);
+        return `
+          <div class="grid-cell icon-cell library-cell current" style="--marker-color:${item.color}">
+            <span class="marker-stage current">
+              <svg class="current-marker" viewBox="0 0 20 20" aria-hidden="true">
+                <path class="outline" d="${path}"></path>
+                <path class="fill" d="${path}"></path>
+              </svg>
+            </span>
+            <span class="icon-meta">
+              <span class="icon-name">custom path</span>
+              <span class="icon-note">filled + outline</span>
+            </span>
+          </div>`;
+      }
+
+      function libraryIcon(item, library, marker = true) {
+        const iconName = item[library];
+        const prefix = prefixes[library];
+        const libraryName = library === "phosphor" ? "Phosphor" : library[0].toUpperCase() + library.slice(1);
+        const stage = marker ? "marker-stage" : "control-stage";
+        return `
+          <div class="grid-cell icon-cell library-cell ${library}" style="--marker-color:${item.color || "#a9eaf2"}">
+            <span class="${stage}">
+              <iconify-icon icon="${prefix}:${escapeHtml(iconName)}" noobserver aria-hidden="true"></iconify-icon>
+            </span>
+            <span class="icon-meta">
+              <span class="icon-name ${library === "tabler" ? "recommended-label" : ""}">${escapeHtml(iconName)}</span>
+              <span class="icon-note">${libraryName}${library === "phosphor" ? " · bold" : ""}</span>
+            </span>
+          </div>`;
+      }
+
+      function renderMarkers() {
+        const rows = markers.map((item, index) => `
+          <div class="grid-cell row-label">
+            <span class="row-number">${String(index + 1).padStart(2, "0")}</span>
+            <span>
+              <strong>${escapeHtml(item.label)}</strong>
+              <span>${escapeHtml(item.key)}</span>
+            </span>
+          </div>
+          ${markerCurrent(item)}
+          ${libraryIcon(item, "lucide")}
+          ${libraryIcon(item, "tabler")}
+          ${libraryIcon(item, "phosphor")}
+        `).join("");
+        document.querySelector("#marker-grid").innerHTML = gridHeader() + rows;
+      }
+
+      function controlCurrent(item) {
+        return `
+          <div class="grid-cell icon-cell library-cell current">
+            <span class="control-stage">${uiSvg[item.key]}</span>
+            <span class="icon-meta">
+              <span class="icon-name">${["close", "minus", "plus"].includes(item.key) ? "text glyph" : "inline SVG"}</span>
+              <span class="icon-note">current control</span>
+            </span>
+          </div>`;
+      }
+
+      function renderControls() {
+        const rows = controls.map((item, index) => `
+          <div class="grid-cell row-label">
+            <span class="row-number">${String(index + 1).padStart(2, "0")}</span>
+            <span>
+              <strong>${escapeHtml(item.label)}</strong>
+              <span>${escapeHtml(item.key)}</span>
+            </span>
+          </div>
+          ${controlCurrent(item)}
+          ${libraryIcon(item, "lucide", false)}
+          ${libraryIcon(item, "tabler", false)}
+          ${libraryIcon(item, "phosphor", false)}
+        `).join("");
+        document.querySelector("#control-grid").innerHTML = gridHeader() + rows;
+      }
+
+      function wireSegmentedControl(selector, onChange) {
+        const control = document.querySelector(selector);
+        control.addEventListener("click", (event) => {
+          const button = event.target.closest("button[data-value]");
+          if (!button) return;
+          control.querySelectorAll("button").forEach((candidate) => {
+            candidate.setAttribute("aria-pressed", String(candidate === button));
+          });
+          onChange(button.dataset.value);
+        });
+      }
+
+      renderMarkers();
+      renderControls();
+
+      wireSegmentedControl('[data-control="library"]', (value) => {
+        document.documentElement.dataset.focus = value;
+      });
+
+      wireSegmentedControl('[data-control="size"]', (value) => {
+        document.documentElement.style.setProperty("--icon-size", `${value}px`);
+      });
+    </script>
+  </body>
+</html>

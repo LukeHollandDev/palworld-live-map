@@ -11,7 +11,7 @@ using SixLabors.ImageSharp.Processing;
 
 const int OutputSize = 8192;
 const string GeneratorName = "palworld-asset-exporter";
-const string GeneratorVersion = "3";
+const string GeneratorVersion = "4";
 
 var options = ParseOptions(args);
 using var mapOutput = StagedOutputDirectory.Create(options.OutputDirectory);
@@ -111,7 +111,7 @@ File.WriteAllText(manifestPath, JsonSerializer.Serialize(manifest, new JsonSeria
 }) + Environment.NewLine);
 Console.WriteLine("Staged map manifest.json");
 
-LandmarkExporter.Export(
+var landmarkExtraction = LandmarkExporter.Export(
     provider,
     landmarkOutput.PayloadDirectory,
     gameVersion,
@@ -119,6 +119,15 @@ LandmarkExporter.Export(
     $"CUE4Parse/{cue4ParseVersion}",
     mappingsManifest,
     pakManifest);
+WorldCatalogueExporter.Export(
+    provider,
+    landmarkOutput.PayloadDirectory,
+    gameVersion,
+    $"{GeneratorName}/{GeneratorVersion}",
+    $"CUE4Parse/{cue4ParseVersion}",
+    mappingsManifest,
+    pakManifest,
+    landmarkExtraction);
 
 Console.WriteLine("Re-hashing source PAKs to verify provenance coherence...");
 var finalPakManifest = SourceSnapshots.CaptureFiles(FindPakFiles(options.PakDirectory));

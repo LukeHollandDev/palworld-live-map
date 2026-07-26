@@ -6,6 +6,8 @@ import {
   coverView,
   formatUptime,
   isScenePointVisible,
+  itemSearchText,
+  kindLabel,
   markerStackOrder,
   sceneViewportBounds,
   toScene,
@@ -58,11 +60,20 @@ describe('map display helpers', () => {
   it('stacks important markers above related and ambient markers', () => {
     const ascendingKinds = [
       'wild-pals',
+      'dungeon-entrances',
+      'effigies',
+      'journals',
+      'ancient-shrine-pickups',
+      'npc-locations',
       'npcs',
       'workers',
       'companions',
+      'waypoints',
+      'watchtowers',
       'alpha-pals',
+      'bounties',
       'bosses',
+      'oil-rigs',
       'bases',
       'players'
     ] as const
@@ -70,5 +81,23 @@ describe('map display helpers', () => {
 
     expect(stack).toEqual([...stack].sort((left, right) => left - right))
     expect(new Set(stack).size).toBe(ascendingKinds.length)
+  })
+
+  it('labels and searches static NPC locations separately from live NPCs', () => {
+    const location = {
+      id: 'npc-location',
+      kind: 'npc-locations',
+      name: 'Merchant',
+      x: 0,
+      y: 0,
+      map: 'palpagos'
+    } as const
+    const liveNpc = { ...location, id: 'live-npc', kind: 'npcs' as const }
+
+    expect(kindLabel(location.kind)).toBe('NPC location')
+    expect(kindLabel(liveNpc.kind)).toBe('NPC')
+    expect(itemSearchText(location)).toContain('static npc')
+    expect(itemSearchText(liveNpc)).toContain('live npc')
+    expect(itemSearchText(liveNpc)).not.toContain('static npc')
   })
 })

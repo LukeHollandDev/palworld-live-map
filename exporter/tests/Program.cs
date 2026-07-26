@@ -1,7 +1,7 @@
 using System.Globalization;
 using Newtonsoft.Json.Linq;
 
-internal static class TestProgram
+internal static partial class TestProgram
 {
     private static readonly (string Name, Action Run)[] Tests =
     [
@@ -15,6 +15,11 @@ internal static class TestProgram
         ("tower missing joins fail closed", TowerMissingJoinsFailClosed),
         ("tower invalid data fails closed", TowerInvalidDataFailsClosed),
         ("duplicate generated IDs fail closed", DuplicateIdsFailClosed),
+        ("expanded boss rows join and deduplicate", ExpandedBossRowsJoinAndDeduplicate),
+        ("expanded boss joins reject case collisions", ExpandedBossJoinsRejectCaseCollisions),
+        ("placed catalogue records retain canonical state keys", PlacedCatalogueRecordsRetainStateKeys),
+        ("Journal, Shrine, and fixed NPC records join game tables", CollectibleAndNpcRecordsJoinGameTables),
+        ("placed catalogue records fail closed on malformed IDs", PlacedCatalogueRecordsRejectMalformedIds),
         ("game version is extracted from DefaultGame.ini", GameVersionIsExtracted),
         ("game version accepts UTF-8 BOM and CRLF", GameVersionAcceptsBomAndCrlf),
         ("game version requires one project settings section", GameVersionRequiresOneSection),

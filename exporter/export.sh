@@ -30,7 +30,7 @@ mkdir -p "$output_directory" "$landmark_output_directory"
 printf 'Building the Palworld Asset Exporter...\n'
 docker build --quiet -t "$image_name" "$script_dir" >/dev/null
 
-printf 'Exporting map artwork and encounter landmarks...\n'
+printf 'Exporting map artwork and static world catalogue...\n'
 set -- \
   --pak-directory /palworld-paks \
   --mappings /mappings.usmap \
@@ -46,4 +46,4 @@ docker run --rm \
   "$image_name" "$@"
 
 printf 'Generated maps and provenance manifest in %s\n' "$output_directory"
-printf 'Generated encounter landmark manifest in %s\n' "$landmark_output_directory"
+printf 'Generated static world catalogue in %s\n' "$landmark_output_directory"

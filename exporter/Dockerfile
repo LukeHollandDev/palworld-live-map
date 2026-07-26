@@ -10,7 +10,7 @@ COPY tests/PalworldAssetExporter.Tests.csproj tests/packages.lock.json ./tests/
 RUN dotnet restore tests/PalworldAssetExporter.Tests.csproj --locked-mode
 
 COPY src/*.cs ./src/
-COPY tests/Program.cs ./tests/
+COPY tests/*.cs ./tests/
 COPY tests/Fixtures/ ./tests/Fixtures/
 RUN dotnet run --project tests/PalworldAssetExporter.Tests.csproj -c Release --no-restore
 RUN dotnet publish src/PalworldAssetExporter.csproj -c Release --no-restore -o /out

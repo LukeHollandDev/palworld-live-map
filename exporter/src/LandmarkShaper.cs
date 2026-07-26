@@ -220,7 +220,7 @@ internal static class LandmarkShaper
         return token.Value<bool>();
     }
 
-    private static double RequireFiniteDouble(JToken? token, string context)
+    internal static double RequireFiniteDouble(JToken? token, string context)
     {
         if (token is not JValue scalar || token.Type is not (JTokenType.Integer or JTokenType.Float))
         {
