@@ -1,4 +1,4 @@
-import { IconChevronRight, IconFilter, IconSearch, IconX } from '@tabler/icons-react'
+import { IconChevronRight, IconSearch, IconX } from '@tabler/icons-react'
 import { type ReactNode, type RefObject, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { guildIdForBase } from '../lib/guilds'
 import { itemSearchText, markerText } from '../lib/map'
@@ -11,6 +11,7 @@ interface ExplorerProps {
   layers: MapLayer[]
   items: MapItem[]
   search: string
+  filterButtonRef: RefObject<HTMLButtonElement | null>
   searchInputRef: RefObject<HTMLInputElement | null>
   enabledKinds: Set<ItemKind>
   enabledPlayerStatuses: Set<PlayerStatus>
@@ -28,7 +29,6 @@ interface ExplorerProps {
   onFocusItem: (item: MapItem, returnFocus: HTMLElement) => void
   onFocusGuild: (guildId: string, returnFocus: HTMLElement) => void
   onClose: () => void
-  onOpen: () => void
   onLayerChange: (layer: MapLayer) => void
 }
 
@@ -209,7 +209,6 @@ function ObjectRow({
 }
 
 export function Explorer(props: ExplorerProps) {
-  const reopenRef = useRef<HTMLButtonElement>(null)
   const closeRef = useRef<HTMLButtonElement>(null)
   const wasOpen = useRef(props.open)
   const [collapsedGroups, setCollapsedGroups] = useState<Set<CategoryGroup>>(() => new Set(DEFAULT_COLLAPSED_GROUPS))
@@ -217,8 +216,8 @@ export function Explorer(props: ExplorerProps) {
   useLayoutEffect(() => {
     if (wasOpen.current === props.open) return
     wasOpen.current = props.open
-    ;(props.open ? closeRef.current : reopenRef.current)?.focus({ preventScroll: true })
-  }, [props.open])
+    ;(props.open ? closeRef.current : props.filterButtonRef.current)?.focus({ preventScroll: true })
+  }, [props.filterButtonRef, props.open])
 
   const toggleCategory = (group: CategoryGroup) => {
     setCollapsedGroups((current) => {
@@ -293,31 +292,8 @@ export function Explorer(props: ExplorerProps) {
   const offlinePlayers = index.byKind.players.filter((player) => player.online === false)
 
   return (
+    // biome-ignore lint/complexity/noUselessFragments: the stable wrapper keeps this large panel's markup isolated from its external header trigger
     <>
-      <button
-        ref={reopenRef}
-        type="button"
-        className={`pal-glass-control filter-trigger-motion absolute top-[78px] left-4 z-30 grid size-12 cursor-pointer place-items-center text-[#dceef0] max-sm:top-[88px] max-sm:left-3 max-sm:size-11 ${
-          props.open ? 'is-panel-open pointer-events-none' : 'is-panel-closed'
-        }`}
-        aria-label={
-          props.search.trim() ? `Open map filters, current search: ${props.search.trim()}` : 'Open map filters'
-        }
-        aria-controls="map-filter-panel"
-        aria-expanded="false"
-        aria-hidden={props.open}
-        inert={props.open}
-        tabIndex={props.open ? -1 : 0}
-        onClick={props.onOpen}
-      >
-        <IconFilter className="size-6" aria-hidden="true" />
-        {props.search.trim() ? (
-          <span
-            className="absolute top-1.5 right-1.5 size-1.5 rounded-full bg-[#55d4e7] shadow-[0_0_5px_rgb(85_212_231/65%)]"
-            aria-hidden="true"
-          />
-        ) : null}
-      </button>
       <aside
         id="map-filter-panel"
         className={`filter-panel-motion absolute top-[78px] bottom-4 left-4 z-[24] flex w-[350px] min-h-0 shrink-0 flex-col max-sm:top-auto max-sm:right-3 max-sm:bottom-3 max-sm:left-3 max-sm:z-[34] max-sm:h-[min(52dvh,480px)] max-sm:w-auto ${props.open ? 'is-panel-open' : 'is-panel-closed pointer-events-none'}`}

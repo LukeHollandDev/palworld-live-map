@@ -140,6 +140,7 @@ function LiveMap({ config }: { config: PublicConfig }) {
   const mapRef = useRef<MapViewportHandle>(null)
   const pendingFocusRef = useRef<{ itemId: string; returnFocus: HTMLElement } | null>(null)
   const searchRef = useRef<HTMLInputElement>(null)
+  const filterButtonRef = useRef<HTMLButtonElement>(null)
   const leaderboardButtonRef = useRef<HTMLButtonElement>(null)
 
   useEffect(() => {
@@ -251,6 +252,32 @@ function LiveMap({ config }: { config: PublicConfig }) {
     setReturnFocus(focus)
     mapRef.current?.clearSelection()
     setDetail({ kind: 'leaderboard', leaderboardId })
+  }
+
+  const mobilePanelLayout = () => window.innerWidth < 640
+
+  const toggleFilters = () => {
+    if (filtersOpen) {
+      setFiltersOpen(false)
+      return
+    }
+    if (mobilePanelLayout() && detail?.kind === 'leaderboard') {
+      pendingFocusRef.current = null
+      setDetail(null)
+      mapRef.current?.clearSelection()
+    }
+    setFiltersOpen(true)
+  }
+
+  const toggleLeaderboards = (focus: HTMLButtonElement) => {
+    if (detail?.kind !== 'leaderboard') {
+      if (mobilePanelLayout()) setFiltersOpen(false)
+      showLeaderboard('player-level', focus)
+      return
+    }
+    pendingFocusRef.current = null
+    setDetail(null)
+    mapRef.current?.clearSelection()
   }
 
   const focusItem = (item: MapItem, focus: HTMLElement) => {
@@ -414,6 +441,7 @@ function LiveMap({ config }: { config: PublicConfig }) {
     layers: config.layers,
     items,
     search,
+    filterButtonRef,
     searchInputRef: searchRef,
     enabledKinds,
     enabledPlayerStatuses,
@@ -441,9 +469,21 @@ function LiveMap({ config }: { config: PublicConfig }) {
 
   return (
     <div className="relative h-dvh overflow-hidden bg-[#171a1d] text-[#f4f5f5]">
-      <StatusBar playerState={playerState} offline={Boolean(players.error)} />
+      <StatusBar
+        playerState={playerState}
+        offline={Boolean(players.error)}
+        controls={{
+          filterButtonRef,
+          filterSearch: search,
+          filtersOpen,
+          leaderboardButtonRef,
+          leaderboardOpen: detail?.kind === 'leaderboard',
+          onToggleFilters: toggleFilters,
+          onToggleLeaderboards: toggleLeaderboards
+        }}
+      />
       <main className="absolute inset-0 overflow-hidden bg-[#0d161e]">
-        <Explorer {...explorerProps} open={filtersOpen} onOpen={() => setFiltersOpen(true)} />
+        <Explorer {...explorerProps} open={filtersOpen} />
         <div className="relative size-full min-h-0 min-w-0 overflow-hidden">
           <MapViewport
             ref={mapRef}
@@ -456,12 +496,7 @@ function LiveMap({ config }: { config: PublicConfig }) {
             onShowItem={showItem}
             inspectorOpen={Boolean(detail)}
           >
-            <ProjectLinks
-              hidden={Boolean(detail && detail.kind !== 'leaderboard')}
-              leaderboardButtonRef={leaderboardButtonRef}
-              leaderboardOpen={detail?.kind === 'leaderboard'}
-              onOpenLeaderboards={(focus) => showLeaderboard('player-level', focus)}
-            />
+            <ProjectLinks hidden={Boolean(detail && detail.kind !== 'leaderboard')} />
             <DetailsDialog
               detail={detail}
               items={items}

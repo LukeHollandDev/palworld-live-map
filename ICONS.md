@@ -18,8 +18,9 @@ The comparison and selected replacements are documented in [`docs/icon-library-c
 
 ## Non-goals
 
-- Do not redesign the surrounding controls, panels, marker labels, or map interactions.
-- Do not change category names, filter behaviour, marker stacking, or saved preferences.
+- Do not redesign panels, marker labels, or map interactions beyond the
+  persistent filter and leaderboard controls documented below.
+- Do not change category names, marker stacking, or saved filter preferences.
 - Do not replace the project favicon or Palworld-specific branding.
 - Do not use Iconify in production; it is only used by the comparison document.
 
@@ -59,12 +60,10 @@ Use `aria-hidden="true"` for decorative icons. The containing button, link, or l
 
 ## Interface icon mapping
 
-The map footer leaderboard control intentionally uses the uppercase
-`LEADERBOARDS` text label rather than an icon.
-
 | Current role | Tabler replacement |
 | --- | --- |
 | Open filters | `IconFilter` |
+| Open leaderboards | `IconTrophy` |
 | Search | `IconSearch` |
 | Close details | `IconX` |
 | Collapse filters | `IconX` |
@@ -121,9 +120,11 @@ Do not pass category colours as inline component properties unless necessary. Ke
 
 ### 3. Migrate interface controls
 
-- Keep the map footer leaderboard control as the uppercase `LEADERBOARDS` text
-  label; do not assign it an icon.
-- Replace filter, search, close, clear, and chevron artwork in `web/src/components/Explorer.tsx`.
+- Use `IconFilter` and `IconTrophy` for the persistent controls flanking the
+  desktop status header. On mobile, retain those icons alongside their text
+  labels in the equal-width control row below the header.
+- Replace the filter artwork in `web/src/components/StatusBar.tsx`.
+- Replace search, close, clear, and chevron artwork in `web/src/components/Explorer.tsx`.
 - Replace coordinate, zoom-in, and zoom-out artwork in `web/src/components/MapViewport.tsx`.
 - Replace the details close glyph in `web/src/components/DetailsDialog.tsx`.
 - Replace the GitHub SVG in `web/src/components/ProjectLinks.tsx`.
@@ -170,6 +171,7 @@ Do not pass category colours as inline component properties unless necessary. Ke
 - `web/src/components/MarkerGlyph.tsx`
 - `web/src/components/MarkerGlyph.test.tsx`
 - `web/src/components/ProjectLinks.tsx`
+- `web/src/components/StatusBar.tsx`
 - `web/src/index.css`
 - Any tests that currently assert the replaced SVG or text-glyph structure
 - Third-party licence/notice file, if required
@@ -181,7 +183,8 @@ Do not pass category colours as inline component properties unless necessary. Ke
 - No production Iconify dependency or network icon loading is introduced.
 - Every `ItemKind` renders a distinct, coloured marker.
 - Markers remain readable over both supported map layers at the normal zoom level.
-- Existing interaction, accessibility, filter, selection, and player-status behaviour is unchanged.
+- Existing accessibility, saved filters, selection, and player-status behaviour
+  is preserved around the documented persistent panel controls.
 - The full web check, test, and build commands pass.
 - The dependency is tree-shaken and its MIT licence obligations are documented.
 

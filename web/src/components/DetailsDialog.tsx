@@ -116,6 +116,7 @@ export function DetailsDialog({
 
   return (
     <aside
+      id={leaderboard ? 'leaderboard-panel' : undefined}
       className="pal-glass-panel surface-enter-motion absolute top-[78px] right-4 bottom-4 z-[24] flex w-[350px] flex-col overflow-hidden text-[#e5f0f2] max-sm:top-auto max-sm:right-0 max-sm:bottom-0 max-sm:left-0 max-sm:max-h-[49dvh] max-sm:w-auto max-sm:border-x-0 max-sm:border-b-0"
       role="dialog"
       aria-modal="false"

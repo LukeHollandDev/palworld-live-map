@@ -1,14 +1,10 @@
 import { IconBrandGithub } from '@tabler/icons-react'
-import type { Ref } from 'react'
 
 interface ProjectLinksProps {
   hidden: boolean
-  leaderboardButtonRef: Ref<HTMLButtonElement>
-  leaderboardOpen: boolean
-  onOpenLeaderboards: (focus: HTMLButtonElement) => void
 }
 
-export function ProjectLinks({ hidden, leaderboardButtonRef, leaderboardOpen, onOpenLeaderboards }: ProjectLinksProps) {
+export function ProjectLinks({ hidden }: ProjectLinksProps) {
   return (
     <nav
       className={`pal-glass-surface absolute right-[354px] bottom-[18px] z-[18] flex h-11 items-center overflow-hidden transition-[opacity,transform] max-sm:right-3.5 max-sm:bottom-[68px] ${
@@ -34,18 +30,6 @@ export function ProjectLinks({ hidden, leaderboardButtonRef, leaderboardOpen, on
         <IconBrandGithub className="size-[19px]" stroke={1.8} aria-hidden="true" focusable="false" />
         <span className="sr-only">Palworld Live Map on GitHub</span>
       </a>
-      <button
-        ref={leaderboardButtonRef}
-        type="button"
-        className="leaderboard-footer-control pal-interactive flex h-11 cursor-pointer items-center border-0 border-l border-white/10 bg-transparent px-3 text-xs font-semibold tracking-[.08em] whitespace-nowrap text-[#9bb7bd] focus-visible:outline-none"
-        aria-label="Open leaderboards"
-        aria-haspopup="dialog"
-        aria-expanded={leaderboardOpen}
-        title="Leaderboards"
-        onClick={(event) => onOpenLeaderboards(event.currentTarget)}
-      >
-        LEADERBOARDS
-      </button>
     </nav>
   )
 }

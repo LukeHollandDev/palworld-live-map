@@ -672,7 +672,7 @@ export const MapViewport = forwardRef<MapViewportHandle, MapViewportProps>(funct
       </div>
 
       {imageState === 'error' && (
-        <div className="pointer-events-none absolute top-[78px] left-1/2 -translate-x-1/2 rounded-md border border-[#665a3e] bg-[#302a20]/95 px-3 py-2 text-xs text-[#d5bd82] max-sm:top-[88px]">
+        <div className="pointer-events-none absolute top-[78px] left-1/2 -translate-x-1/2 rounded-md border border-[#665a3e] bg-[#302a20]/95 px-3 py-2 text-xs text-[#d5bd82] max-sm:top-[140px]">
           Map artwork is not installed.
         </div>
       )}

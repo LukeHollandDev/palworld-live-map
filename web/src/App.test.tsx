@@ -109,9 +109,39 @@ describe('App', () => {
     expect(serverTitle).toHaveClass('font-bold', 'text-[21px]')
     const statusBar = screen.getByRole('banner')
     expect(statusBar).toHaveClass('absolute', 'pointer-events-none')
-    expect(statusBar).toHaveClass('min-[1600px]:inset-x-[386px]', 'min-[1600px]:px-0')
+    expect(statusBar).toHaveClass('min-[1600px]:inset-x-[324px]', 'min-[1600px]:px-0')
     expect(statusBar).not.toHaveClass('bg-[#0f1b21]/98')
-    expect(serverTitle.parentElement?.parentElement).toHaveClass('pal-glass-surface', 'h-[54px]')
+    const commandbarLayout = statusBar.querySelector<HTMLElement>('.status-commandbar-layout')
+    const serverSurface = serverTitle.parentElement?.parentElement
+    if (!commandbarLayout || !serverSurface) throw new Error('Expected the responsive command bar layout')
+    expect(commandbarLayout).toHaveClass(
+      'grid-cols-[54px_minmax(0,1fr)_54px]',
+      'max-sm:grid-cols-2',
+      'max-sm:grid-rows-[70px_44px]'
+    )
+    expect(serverSurface).toHaveClass(
+      'pal-glass-surface',
+      'h-[54px]',
+      'max-sm:col-span-2',
+      'max-sm:col-start-1',
+      'row-start-1'
+    )
+    const filterControl = within(statusBar).getByRole('button', { name: 'Map filters' })
+    const leaderboardControl = within(statusBar).getByRole('button', { name: 'Leaderboards' })
+    for (const control of [filterControl, leaderboardControl]) {
+      expect(control).toHaveClass('header-panel-control', 'size-[54px]', 'max-sm:h-11', 'max-sm:w-full')
+      expect(control).not.toHaveAttribute('aria-hidden')
+      expect(control).not.toHaveAttribute('inert')
+    }
+    expect(filterControl).toHaveClass('pal-selected', 'col-start-1', 'max-sm:row-start-2')
+    expect(filterControl).toHaveAttribute('aria-expanded', 'true')
+    expect(filterControl.querySelector('svg')).toHaveClass('tabler-icon-filter')
+    expect(leaderboardControl).not.toHaveClass('pal-selected')
+    expect(leaderboardControl).toHaveClass('col-start-3', 'max-sm:col-start-2', 'max-sm:row-start-2')
+    expect(leaderboardControl).toHaveAttribute('aria-expanded', 'false')
+    expect(leaderboardControl.querySelector('svg')).toHaveClass('tabler-icon-trophy')
+    expect(filterControl.compareDocumentPosition(serverSurface) & Node.DOCUMENT_POSITION_FOLLOWING).not.toBe(0)
+    expect(serverSurface.compareDocumentPosition(leaderboardControl) & Node.DOCUMENT_POSITION_FOLLOWING).not.toBe(0)
     expect(screen.getByRole('main')).toHaveClass('absolute', 'inset-0')
     expect(screen.queryByText('Demo data')).not.toBeInTheDocument()
     expect(screen.getByRole('status')).toHaveTextContent('1 / 32 players')
@@ -134,10 +164,10 @@ describe('App', () => {
     expect(screen.queryByRole('link', { name: "Luke Holland's website" })).not.toBeInTheDocument()
     expect(screen.queryByText('Built by Luke')).not.toBeInTheDocument()
     expect(
-      within(screen.getByRole('navigation', { name: 'Project links' })).getByRole('button', {
-        name: 'Open leaderboards'
+      within(screen.getByRole('navigation', { name: 'Project links' })).queryByRole('button', {
+        name: 'Leaderboards'
       })
-    ).toHaveTextContent('LEADERBOARDS')
+    ).not.toBeInTheDocument()
 
     const explorer = screen.getByRole('complementary', { name: 'Map filters' })
     await user.click(within(explorer).getByRole('button', { name: 'View Luke · Lv 55' }))
@@ -426,12 +456,18 @@ describe('App', () => {
     const user = userEvent.setup()
     render(<App />)
     await screen.findByRole('heading', { name: 'Test Realm' })
+    const filterControl = within(screen.getByRole('banner')).getByRole('button', { name: 'Map filters' })
+    const durableCloseTarget = within(screen.getByRole('banner')).getByRole('button', { name: 'Leaderboards' })
     await user.type(screen.getByRole('searchbox'), 'Luke')
 
     const explorer = screen.getByRole('complementary', { name: 'Map filters' })
     const opener = within(explorer).getByRole('button', { name: 'View Luke · Lv 55' })
     await user.click(opener)
     await waitFor(() => expect(screen.getByRole('heading', { name: 'Luke' })).toHaveFocus())
+    expect(filterControl).not.toHaveAttribute('aria-hidden')
+    expect(filterControl).not.toHaveAttribute('inert')
+    expect(durableCloseTarget).not.toHaveAttribute('aria-hidden')
+    expect(durableCloseTarget).not.toHaveAttribute('inert')
     expect(within(screen.getByRole('dialog')).getByText('Unnamed guild')).toBeVisible()
     expect(within(screen.getByRole('dialog')).getByRole('heading', { name: 'Current companion Pals' })).toBeVisible()
 
@@ -452,7 +488,7 @@ describe('App', () => {
     expect(within(explorer).getByText('Unnamed guild')).toBeVisible()
 
     await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Close details' }))
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Open leaderboards' })).toHaveFocus())
+    await waitFor(() => expect(durableCloseTarget).toHaveFocus())
   })
 
   it('shows player, guild, base and Pal relationships in both directions', async () => {
@@ -663,7 +699,13 @@ describe('App', () => {
     render(<App />)
     await screen.findByRole('heading', { name: 'Test Realm' })
 
+    const filterControl = within(screen.getByRole('banner')).getByRole('button', { name: 'Map filters' })
     const filterPanel = screen.getByRole('complementary', { name: 'Map filters' })
+    expect(filterControl).toHaveAttribute('aria-expanded', 'true')
+    expect(filterControl).toHaveClass('header-panel-control', 'pal-selected')
+    expect(filterControl).not.toHaveAttribute('aria-hidden')
+    expect(filterControl).not.toHaveAttribute('inert')
+    expect(filterControl.querySelector('svg')).toHaveClass('tabler-icon-filter')
     const searchbox = within(filterPanel).getByRole('searchbox')
     expect(searchbox).toHaveAttribute('type', 'search')
     expect(searchbox).toHaveAttribute('placeholder', 'Filter map results…')
@@ -672,31 +714,77 @@ describe('App', () => {
     expect(screen.getAllByRole('button', { name: 'Clear search' })).toHaveLength(1)
     expect(screen.getByText('No online players or companion Pals match “missing”.')).toBeInTheDocument()
 
-    await user.click(screen.getByRole('button', { name: 'Collapse map filter' }))
+    await user.click(filterControl)
     await waitFor(() => expect(screen.queryByRole('complementary', { name: 'Map filters' })).not.toBeInTheDocument())
     expect(document.querySelector('#map-filter-panel')).toBe(filterPanel)
     expect(filterPanel).toHaveAttribute('aria-hidden', 'true')
     expect(filterPanel).toHaveAttribute('inert')
     expect(screen.queryByRole('searchbox')).not.toBeInTheDocument()
-    const reopenFilter = screen.getByRole('button', { name: 'Open map filters, current search: missing' })
-    expect(reopenFilter).toHaveFocus()
-    expect(reopenFilter).toHaveClass('size-12')
-    expect(reopenFilter.querySelector('svg')).toHaveClass('size-6')
-    expect(reopenFilter).not.toHaveTextContent('Map filter')
-    expect(reopenFilter).not.toHaveTextContent('Filters')
+    expect(screen.getByRole('button', { name: 'Map filters' })).toBe(filterControl)
+    expect(filterControl).toHaveFocus()
+    expect(filterControl).toHaveAttribute('aria-expanded', 'false')
+    expect(filterControl).not.toHaveClass('pal-selected')
+    expect(filterControl).not.toHaveAttribute('aria-hidden')
+    expect(filterControl).not.toHaveAttribute('inert')
     expect(document.querySelector('#map-search')).toHaveValue('missing')
+
+    await user.click(filterControl)
+    expect(screen.getByRole('complementary', { name: 'Map filters' })).toBe(filterPanel)
+    expect(screen.getByRole('button', { name: 'Map filters' })).toBe(filterControl)
+    expect(filterControl).toHaveAttribute('aria-expanded', 'true')
+    expect(filterControl).toHaveClass('pal-selected')
+    expect(screen.getByRole('searchbox')).toHaveValue('missing')
+
+    await user.click(filterControl)
+    await waitFor(() => expect(screen.queryByRole('complementary', { name: 'Map filters' })).not.toBeInTheDocument())
+    expect(filterControl).toHaveAttribute('aria-expanded', 'false')
+    expect(filterControl).not.toHaveClass('pal-selected')
 
     await user.keyboard('/')
     expect(screen.getByRole('complementary', { name: 'Map filters' })).toBe(filterPanel)
     expect(screen.getByRole('searchbox')).toHaveValue('missing')
     await waitFor(() => expect(screen.getByRole('searchbox')).toHaveFocus())
-    expect(screen.queryByRole('button', { name: 'Open map filters' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Map filters' })).toBe(filterControl)
+    expect(filterControl).toHaveAttribute('aria-expanded', 'true')
+    expect(filterControl).toHaveClass('pal-selected')
 
     await user.keyboard('{Escape}')
     expect(screen.getByRole('searchbox')).toHaveValue('')
     expect(within(filterPanel).getByRole('button', { name: 'Expand NPC Locations section' })).toBeVisible()
     await user.keyboard('{Escape}')
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Open map filters' })).toHaveFocus())
+    await waitFor(() => expect(filterControl).toHaveFocus())
+    expect(filterControl).toHaveAttribute('aria-expanded', 'false')
+    expect(filterControl).not.toHaveClass('pal-selected')
+  })
+
+  it('keeps the two mobile panel controls from opening overlapping sheets', async () => {
+    vi.spyOn(window, 'innerWidth', 'get').mockReturnValue(390)
+    mockAPI()
+    const user = userEvent.setup()
+    render(<App />)
+    await screen.findByRole('heading', { name: 'Test Realm' })
+
+    const statusBar = screen.getByRole('banner')
+    const filterControl = within(statusBar).getByRole('button', { name: 'Map filters' })
+    const leaderboardControl = within(statusBar).getByRole('button', { name: 'Leaderboards' })
+    expect(filterControl).toHaveAttribute('aria-expanded', 'false')
+    expect(leaderboardControl).toHaveAttribute('aria-expanded', 'false')
+
+    await user.click(filterControl)
+    expect(filterControl).toHaveAttribute('aria-expanded', 'true')
+    expect(screen.getByRole('complementary', { name: 'Map filters' })).toBeVisible()
+
+    await user.click(leaderboardControl)
+    expect(filterControl).toHaveAttribute('aria-expanded', 'false')
+    expect(leaderboardControl).toHaveAttribute('aria-expanded', 'true')
+    expect(screen.queryByRole('complementary', { name: 'Map filters' })).not.toBeInTheDocument()
+    expect(screen.getByRole('dialog')).toHaveAttribute('id', 'leaderboard-panel')
+
+    await user.click(filterControl)
+    expect(filterControl).toHaveAttribute('aria-expanded', 'true')
+    expect(leaderboardControl).toHaveAttribute('aria-expanded', 'false')
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(screen.getByRole('complementary', { name: 'Map filters' })).toBeVisible()
   })
 
   it('restores saved filter categories and the active map layer', async () => {
@@ -895,23 +983,38 @@ describe('App', () => {
     await user.click(offlineVisibility)
     expect(screen.getByRole('button', { name: 'Zoe · Lv 60' })).toBeInTheDocument()
 
-    const leaderboardOpener = screen.getByRole('button', { name: 'Open leaderboards' })
+    const statusBar = screen.getByRole('banner')
+    const leaderboardOpener = within(statusBar).getByRole('button', { name: 'Leaderboards' })
     const projectLinks = screen.getByRole('navigation', { name: 'Project links' })
-    expect(within(projectLinks).getByRole('button', { name: 'Open leaderboards' })).toBe(leaderboardOpener)
-    expect(
-      within(screen.getByRole('banner')).queryByRole('button', { name: 'Open leaderboards' })
-    ).not.toBeInTheDocument()
-    expect(within(screen.getByRole('main')).getByRole('button', { name: 'Open leaderboards' })).toBe(leaderboardOpener)
-    expect(leaderboardOpener.querySelector('svg')).not.toBeInTheDocument()
-    expect(leaderboardOpener).toHaveTextContent('LEADERBOARDS')
-    expect(leaderboardOpener).toHaveClass('leaderboard-footer-control')
-    await user.click(leaderboardOpener)
-    expect(leaderboardOpener).toHaveAttribute('aria-expanded', 'true')
+    expect(within(projectLinks).queryByRole('button', { name: 'Leaderboards' })).not.toBeInTheDocument()
+    expect(within(screen.getByRole('main')).queryByRole('button', { name: 'Leaderboards' })).not.toBeInTheDocument()
+    expect(leaderboardOpener).toHaveClass('header-panel-control')
+    expect(leaderboardOpener).toHaveAttribute('aria-expanded', 'false')
+    expect(leaderboardOpener).not.toHaveClass('pal-selected')
     expect(leaderboardOpener).not.toHaveAttribute('aria-hidden')
     expect(leaderboardOpener).not.toHaveAttribute('inert')
-    expect(screen.getByRole('button', { name: 'Open leaderboards' })).toBe(leaderboardOpener)
+    expect(leaderboardOpener.querySelector('svg')).toHaveClass('tabler-icon-trophy')
+    await user.click(leaderboardOpener)
+    expect(leaderboardOpener).toHaveAttribute('aria-expanded', 'true')
+    expect(leaderboardOpener).toHaveClass('pal-selected')
+    expect(leaderboardOpener).not.toHaveAttribute('aria-hidden')
+    expect(leaderboardOpener).not.toHaveAttribute('inert')
+    expect(screen.getByRole('button', { name: 'Leaderboards' })).toBe(leaderboardOpener)
     expect(projectLinks).toBeVisible()
     expect(projectLinks).toHaveAttribute('aria-hidden', 'false')
+    expect(screen.getByRole('dialog')).toBeInTheDocument()
+
+    await user.click(leaderboardOpener)
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    expect(screen.getByRole('button', { name: 'Leaderboards' })).toBe(leaderboardOpener)
+    expect(leaderboardOpener).toHaveFocus()
+    expect(leaderboardOpener).toHaveAttribute('aria-expanded', 'false')
+    expect(leaderboardOpener).not.toHaveClass('pal-selected')
+
+    await user.click(leaderboardOpener)
+    expect(screen.getByRole('button', { name: 'Leaderboards' })).toBe(leaderboardOpener)
+    expect(leaderboardOpener).toHaveAttribute('aria-expanded', 'true')
+    expect(leaderboardOpener).toHaveClass('pal-selected')
     const leaderboard = screen.getByRole('dialog')
     expect(leaderboard).toHaveClass('top-[78px]', 'bottom-4', 'w-[350px]')
     expect(explorer).toHaveClass('top-[78px]', 'bottom-4', 'w-[350px]')
@@ -934,6 +1037,10 @@ describe('App', () => {
 
     await user.click(within(leaderboard).getByRole('button', { name: 'View leaderboard rank 1: Zoe · Lv 60, Offline' }))
     const playerInspector = screen.getByRole('dialog')
+    expect(leaderboardOpener).toHaveAttribute('aria-expanded', 'false')
+    expect(leaderboardOpener).not.toHaveClass('pal-selected')
+    expect(leaderboardOpener).not.toHaveAttribute('aria-hidden')
+    expect(leaderboardOpener).not.toHaveAttribute('inert')
     expect(within(playerInspector).getByRole('heading', { name: 'Zoe' })).toBeVisible()
     const status = within(playerInspector).getByText('Status')
     expect(status.nextElementSibling).toHaveTextContent('Offline')

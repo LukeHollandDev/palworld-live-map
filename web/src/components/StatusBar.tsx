@@ -1,10 +1,22 @@
-import { useEffect, useId, useState } from 'react'
+import { IconFilter, IconTrophy } from '@tabler/icons-react'
+import { type Ref, useEffect, useId, useState } from 'react'
 import { formatUptime } from '../lib/map'
 import type { PlayerState, ServerMetrics } from '../types'
+
+interface StatusBarControls {
+  filterButtonRef: Ref<HTMLButtonElement>
+  filterSearch: string
+  filtersOpen: boolean
+  leaderboardButtonRef: Ref<HTMLButtonElement>
+  leaderboardOpen: boolean
+  onToggleFilters: () => void
+  onToggleLeaderboards: (focus: HTMLButtonElement) => void
+}
 
 interface StatusBarProps {
   playerState: PlayerState | null
   offline: boolean
+  controls?: StatusBarControls
 }
 
 function updateAge(lastSuccessAt?: string): string {
@@ -141,7 +153,7 @@ function Metrics({
   )
 }
 
-export function StatusBar({ playerState, offline }: StatusBarProps) {
+export function StatusBar({ playerState, offline, controls }: StatusBarProps) {
   const [age, setAge] = useState(() => updateAge(playerState?.lastSuccessAt))
 
   useEffect(() => {
@@ -186,32 +198,94 @@ export function StatusBar({ playerState, offline }: StatusBarProps) {
 
   const server = playerState?.server
   const title = server?.name || 'Palworld Live Map'
+  const statusSurface = (
+    <div
+      className={`pal-glass-surface pointer-events-auto relative z-[1] grid h-[54px] w-full min-w-0 grid-cols-[minmax(0,1fr)_clamp(300px,25vw,360px)_minmax(0,1fr)] items-stretch text-center text-xs text-[#e5f7f8] max-md:h-[70px] max-md:grid-cols-1 max-md:grid-rows-[30px_40px] ${
+        controls
+          ? 'col-start-2 row-start-1 max-sm:col-span-2 max-sm:col-start-1'
+          : 'mx-auto max-w-[1240px] min-[1600px]:max-w-none'
+      }`}
+      data-status-surface
+    >
+      <span role="status" className="sr-only">
+        {status.text}
+      </span>
+      <Metrics
+        metrics={metrics}
+        status={status.kind}
+        age={age}
+        connectionAvailable={connectionAvailable}
+        onlinePlayerCount={onlinePlayerCount}
+      />
+      <div className="relative z-[2] col-start-2 row-start-1 flex min-w-0 flex-col items-center justify-center border-x border-white/10 px-6 text-center max-lg:px-3 max-md:col-start-1 max-md:h-[30px] max-md:border-x-0 max-md:border-b">
+        <h1 className="m-0 w-full overflow-hidden text-ellipsis whitespace-nowrap text-[21px] leading-6 font-bold tracking-[.04em] text-[#f2fbfc] max-md:text-[17px] max-md:leading-5">
+          {title}
+        </h1>
+        {server?.description && (
+          <p
+            className="m-0 w-full overflow-hidden text-ellipsis whitespace-nowrap text-xs leading-4 text-[#a5b7bc] max-md:hidden"
+            title={`${server.description}${server.version ? ` · Palworld ${server.version}` : ''}`}
+          >
+            {server.description}
+          </p>
+        )}
+      </div>
+    </div>
+  )
+
+  if (!controls) {
+    return (
+      <header className="status-commandbar pointer-events-none absolute inset-x-0 top-0 z-40 flex min-w-0 px-7 pt-3 min-[1600px]:inset-x-[386px] min-[1600px]:px-0 max-md:px-2.5 max-md:pt-2">
+        {statusSurface}
+      </header>
+    )
+  }
+
   return (
-    <header className="status-commandbar pointer-events-none absolute inset-x-0 top-0 z-40 flex min-w-0 px-7 pt-3 min-[1600px]:inset-x-[386px] min-[1600px]:px-0 max-md:px-2.5 max-md:pt-2">
-      <div className="pal-glass-surface pointer-events-auto relative z-[1] mx-auto grid h-[54px] w-full max-w-[1240px] min-w-0 grid-cols-[minmax(0,1fr)_clamp(300px,25vw,360px)_minmax(0,1fr)] items-stretch text-center text-xs text-[#e5f7f8] min-[1600px]:max-w-none max-md:h-[70px] max-md:grid-cols-1 max-md:grid-rows-[30px_40px]">
-        <span role="status" className="sr-only">
-          {status.text}
-        </span>
-        <Metrics
-          metrics={metrics}
-          status={status.kind}
-          age={age}
-          connectionAvailable={connectionAvailable}
-          onlinePlayerCount={onlinePlayerCount}
-        />
-        <div className="relative z-[2] col-start-2 row-start-1 flex min-w-0 flex-col items-center justify-center border-x border-white/10 px-6 text-center max-lg:px-3 max-md:col-start-1 max-md:h-[30px] max-md:border-x-0 max-md:border-b">
-          <h1 className="m-0 w-full overflow-hidden text-ellipsis whitespace-nowrap text-[21px] leading-6 font-bold tracking-[.04em] text-[#f2fbfc] max-md:text-[17px] max-md:leading-5">
-            {title}
-          </h1>
-          {server?.description && (
-            <p
-              className="m-0 w-full overflow-hidden text-ellipsis whitespace-nowrap text-xs leading-4 text-[#a5b7bc] max-md:hidden"
-              title={`${server.description}${server.version ? ` · Palworld ${server.version}` : ''}`}
-            >
-              {server.description}
-            </p>
-          )}
-        </div>
+    <header className="status-commandbar pointer-events-none absolute inset-x-0 top-0 z-40 flex min-w-0 px-7 pt-3 min-[1600px]:inset-x-[324px] min-[1600px]:px-0 max-md:px-2.5 max-md:pt-2">
+      <div className="status-commandbar-layout pointer-events-none mx-auto grid w-full max-w-[1364px] min-w-0 grid-cols-[54px_minmax(0,1fr)_54px] grid-rows-[54px] gap-x-2 min-[1600px]:max-w-none max-md:grid-rows-[70px] max-sm:grid-cols-2 max-sm:grid-rows-[70px_44px] max-sm:gap-y-2">
+        <button
+          ref={controls.filterButtonRef}
+          type="button"
+          className={`header-panel-control pal-glass-control pointer-events-auto relative col-start-1 row-start-1 flex size-[54px] cursor-pointer items-center justify-center self-center text-[#dceef0] max-sm:row-start-2 max-sm:h-11 max-sm:w-full max-sm:gap-2 ${
+            controls.filtersOpen ? 'pal-selected' : ''
+          }`}
+          data-panel-control="filters"
+          aria-label="Map filters"
+          aria-controls="map-filter-panel"
+          aria-expanded={controls.filtersOpen}
+          title="Map filters"
+          onClick={controls.onToggleFilters}
+        >
+          <IconFilter className="size-6 max-sm:size-5" stroke={1.8} aria-hidden="true" />
+          <span className="hidden text-[11px] font-semibold tracking-[.09em] max-sm:inline">FILTERS</span>
+          {controls.filterSearch.trim() ? (
+            <span
+              className="absolute top-1.5 right-1.5 size-1.5 rounded-full bg-[#55d4e7] shadow-[0_0_5px_rgb(85_212_231/65%)]"
+              aria-hidden="true"
+            />
+          ) : null}
+        </button>
+
+        {statusSurface}
+
+        <button
+          ref={controls.leaderboardButtonRef}
+          type="button"
+          className={`header-panel-control pal-glass-control pointer-events-auto col-start-3 row-start-1 flex size-[54px] cursor-pointer items-center justify-center self-center text-[#d9c98e] max-sm:col-start-2 max-sm:row-start-2 max-sm:h-11 max-sm:w-full max-sm:gap-2 ${
+            controls.leaderboardOpen ? 'pal-selected' : ''
+          }`}
+          data-panel-control="leaderboards"
+          aria-label="Leaderboards"
+          aria-controls="leaderboard-panel"
+          aria-haspopup="dialog"
+          aria-expanded={controls.leaderboardOpen}
+          title="Leaderboards"
+          onClick={(event) => controls.onToggleLeaderboards(event.currentTarget)}
+        >
+          <IconTrophy className="size-6 max-sm:size-5" stroke={1.8} aria-hidden="true" />
+          <span className="hidden text-[11px] font-semibold tracking-[.09em] max-sm:inline">LEADERBOARDS</span>
+        </button>
       </div>
     </header>
   )
