@@ -427,14 +427,11 @@
         height: 46px;
         flex: none;
         place-items: center;
-        border: 1px solid rgb(202 239 245 / 12%);
-        border-radius: 50%;
         color: var(--marker-color, #a6edf5);
-        background:
-          radial-gradient(circle, rgb(24 37 43 / 96%) 0 56%, rgb(5 10 13 / 86%) 57% 72%, transparent 73%);
       }
 
       .control-stage {
+        border: 1px solid rgb(202 239 245 / 12%);
         border-radius: 3px;
         background: linear-gradient(145deg, #1d2a30, #11191d);
       }
@@ -638,8 +635,8 @@
           <h2>Tabler Icons</h2>
           <p>
             It has the most convincing semantic matches for the map-specific categories while retaining the crisp
-            technical style of the current interface. Use the React package with named imports, and preserve the
-            current dark marker halo for map legibility.
+            technical style of the current interface. Use the React package with named imports, and preserve map
+            legibility with a subtle line shadow rather than a backing shape.
           </p>
         </aside>
       </header>
@@ -721,8 +718,8 @@
             <h2 id="markers-title">Map marker glyphs</h2>
           </div>
           <p>
-            The first column reproduces the current SVG path. Alternatives sit inside a subtle dark halo because a
-            bare line icon loses contrast over a detailed map image.
+            The first column reproduces the current SVG path. Alternatives use a subtle line shadow for contrast over
+            detailed map imagery without placing icons inside background circles.
           </p>
         </div>
         <div class="toolbar" role="group" aria-label="Marker comparison controls">

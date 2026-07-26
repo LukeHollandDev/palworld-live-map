@@ -123,13 +123,13 @@
     backdrop-filter: blur(14px) saturate(125%);
   }
 
-  .leaderboard-header-icon {
+  .leaderboard-header-control > span {
     position: relative;
     z-index: 1;
-    width: 20px;
-    height: 20px;
-    color: currentColor;
-    stroke-width: 2;
+    font-size: 11px;
+    font-weight: 750;
+    letter-spacing: 0.16em;
+    line-height: 1;
     transform: translateY(-1px);
   }
 
@@ -346,12 +346,8 @@
     height: 20px;
     flex: none;
     overflow: visible;
-    border-radius: 9999px;
-    background: rgb(8 18 24 / 78%);
-    box-shadow:
-      0 0 0 1px rgb(241 255 255 / 24%),
-      0 1px 5px rgb(0 0 0 / 72%);
     color: var(--marker-glyph-color);
+    filter: drop-shadow(0 1px 1px rgb(8 18 24 / 95%)) drop-shadow(0 0 2px rgb(8 18 24 / 80%));
     pointer-events: none;
     shape-rendering: geometricPrecision;
     stroke: currentColor;

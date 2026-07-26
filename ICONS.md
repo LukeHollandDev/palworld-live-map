@@ -59,9 +59,12 @@ Use `aria-hidden="true"` for decorative icons. The containing button, link, or l
 
 ## Interface icon mapping
 
+The detached header leaderboard control intentionally uses the uppercase
+`LEADERBOARDS` text label rather than an icon so it matches the header's metric
+typography.
+
 | Current role | Tabler replacement |
 | --- | --- |
-| Leaderboards | `IconTrophy` |
 | Open filters | `IconFilter` |
 | Search | `IconSearch` |
 | Close details | `IconX` |
@@ -85,14 +88,16 @@ Replace `GLYPH_PATHS` with an `ItemKind` to Tabler component mapping. `MarkerGly
 - `aria-hidden="true"` and `focusable="false"`.
 - The existing category and online/offline colour selection.
 
-Tabler icons are outlined rather than filled shapes. Preserve map contrast with the dark circular halo demonstrated in the comparison document. The halo should be implemented with CSS around the icon, not baked into each SVG.
+Tabler icons are outlined rather than filled shapes. Keep them visually open
+without a circular backing shape. Preserve map contrast with a subtle CSS
+drop-shadow around the icon strokes.
 
 Recommended initial marker settings:
 
 - Icon size: 18–20px inside the existing 20px footprint.
 - Stroke width: start at Tabler’s default `2`; test `2.25` if the 20px view is too light.
 - Stroke colour: `var(--marker-glyph-color)`.
-- Halo: dark translucent circular background with a subtle outer edge.
+- Contrast: subtle CSS drop-shadow only; no background circle.
 - Selected/hover state: preserve the existing filter/drop-shadow behaviour.
 
 Do not pass category colours as inline component properties unless necessary. Keeping colour ownership in `index.css` preserves the existing theme contract.
@@ -109,14 +114,16 @@ Do not pass category colours as inline component properties unless necessary. Ke
 ### 2. Migrate map markers
 
 - Replace the custom path table in `web/src/components/MarkerGlyph.tsx`.
-- Update the marker styles in `web/src/index.css` for outlined icons and the contrast halo.
+- Update the marker styles in `web/src/index.css` for outlined icons and a
+  subtle non-circular contrast shadow.
 - Keep the public `MarkerGlyph` props and DOM data attributes stable.
 - Check every category at 20px on both map layers and in the Explorer list.
 - Check online and offline player colours independently.
 
 ### 3. Migrate interface controls
 
-- Replace `LeaderboardIcon` in `web/src/App.tsx`.
+- Keep the detached header leaderboard control as the uppercase `LEADERBOARDS`
+  text label; do not assign it an icon.
 - Replace filter, search, close, clear, and chevron artwork in `web/src/components/Explorer.tsx`.
 - Replace coordinate, zoom-in, and zoom-out artwork in `web/src/components/MapViewport.tsx`.
 - Replace the details close glyph in `web/src/components/DetailsDialog.tsx`.
@@ -158,7 +165,7 @@ Do not pass category colours as inline component properties unless necessary. Ke
 
 - `web/package.json`
 - `web/package-lock.json`
-- `web/src/App.tsx`
+- `web/src/components/StatusBar.tsx`
 - `web/src/components/DetailsDialog.tsx`
 - `web/src/components/Explorer.tsx`
 - `web/src/components/MapViewport.tsx`
