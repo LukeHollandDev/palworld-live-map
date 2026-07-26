@@ -17,7 +17,7 @@ Credentials, network details, and upstream identifiers are excluded from public 
 
 Player and metric data use `POLL_INTERVAL`; world objects use `WORLD_POLL_INTERVAL`; server metadata refreshes once per minute. Results are cached independently so an upstream failure does not discard the last successful snapshot.
 
-Optional save enrichment invokes the separately licensed `palsave` binary
+Optional save enrichment invokes the external `palsave` binary
 with its `player-details` preset for each player file in the
 selected immutable backup generation. The app performs bounded aggregation and
 joins those details to REST-visible players without importing decoder packages.
