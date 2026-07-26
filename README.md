@@ -16,7 +16,8 @@ Give your Palworld community a live view of players, guilds, bases, Pals, in-gam
 - Current companion Pals linked to their players
 - Search and filters for players, guilds, Pals, bases, and in-game locations
 - Live player count, server FPS, uptime, base count, in-game day, and connection status
-- Optional save integration adds player capture totals, Paldeck progress, and last-seen times
+- Optional save integration adds offline players, saved locations, levels,
+  guilds, capture totals, Paldeck progress, and last-seen times
 - Configurable refresh intervals and world-object layers
 - Demo mode with fictional moving players and world objects
 
@@ -41,6 +42,9 @@ docker run -d \
 ```
 
 Replace the URL and password with your server's values, then open <http://localhost:8080>. Enable Palworld's game-data API to also display bases, Pals, and NPCs. A healthcheck endpoint is available at `/-/health`.
+
+To enable save enrichment, add `-v /path/to/Pal/Saved/SaveGames/0:/data/palworld/saves:ro`
+and `-e SAVE_DATA_ENABLED=true`. The save directory must be mounted read-only.
 
 In-game locations are bundled with the map, so they remain available without the game-data API.
 
@@ -83,8 +87,12 @@ services:
     environment:
       PALWORLD_REST_URL: http://palworld:8212
       PALWORLD_ADMIN_PASSWORD: "${ADMIN_PASSWORD}"
+      SAVE_DATA_ENABLED: "true"
+      PALWORLD_SAVE_ROOT: /palworld-data/Pal/Saved/SaveGames/0
     ports:
       - "${HTTP_PORT:-8080}:8080"
+    volumes:
+      - palworld-data:/palworld-data:ro
 
 volumes:
   palworld-data:
@@ -109,14 +117,19 @@ Every supported environment option and timeout is listed below and documented in
 | `SAVE_DATA_ENABLED`       | Enrich REST-visible players from immutable save backups              | `false`                |
 | `PALWORLD_SAVE_ROOT`      | Read-only `SaveGames/0` directory                                    | `/data/palworld/saves` |
 | `PALWORLD_SAVE_WORLD_ID`  | Exact world ID when automatic discovery is ambiguous                 | empty                  |
-| `PALWORLD_SAVE_DECODER`   | Absolute `palsave` path; blank searches beside the app binary        | empty                  |
 | `SAVE_POLL_INTERVAL`      | Save enrichment interval; minimum `15s`                              | `30s`                  |
 | `SAVE_TIMEOUT`            | Whole-generation timeout; must be below `SAVE_POLL_INTERVAL`         | `20s`                  |
 
-The current `palsave` contract projects one player save at a time. It does
-not expose the names, levels, or guild data stored in `Level.sav`, so save-only
-records are not published as anonymous offline players. Save details are joined
-by opaque ID onto players identified by the REST API.
+To enable save integration, mount the server's `SaveGames/0` directory read-only
+and set `SAVE_DATA_ENABLED=true`. The image includes the pinned
+[`palworld-save-reader`](https://github.com/LukeHollandDev/palworld-save-reader)
+automatically. Save records add offline players and progression without exposing
+raw account, player, or guild identifiers.
+
+Save decoding can use substantial memory, so leave container headroom. A
+decoding problem does not interrupt the live map: online players and available
+progress remain visible, while the map reports that offline details are
+temporarily unavailable.
 
 ## License
 

@@ -355,8 +355,44 @@ function LiveMap({ config }: { config: PublicConfig }) {
   }
 
   const toggleItems = (ids: string[], visible: boolean) => {
+    const selectedItems = visible
+      ? ids.map((id) => itemById.get(id)).filter((item): item is MapItem => Boolean(item))
+      : []
+    const newlyEnabledKinds = new Set(
+      selectedItems.filter((item) => !enabledKinds.has(item.kind)).map((item) => item.kind)
+    )
+    const newlyEnabledPlayerStatuses = new Set(
+      selectedItems
+        .filter((item) => item.kind === 'players')
+        .map((item) => (item.online === false ? 'offline' : 'online') as PlayerStatus)
+        .filter((status) => !enabledPlayerStatuses.has(status))
+    )
+    if (visible) {
+      setEnabledKinds((current) => {
+        const next = new Set(current)
+        for (const item of selectedItems) next.add(item.kind)
+        return next
+      })
+      setEnabledPlayerStatuses((current) => {
+        const next = new Set(current)
+        for (const item of selectedItems) {
+          if (item.kind === 'players') next.add(item.online === false ? 'offline' : 'online')
+        }
+        return next
+      })
+    }
     setHiddenIds((current) => {
       const next = new Set(current)
+      if (visible && (newlyEnabledKinds.size > 0 || newlyEnabledPlayerStatuses.size > 0)) {
+        for (const item of items) {
+          const playerStatus = item.kind === 'players' ? (item.online === false ? 'offline' : 'online') : undefined
+          if (
+            newlyEnabledKinds.has(item.kind) ||
+            (playerStatus !== undefined && newlyEnabledPlayerStatuses.has(playerStatus))
+          )
+            next.add(item.id)
+        }
+      }
       for (const id of ids) visible ? next.delete(id) : next.add(id)
       return next
     })
@@ -445,6 +481,13 @@ function LiveMap({ config }: { config: PublicConfig }) {
     objectNotice = objectNotice ? `${objectNotice} ${catalogueNotice}` : catalogueNotice
   }
 
+  const dataNotices = [
+    playerState?.saveEnabled && playerState.saveLastError === 'resolve-failed'
+      ? 'Offline player details are temporarily unavailable. Live players and saved progress remain available.'
+      : null,
+    objectNotice
+  ].filter((notice): notice is string => notice !== null)
+
   const explorerProps = {
     activeLayer,
     layers: config.layers,
@@ -457,7 +500,7 @@ function LiveMap({ config }: { config: PublicConfig }) {
     hiddenIds,
     expandedGuilds,
     expandedBases,
-    objectNotice,
+    dataNotices,
     onSearchChange: setSearch,
     onUncheckAll: uncheckAll,
     onToggleKinds: toggleKinds,

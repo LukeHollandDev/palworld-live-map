@@ -28,6 +28,7 @@ const (
 	maxWorldEntries      = 128
 	maxGenerationEntries = 512
 	maxPublicIDBytes     = 256
+	maxNameBytes         = 96
 )
 
 // SnapshotReader is the narrow part of the save decoder used by the adapter.
@@ -40,7 +41,7 @@ type SnapshotReader interface {
 
 // IDProjector turns a private persistent save GUID into an opaque public key.
 // Implementations must not return the input GUID or otherwise encode it in the
-// result. palworld.Client.PublicPlayerID satisfies this API.
+// result. palworld.Client.PublicPlayerID and PublicGuildKey satisfy this API.
 type IDProjector func(string) (string, bool)
 
 type Options struct {
@@ -60,6 +61,10 @@ type Options struct {
 	Reader  SnapshotReader
 
 	ProjectPlayerID IDProjector
+	// ProjectGuildKey must land save guild GUIDs in the same opaque keyspace the
+	// REST path publishes, or save-derived members will form guilds parallel to
+	// the REST ones instead of joining them.
+	ProjectGuildKey IDProjector
 }
 
 // Source implements palworld.RosterSource.
@@ -69,6 +74,7 @@ type Source struct {
 	timeout         time.Duration
 	reader          SnapshotReader
 	projectPlayerID IDProjector
+	projectGuildKey IDProjector
 }
 
 var (
@@ -101,9 +107,12 @@ func New(options Options) (*Source, error) {
 	if options.ProjectPlayerID == nil {
 		return nil, errors.New("save roster requires a player ID projector")
 	}
+	if options.ProjectGuildKey == nil {
+		return nil, errors.New("save roster requires a guild key projector")
+	}
 	return &Source{
 		root: root, worldID: worldID, timeout: options.Timeout, reader: options.Reader,
-		projectPlayerID: options.ProjectPlayerID,
+		projectPlayerID: options.ProjectPlayerID, projectGuildKey: options.ProjectGuildKey,
 	}, nil
 }
 
@@ -144,9 +153,14 @@ func (s *Source) Roster(ctx context.Context) (palworld.RosterSnapshot, error) {
 	if err := ctx.Err(); err != nil {
 		return palworld.RosterSnapshot{}, err
 	}
+	partialError := snapshot.Stats.ResolveError
+	if snapshot.Stats.ResolveFailed && partialError == nil {
+		partialError = errors.New("save decoder resolve failed without a diagnostic")
+	}
 	return palworld.RosterSnapshot{
-		SnapshotAt: snapshotAt,
-		Players:    players,
+		SnapshotAt:   snapshotAt,
+		Players:      players,
+		PartialError: partialError,
 	}, nil
 }
 
@@ -413,7 +427,16 @@ func (s *Source) projectPlayers(ctx context.Context, players []savesidecar.Playe
 		if !ok {
 			continue
 		}
-		player := palworld.Player{ID: id, Online: false}
+		player := palworld.Player{ID: id, Online: false, Name: cleanName(raw.Name)}
+		if raw.Level > 0 {
+			player.Level = raw.Level
+		}
+		// A guild name without a key cannot be grouped and would render as a
+		// guild of its own, so publish the pair or neither.
+		if guildKey, ok := projectID(s.projectGuildKey, raw.GuildID); ok {
+			player.GuildKey = guildKey
+			player.GuildName = cleanName(raw.GuildName)
+		}
 		if raw.X != nil && raw.Y != nil && finite(*raw.X) && finite(*raw.Y) {
 			if mapID, ok := mapdata.LayerID(*raw.X, *raw.Y); ok {
 				player.X, player.Y, player.Map = *raw.X, *raw.Y, mapID
@@ -483,6 +506,28 @@ func projectID(project IDProjector, raw string) (string, bool) {
 func canonicalPrivateGUID(value string) (string, bool) {
 	value = strings.ReplaceAll(strings.ToLower(strings.TrimSpace(value)), "-", "")
 	return canonicalWorldID(value)
+}
+
+// cleanName bounds and strips control characters from a save-authored string.
+// Names reach browsers, and the save is player-controlled input, so it gets the
+// same treatment as the REST path's names.
+func cleanName(value string) string {
+	value = strings.TrimSpace(strings.Map(func(character rune) rune {
+		if character < 0x20 || character == 0x7f {
+			return -1
+		}
+		return character
+	}, value))
+	if len(value) > maxNameBytes {
+		value = value[:maxNameBytes]
+		for len(value) > 0 && !utf8.ValidString(value) {
+			value = value[:len(value)-1]
+		}
+	}
+	if !utf8.ValidString(value) {
+		return ""
+	}
+	return value
 }
 
 func finite(value float64) bool {

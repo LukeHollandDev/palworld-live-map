@@ -19,7 +19,7 @@ interface ExplorerProps {
   hiddenIds: Set<string>
   expandedGuilds: Set<string>
   expandedBases: Set<string>
-  objectNotice: string | null
+  dataNotices: string[]
   onSearchChange: (value: string) => void
   onUncheckAll: () => void
   onToggleKinds: (kinds: ItemKind[], visible: boolean) => void
@@ -90,6 +90,8 @@ const GROUP_KINDS: Record<NonPlayerCategoryGroup, ItemKind[]> = {
 }
 
 const DEFAULT_COLLAPSED_GROUPS: CategoryGroup[] = [
+  'offline-players',
+  'bases',
   'alpha-pals',
   'bosses',
   'bounties',
@@ -124,7 +126,7 @@ function visibilityState(
   return {
     checked: items.length > 0 && visible === items.length,
     indeterminate: visible > 0 && visible < items.length,
-    disabled: items.length === 0 || !items.some(enabled)
+    disabled: items.length === 0
   }
 }
 
@@ -551,11 +553,15 @@ export function Explorer(props: ExplorerProps) {
               />
             </div>
 
-            {props.objectNotice && (
-              <p className="m-3 mt-1 rounded-md border border-[#554b37] bg-[#302b22] px-2.5 py-2 text-[11px] leading-4 text-[#d2b980]">
-                {props.objectNotice}
+            {props.dataNotices.map((notice) => (
+              <p
+                key={notice}
+                aria-live="polite"
+                className="m-3 mt-1 rounded-md border border-[#554b37] bg-[#302b22] px-2.5 py-2 text-[11px] leading-4 text-[#d2b980]"
+              >
+                {notice}
               </p>
-            )}
+            ))}
           </div>
         </div>
       </MapPanelShell>

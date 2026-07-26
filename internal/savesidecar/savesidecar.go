@@ -17,8 +17,10 @@ import (
 )
 
 const (
-	defaultBinaryName           = "palsave"
+	defaultBinaryName           = "palworld-save-reader"
 	playerPresetName            = "player-details"
+	resolveRosterKind           = "roster"
+	resolveVersion              = 2
 	maxPlayerFiles              = 10_000
 	maxOutputBytes              = 16 << 20
 	maxStderrBytes              = 8 << 10
@@ -28,24 +30,24 @@ const (
 
 // Options configures a Reader.
 type Options struct {
-	// BinaryPath is the absolute path to palsave. When empty, the Reader
-	// looks beside the running server executable.
+	// BinaryPath is an internal test seam. Production always leaves it empty and
+	// uses the pinned palworld-save-reader beside the server executable.
 	BinaryPath string
 	// MaxOutputBytes overrides the per-process stdout cap. Zero uses the
 	// default.
 	MaxOutputBytes int64
 }
 
-// Reader invokes the palsave CLI once per immutable player save and aggregates
-// its player-details projections.
+// Reader invokes the palworld-save-reader CLI once per immutable player save
+// and aggregates its player-details projections.
 type Reader struct {
 	binary    string
 	maxOutput int64
 }
 
-// NewReader resolves the executable and verifies that it advertises the
-// player-details contract needed by the application. Preset gameVersion is
-// provenance in palsave's current interface, not an invocation selector.
+// NewReader resolves the executable and verifies both reader contracts needed
+// by the application. Preset gameVersion is provenance, not an invocation
+// selector.
 func NewReader(options Options) (*Reader, error) {
 	binary := strings.TrimSpace(options.BinaryPath)
 	if binary == "" {
@@ -80,14 +82,32 @@ func NewReader(options Options) (*Reader, error) {
 	if err := decodeSingleJSON(data, &presets); err != nil {
 		return nil, fmt.Errorf("decode save decoder presets: %w", err)
 	}
+	validPreset := false
 	for _, candidate := range presets {
 		if candidate.Name == playerPresetName &&
 			candidate.SaveType == "player.sav" &&
 			strings.TrimSpace(candidate.GameVersion) != "" {
+			validPreset = true
+			break
+		}
+	}
+	if !validPreset {
+		return nil, fmt.Errorf("save decoder has no valid %s preset for player.sav", playerPresetName)
+	}
+	data, err = reader.run(ctx, "--list-resolvers")
+	if err != nil {
+		return nil, fmt.Errorf("inspect save decoder resolvers: %w", err)
+	}
+	var resolvers []string
+	if err := decodeSingleJSON(data, &resolvers); err != nil {
+		return nil, fmt.Errorf("decode save decoder resolvers: %w", err)
+	}
+	for _, kind := range resolvers {
+		if kind == resolveRosterKind {
 			return reader, nil
 		}
 	}
-	return nil, fmt.Errorf("save decoder has no valid %s preset for player.sav", playerPresetName)
+	return nil, fmt.Errorf("save decoder has no %s resolver", resolveRosterKind)
 }
 
 func binaryNextToExecutable() (string, error) {
@@ -187,6 +207,43 @@ func (r *Reader) ReadSnapshot(ctx context.Context, dir string) (*Snapshot, error
 		byID[key] = len(snapshot.Players)
 		snapshot.Players = append(snapshot.Players, player)
 	}
+	// Naming runs inside the immutability window below so the names, levels, and
+	// guilds land on the same generation the presets were read from. A failure
+	// here leaves the preset data intact rather than discarding the generation:
+	// enrichment of REST-visible players keeps working, and only the offline
+	// records go missing until the next poll.
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	resolved, err := r.resolveRoster(ctx, dir)
+	if err != nil {
+		if ctxErr := ctx.Err(); ctxErr != nil {
+			return nil, ctxErr
+		}
+		snapshot.Stats.ResolveFailed = true
+		snapshot.Stats.ResolveError = err
+	} else {
+		snapshot.Stats.RosterRecords = len(resolved)
+	}
+	for index := range snapshot.Players {
+		match, ok := resolved[playerKey(snapshot.Players[index].PlayerID)]
+		if !ok {
+			continue
+		}
+		if match.Character != nil {
+			snapshot.Players[index].Name = match.Character.Nickname
+			snapshot.Players[index].Level = match.Character.Level
+		}
+		if match.Guild != nil {
+			snapshot.Players[index].GuildID = match.Guild.ID
+			snapshot.Players[index].GuildName = match.Guild.Name
+		}
+		if snapshot.Players[index].Name != "" {
+			snapshot.Stats.NamesResolved++
+		} else {
+			snapshot.Stats.UnnamedPlayers++
+		}
+	}
 	if len(files) > 0 && len(snapshot.Players) == 0 {
 		return nil, fmt.Errorf("save decoder failed for all %d player saves", len(files))
 	}
@@ -232,6 +289,46 @@ func DecodePlayer(data []byte) (Player, error) {
 	player.CaptureTotal = captureTotal(raw.RecordData.PalCaptureCount)
 	player.PaldeckUnlocked = paldeckUnlocked(raw.RecordData.PaldeckUnlockFlag)
 	return player, nil
+}
+
+// resolveRoster reads the compact name, level, and guild document keyed by
+// canonical player GUID.
+func (r *Reader) resolveRoster(ctx context.Context, dir string) (map[string]resolvedPlayer, error) {
+	data, err := r.run(ctx, "--resolve", resolveRosterKind, "--saves", dir)
+	if err != nil {
+		return nil, fmt.Errorf("resolve player roster: %w", err)
+	}
+	var document resolveDocument
+	if err := decodeSingleJSON(data, &document); err != nil {
+		return nil, fmt.Errorf("decode resolved roster JSON: %w", err)
+	}
+	if document.ResolveVersion != resolveVersion {
+		return nil, fmt.Errorf("save decoder resolve version %d, want %d", document.ResolveVersion, resolveVersion)
+	}
+	if document.Kind != resolveRosterKind {
+		return nil, fmt.Errorf("save decoder resolved %q, want %q", document.Kind, resolveRosterKind)
+	}
+	resolved := make(map[string]resolvedPlayer, len(document.Roster))
+	for _, player := range document.Roster {
+		key := playerKey(player.PlayerUID)
+		if key == "" {
+			continue
+		}
+		// A repeated GUID makes every record under it ambiguous, so drop the
+		// name rather than risk labelling one player with another's.
+		if _, duplicate := resolved[key]; duplicate {
+			resolved[key] = resolvedPlayer{}
+			continue
+		}
+		resolved[key] = player
+	}
+	return resolved, nil
+}
+
+// playerKey canonicalises a save GUID so the preset and resolve passes agree on
+// identity regardless of hyphenation or case.
+func playerKey(value string) string {
+	return strings.ToLower(strings.ReplaceAll(strings.TrimSpace(value), "-", ""))
 }
 
 func decodeSingleJSON(data []byte, destination any) error {

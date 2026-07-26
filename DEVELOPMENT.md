@@ -17,10 +17,9 @@ Credentials, network details, and upstream identifiers are excluded from public 
 
 Player and metric data use `POLL_INTERVAL`; world objects use `WORLD_POLL_INTERVAL`; server metadata refreshes once per minute. Results are cached independently so an upstream failure does not discard the last successful snapshot.
 
-Optional save enrichment invokes the external `palsave` binary
-with its `player-details` preset for each player file in the
-selected immutable backup generation. The app performs bounded aggregation and
-joins those details to REST-visible players without importing decoder packages.
+Optional save enrichment runs the external [`palworld-save-reader`](https://github.com/LukeHollandDev/palworld-save-reader) binary against the selected immutable backup generation: its `player-details` preset once per player file for progress counters, then the compact `--resolve roster` pass for names, levels, and guilds from `Level.sav`. The app aggregates both under fixed bounds and joins them to REST-visible players by opaque ID; save records with no REST counterpart become offline players. The reader checks the `Level.sav` size and modification time after decoding; it does not independently recheck every player file or `LevelMeta.sav`.
+
+The container image builds the pinned decoder in its own stage and installs it beside the server binary. Source runs use the same layout under the ignored `bin` directory.
 
 Field Alpha and tower-boss locations are versioned data under [`assets/palworld`](assets/palworld). The frontend lives in [`web`](web) and uses React, TypeScript, Vite, Tailwind CSS, Biome, and Vitest.
 
@@ -38,15 +37,27 @@ make run
 
 Open <http://localhost:8080>.
 
-To exercise save enrichment from a sibling `palworld-save-reader` checkout,
-build its unchanged source into this repository's ignored local workspace:
+To exercise save enrichment, install the pinned decoder beside the local app
+binary. Run this from the repository root:
 
 ```bash
-(cd ../palworld-save-reader && go build -o ../palworld-live-map/.local/bin/palsave ./cmd/palsave)
+GOBIN="$PWD/bin" go install \
+  github.com/LukeHollandDev/palworld-save-reader/cmd/palworld-save-reader@v0.1.0
 ```
 
-Then set `SAVE_DATA_ENABLED=true`, `PALWORLD_SAVE_ROOT`,
-`PALWORLD_SAVE_DECODER` (to the absolute `.local/bin/palsave` path) in `.env`.
+Then set `SAVE_DATA_ENABLED=true` and `PALWORLD_SAVE_ROOT` in `.env`. The app
+always uses the `palworld-save-reader` executable beside its own binary.
+
+To check the decoder contract itself — the executable name, the preset probe,
+and the JSON field names — run the save-backed integration test against a real
+save directory. It uses the same `bin/palworld-save-reader` installation and
+skips when `PALWORLD_SAVE_ROOT_FIXTURE` is unset, so `make test` stays hermetic.
+Point it at any `SaveGames/0` directory:
+
+```bash
+PALWORLD_SAVE_ROOT_FIXTURE=/path/to/Pal/Saved/SaveGames/0 \
+  go test ./internal/saveroster/ -run TestReaderAndRosterAgainstRealSave -v
+```
 
 To run without a Palworld server:
 
@@ -86,13 +97,13 @@ Run `make game-assets` to regenerate map artwork and encounter data from a local
 
 ## Verify Changes
 
-| Command | Purpose |
-| --- | --- |
-| `make test` | Run frontend and Go tests |
-| `make check` | Run frontend checks/build, Go formatting, vet, and race-enabled tests |
-| `make build` | Build frontend assets and the local Go binary |
-| `make image` | Build the production container image locally |
-| `make exporter-check` | Test and compile the asset exporter |
+| Command               | Purpose                                                               |
+| --------------------- | --------------------------------------------------------------------- |
+| `make test`           | Run frontend and Go tests                                             |
+| `make check`          | Run frontend checks/build, Go formatting, vet, and race-enabled tests |
+| `make build`          | Build frontend assets and the local Go binary                         |
+| `make image`          | Build the production container image locally                          |
+| `make exporter-check` | Test and compile the asset exporter                                   |
 
 Use `make clean` to remove build and coverage outputs. Use `make distclean` to also remove frontend dependencies and the ignored `build/` workspace. Neither removes `.env` or `.local/`.
 

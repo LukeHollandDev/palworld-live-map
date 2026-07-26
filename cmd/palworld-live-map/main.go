@@ -55,7 +55,7 @@ func main() {
 		}
 		source = client
 		if cfg.SaveDataEnabled {
-			reader, readerErr := savesidecar.NewReader(savesidecar.Options{BinaryPath: cfg.SaveDecoderPath})
+			reader, readerErr := savesidecar.NewReader(savesidecar.Options{})
 			if readerErr != nil {
 				logger.Error("save decoder setup failed", "error", readerErr)
 				os.Exit(1)
@@ -63,6 +63,7 @@ func main() {
 			rosterSource, rosterErr := saveroster.New(saveroster.Options{
 				Root: cfg.SaveRoot, WorldID: cfg.SaveWorldID, Timeout: cfg.SaveTimeout, Reader: reader,
 				ProjectPlayerID: client.PublicPlayerID,
+				ProjectGuildKey: client.PublicGuildKey,
 			})
 			if rosterErr != nil {
 				logger.Error("save roster setup failed", "error", rosterErr)

@@ -120,6 +120,12 @@ export interface PlayerState {
   connected: boolean
   stale: boolean
   lastSuccessAt?: string
+  saveEnabled: boolean
+  saveAvailable: boolean
+  saveStale: boolean
+  saveUpdatedAt?: string
+  saveSnapshotAt?: string
+  saveLastError?: string
   players: Player[]
 }
 

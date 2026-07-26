@@ -11,6 +11,8 @@ import (
 	"time"
 )
 
+const saveResolveFailed = "resolve-failed"
+
 type Snapshot struct {
 	Server             ServerInfo    `json:"server"`
 	Connected          bool          `json:"connected"`
@@ -75,10 +77,12 @@ type Source interface {
 
 // RosterSnapshot is the persistent, save-derived view of players. Positions
 // are the last saved positions and are superseded by REST coordinates while a
-// player is online.
+// player is online. PartialError describes a usable but degraded snapshot and
+// remains server-side; the poller publishes only a stable error category.
 type RosterSnapshot struct {
-	SnapshotAt time.Time
-	Players    []Player
+	SnapshotAt   time.Time
+	Players      []Player
+	PartialError error
 }
 
 type RosterSource interface {
@@ -261,7 +265,12 @@ func (p *Poller) refreshRoster(ctx context.Context) {
 		return
 	}
 	now := time.Now().UTC()
+	lastError := ""
+	if roster.PartialError != nil {
+		lastError = saveResolveFailed
+	}
 	p.mu.Lock()
+	previousError := p.snapshot.SaveLastError
 	p.saved = clonePlayers(roster.Players)
 	for index := range p.saved {
 		p.saved[index].Online = false
@@ -270,9 +279,15 @@ func (p *Poller) refreshRoster(ctx context.Context) {
 	p.snapshot.SaveStale = false
 	p.snapshot.SaveUpdatedAt = now
 	p.snapshot.SaveSnapshotAt = roster.SnapshotAt.UTC()
-	p.snapshot.SaveLastError = ""
+	p.snapshot.SaveLastError = lastError
 	p.snapshot.Players = mergePlayers(p.saved, p.online)
 	p.mu.Unlock()
+	switch {
+	case lastError == saveResolveFailed && previousError != saveResolveFailed:
+		p.logger.Warn("Palworld save-roster resolve failed; using partial enrichment", "error", roster.PartialError)
+	case lastError == "" && previousError == saveResolveFailed:
+		p.logger.Info("Palworld save-roster resolve recovered")
+	}
 }
 
 func (p *Poller) refreshMetrics(ctx context.Context) {
@@ -367,9 +382,10 @@ func mergePlayers(saved, online []Player) []Player {
 			}
 			persistedByID[player.ID] = player
 		}
-		// The refactored save reader's player-details preset intentionally has
-		// no display name, level, or guild metadata. Keep those records available
-		// for ID-based enrichment, but never publish anonymous offline markers.
+		// Names come from the roster's resolve pass. When it fails or skips a
+		// record the player stays available for ID-based enrichment of the REST
+		// list, but is never published as an anonymous offline marker: an
+		// unnamed dot cannot be identified, searched, or attributed.
 		if player.Name == "" {
 			continue
 		}

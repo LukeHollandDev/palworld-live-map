@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
+	"hash/fnv"
 	"math"
 	"os"
 	"path/filepath"
@@ -37,7 +39,7 @@ func (f *fakeSnapshotReader) ReadSnapshot(ctx context.Context, path string) (*sa
 func TestNewValidatesConfiguration(t *testing.T) {
 	valid := Options{
 		Root: t.TempDir(), Reader: &fakeSnapshotReader{},
-		ProjectPlayerID: testPlayerProjector,
+		ProjectPlayerID: testPlayerProjector, ProjectGuildKey: testGuildProjector,
 	}
 	tests := []struct {
 		name   string
@@ -52,6 +54,7 @@ func TestNewValidatesConfiguration(t *testing.T) {
 		{name: "non-hex world ID", mutate: func(o *Options) { o.WorldID = strings.Repeat("z", 32) }, want: "32 hexadecimal"},
 		{name: "missing reader", mutate: func(o *Options) { o.Reader = nil }, want: "snapshot reader"},
 		{name: "missing player projector", mutate: func(o *Options) { o.ProjectPlayerID = nil }, want: "projector"},
+		{name: "missing guild projector", mutate: func(o *Options) { o.ProjectGuildKey = nil }, want: "guild key projector"},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -127,6 +130,23 @@ func TestRosterUsesOnlyCompleteGenerationAndGenerationTimeFallback(t *testing.T)
 	wantTime := time.Date(2026, 7, 21, 9, 8, 7, 0, time.UTC)
 	if !roster.SnapshotAt.Equal(wantTime) {
 		t.Fatalf("SnapshotAt = %v, want generation time %v", roster.SnapshotAt, wantTime)
+	}
+}
+
+func TestRosterPropagatesPartialDecoderFailure(t *testing.T) {
+	root := t.TempDir()
+	makeGeneration(t, root, testWorldOne, "generation")
+	resolveError := errors.New("decoder resolve failed")
+	reader := &fakeSnapshotReader{snapshot: &savesidecar.Snapshot{
+		Stats: savesidecar.Stats{ResolveFailed: true, ResolveError: resolveError},
+	}}
+	source := newTestSource(t, root, "", 0, reader, testPlayerProjector)
+	roster, err := source.Roster(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !errors.Is(roster.PartialError, resolveError) {
+		t.Fatalf("PartialError = %v, want %v", roster.PartialError, resolveError)
 	}
 }
 
@@ -267,6 +287,56 @@ func TestDirectoryScanIsBoundedAndHonorsContext(t *testing.T) {
 	}
 	if _, err := readDirectoryBounded(context.Background(), link, 4); err == nil || !strings.Contains(err.Error(), "non-symlink") {
 		t.Fatalf("symlinked root error = %v", err)
+	}
+}
+
+// Names, levels, and guilds only exist once the decoder's resolve pass supplies
+// them, and the guild GUID must leave through the projector like every other
+// private identifier.
+func TestRosterProjectsNamesLevelsAndGuilds(t *testing.T) {
+	root := t.TempDir()
+	makeGeneration(t, root, testWorldOne, "generation")
+	rawGuild := strings.Repeat("c", 32)
+	reader := &fakeSnapshotReader{snapshot: &savesidecar.Snapshot{
+		SnapshotAt: time.Now().UTC(),
+		Players: []savesidecar.Player{
+			{PlayerID: strings.Repeat("a", 32), Name: "Sable", Level: 42, GuildID: rawGuild, GuildName: "Aurora"},
+			// A control character and an over-long name are player-controlled
+			// input on their way to a browser.
+			{PlayerID: strings.Repeat("b", 32), Name: "Bad\x00Name" + strings.Repeat("x", 200), Level: -3},
+			// An unprojectable guild must cost the guild pair, not the player.
+			{PlayerID: strings.Repeat("d", 32), Name: "Loner", Level: 7, GuildID: "not-a-guid", GuildName: "Phantom"},
+		},
+	}}
+	source := newTestSource(t, root, "", 0, reader, func(raw string) (string, bool) {
+		return "player:" + raw[:1], true
+	})
+	roster, err := source.Roster(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(roster.Players) != 3 {
+		t.Fatalf("players = %#v", roster.Players)
+	}
+	named, sanitized, loner := roster.Players[0], roster.Players[1], roster.Players[2]
+
+	wantGuild, _ := testGuildProjector(rawGuild)
+	if named.Name != "Sable" || named.Level != 42 || named.GuildKey != wantGuild || named.GuildName != "Aurora" {
+		t.Fatalf("named player = %#v, want the projected guild %q", named, wantGuild)
+	}
+	if strings.Contains(named.GuildKey, rawGuild) {
+		t.Fatalf("guild key %q leaks the private GUID", named.GuildKey)
+	}
+
+	if strings.ContainsRune(sanitized.Name, 0) || len(sanitized.Name) > maxNameBytes {
+		t.Fatalf("sanitized name = %q, want control characters stripped and length bounded", sanitized.Name)
+	}
+	if sanitized.Level != 0 {
+		t.Fatalf("sanitized player level = %d, want a negative level dropped", sanitized.Level)
+	}
+
+	if loner.Name != "Loner" || loner.GuildKey != "" || loner.GuildName != "" {
+		t.Fatalf("loner = %#v, want the player kept and the unprojectable guild dropped", loner)
 	}
 }
 
@@ -455,7 +525,7 @@ func newTestSource(t *testing.T, root, worldID string, timeout time.Duration, re
 	t.Helper()
 	source, err := New(Options{
 		Root: root, WorldID: worldID, Timeout: timeout, Reader: reader,
-		ProjectPlayerID: player,
+		ProjectPlayerID: player, ProjectGuildKey: testGuildProjector,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -506,4 +576,16 @@ func testPlayerProjector(raw string) (string, bool) {
 		return "", false
 	}
 	return "player:test", true
+}
+
+// Distinct guilds must project to distinct keys without the result carrying any
+// part of the private GUID, which is what the real keyed HMAC gives.
+func testGuildProjector(raw string) (string, bool) {
+	canonical, ok := canonicalPrivateGUID(raw)
+	if !ok {
+		return "", false
+	}
+	digest := fnv.New64a()
+	_, _ = digest.Write([]byte(canonical))
+	return fmt.Sprintf("guild:test-%x", digest.Sum64()), true
 }

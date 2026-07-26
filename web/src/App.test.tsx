@@ -39,6 +39,9 @@ const responses: Record<string, unknown> = {
     connected: true,
     stale: false,
     lastSuccessAt: new Date().toISOString(),
+    saveEnabled: false,
+    saveAvailable: false,
+    saveStale: false,
     players: [{ id: 'player-luke', name: 'Luke', level: 55, online: true, x: 10, y: 20, map: 'palpagos' }]
   },
   '/api/objects': {
@@ -240,6 +243,7 @@ describe('App', () => {
     }
 
     await user.click(within(inspector).getByRole('button', { name: 'Close details' }))
+    await user.click(within(explorer).getByRole('button', { name: 'Expand Offline Players section' }))
     await user.click(within(explorer).getByRole('button', { name: 'View Legacy · Lv 12' }))
 
     inspector = screen.getByRole('dialog')
@@ -247,6 +251,27 @@ describe('App', () => {
     for (const label of ['Last seen', 'Captures', 'Unique Pals captured', 'Paldeck unlocked']) {
       expect(within(inspector).queryByText(label)).not.toBeInTheDocument()
     }
+  })
+
+  it('warns when offline player details are temporarily degraded', async () => {
+    mockAPI((path) =>
+      path === '/api/players'
+        ? {
+            ...(responses[path] as object),
+            saveEnabled: true,
+            saveAvailable: true,
+            saveStale: false,
+            saveLastError: 'resolve-failed'
+          }
+        : responses[path]
+    )
+    render(<App />)
+
+    const warning = await screen.findByText(
+      'Offline player details are temporarily unavailable. Live players and saved progress remain available.'
+    )
+    expect(warning).toBeVisible()
+    expect(warning).toHaveAttribute('aria-live', 'polite')
   })
 
   it('auto-enables every populated category while leaving extra sections collapsed', async () => {
@@ -322,8 +347,8 @@ describe('App', () => {
       expect(within(explorer).getByRole('checkbox', { name: 'Show Guilds' })).toBeChecked()
     })
     expect(within(explorer).getByRole('button', { name: 'Collapse Online Players section' })).toBeVisible()
-    expect(within(explorer).getByRole('button', { name: 'Collapse Offline Players section' })).toBeVisible()
-    expect(within(explorer).getByRole('button', { name: 'Collapse Guilds section' })).toBeVisible()
+    expect(within(explorer).getByRole('button', { name: 'Expand Offline Players section' })).toBeVisible()
+    expect(within(explorer).getByRole('button', { name: 'Expand Guilds section' })).toBeVisible()
 
     for (const category of ['Alpha Pals', 'Tower Bosses']) {
       const checkbox = within(explorer).getByRole('checkbox', { name: `Show ${category}` })
@@ -494,7 +519,7 @@ describe('App', () => {
     expect(screen.queryByRole('button', { name: 'Spark · Lv 12' })).not.toBeInTheDocument()
     expect(within(explorer).getByRole('button', { name: 'View Spark · Lv 12' })).toBeVisible()
     await waitFor(() => expect(screen.getByRole('heading', { name: 'Spark' })).toHaveFocus())
-    expect(within(explorer).getByText('Unnamed guild')).toBeVisible()
+    expect(within(explorer).getByRole('button', { name: 'Expand Guilds section' })).toBeVisible()
 
     await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Close details' }))
     await waitFor(() => expect(durableCloseTarget).toHaveFocus())
@@ -620,7 +645,9 @@ describe('App', () => {
     await screen.findByRole('heading', { name: 'Test Realm' })
 
     const explorer = screen.getByRole('complementary', { name: 'Map filters' })
-    expect(within(explorer).getByRole('button', { name: 'Collapse Guilds section' })).toBeVisible()
+    const guildCategory = within(explorer).getByRole('button', { name: 'Expand Guilds section' })
+    expect(guildCategory).toBeVisible()
+    await user.click(guildCategory)
     const guildOpener = within(explorer).getByRole('button', { name: 'View guild Builders' })
     const guildDisclosure = within(explorer).getByRole('button', { name: 'Expand Builders' })
     expect(guildDisclosure).toHaveAttribute('aria-expanded', 'false')
@@ -1036,6 +1063,49 @@ describe('App', () => {
     for (const checkbox of within(explorer).getAllByRole('checkbox')) expect(checkbox).not.toBeChecked()
   })
 
+  it('can show a child item after all filters or its category are unchecked', async () => {
+    mockAPI((path) => {
+      if (path !== '/api/players') return responses[path]
+      const state = responses[path] as (typeof responses)['/api/players'] & { players: Array<Record<string, unknown>> }
+      return {
+        ...state,
+        players: [
+          ...state.players,
+          { id: 'player-anne', name: 'Anne', level: 20, online: true, x: 30, y: 40, map: 'palpagos' }
+        ]
+      }
+    })
+    const user = userEvent.setup()
+    render(<App />)
+    await screen.findByRole('heading', { name: 'Test Realm' })
+    const explorer = screen.getByRole('complementary', { name: 'Map filters' })
+    const playerVisibility = within(explorer).getByRole('checkbox', { name: 'Show Luke · Lv 55' })
+    const siblingVisibility = within(explorer).getByRole('checkbox', { name: 'Show Anne · Lv 20' })
+    const categoryVisibility = within(explorer).getByRole('checkbox', { name: 'Show Online Players' })
+
+    await user.click(within(explorer).getByRole('button', { name: 'Uncheck all' }))
+    expect(playerVisibility).toBeEnabled()
+    expect(playerVisibility).not.toBeChecked()
+
+    await user.click(playerVisibility)
+    expect(playerVisibility).toBeChecked()
+    expect(siblingVisibility).not.toBeChecked()
+    expect(screen.getByRole('button', { name: 'Luke · Lv 55' })).toBeVisible()
+    expect(screen.queryByRole('button', { name: 'Anne · Lv 20' })).not.toBeInTheDocument()
+
+    await user.click(categoryVisibility)
+    expect(categoryVisibility).toBeChecked()
+    await user.click(categoryVisibility)
+    expect(playerVisibility).toBeEnabled()
+    expect(playerVisibility).not.toBeChecked()
+
+    await user.click(playerVisibility)
+    expect(playerVisibility).toBeChecked()
+    expect(siblingVisibility).not.toBeChecked()
+    expect(screen.getByRole('button', { name: 'Luke · Lv 55' })).toBeVisible()
+    expect(screen.queryByRole('button', { name: 'Anne · Lv 20' })).not.toBeInTheDocument()
+  })
+
   it('finds online players by guild name in the explorer and on the map', async () => {
     mockAPI((path) => {
       if (path !== '/api/players') return responses[path]
@@ -1131,6 +1201,12 @@ describe('App', () => {
     expect(within(explorer).getByRole('checkbox', { name: 'Show Online Players' })).toBeChecked()
     const offlineVisibility = within(explorer).getByRole('checkbox', { name: 'Show Offline Players' })
     expect(offlineVisibility).toBeChecked()
+    const offlineCategory = within(explorer).getByRole('button', { name: 'Expand Offline Players section' })
+    expect(offlineCategory.querySelector('[data-marker-kind="players"]')).toHaveAttribute(
+      'data-player-status',
+      'offline'
+    )
+    await user.click(offlineCategory)
     const offlinePlayer = within(explorer).getByRole('button', { name: 'View Zoe · Lv 60' })
     expect(within(explorer).getByRole('button', { name: 'View Alice · Lv 50' })).toBeVisible()
     const onlinePlayer = within(explorer).getByRole('button', { name: 'View Bob · Lv 50' })
@@ -1141,11 +1217,6 @@ describe('App', () => {
         .getByRole('button', { name: 'Collapse Online Players section' })
         .querySelector('[data-marker-kind="players"]')
     ).toHaveAttribute('data-player-status', 'online')
-    expect(
-      within(explorer)
-        .getByRole('button', { name: 'Collapse Offline Players section' })
-        .querySelector('[data-marker-kind="players"]')
-    ).toHaveAttribute('data-player-status', 'offline')
     expect(within(explorer).queryByRole('button', { name: 'View guild Save Crew' })).not.toBeInTheDocument()
 
     await user.click(offlineVisibility)
@@ -1805,6 +1876,7 @@ describe('App', () => {
     await screen.findByRole('heading', { name: 'Test Realm' })
     const explorer = screen.getByRole('complementary', { name: 'Map filters' })
 
+    await user.click(within(explorer).getByRole('button', { name: 'Expand Guilds section' }))
     await user.type(screen.getByRole('searchbox'), 'Moldron')
     const guildOutside = within(explorer).getByRole('group', { name: 'Outside base perimeters for Builders' })
     expect(within(guildOutside).getByRole('button', { name: 'View Moldron' })).toBeVisible()

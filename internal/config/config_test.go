@@ -93,7 +93,7 @@ func TestLoadRejectsInvalidConfiguration(t *testing.T) {
 	}
 }
 
-func TestLoadValidatesEnabledSaveReader(t *testing.T) {
+func TestLoadValidatesEnabledSaveData(t *testing.T) {
 	tests := []struct {
 		name  string
 		key   string
@@ -101,7 +101,6 @@ func TestLoadValidatesEnabledSaveReader(t *testing.T) {
 		want  string
 	}{
 		{name: "relative root", key: "PALWORLD_SAVE_ROOT", value: "saves", want: "absolute"},
-		{name: "relative decoder", key: "PALWORLD_SAVE_DECODER", value: "palsave", want: "PALWORLD_SAVE_DECODER"},
 		{name: "poll too short", key: "SAVE_POLL_INTERVAL", value: "10s", want: "at least 15s"},
 		{name: "timeout", key: "SAVE_TIMEOUT", value: "30s", want: "shorter"},
 	}

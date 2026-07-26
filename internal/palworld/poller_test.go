@@ -1,11 +1,14 @@
 package palworld
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"io"
 	"log/slog"
 	"net/http"
+	"strings"
 	"testing"
 	"time"
 )
@@ -223,6 +226,55 @@ func TestPollerMergesPersistentRosterWithOnlinePlayers(t *testing.T) {
 	stale := poller.PlayerSnapshot()
 	if !stale.SaveAvailable || !stale.SaveStale || stale.SaveLastError != "refresh-failed" || len(stale.Players) != 2 {
 		t.Fatalf("stale save state = %#v", stale)
+	}
+}
+
+func TestPollerReportsPartialSaveRosterAndLogsTransitions(t *testing.T) {
+	var logs bytes.Buffer
+	roster := &stubRoster{snapshot: RosterSnapshot{
+		SnapshotAt:   time.Now().UTC(),
+		Players:      []Player{},
+		PartialError: errors.New("private decoder detail"),
+	}}
+	poller := NewPollerWithRoster(
+		&stubSource{},
+		roster,
+		time.Minute,
+		time.Minute,
+		time.Minute,
+		false,
+		slog.New(slog.NewTextHandler(&logs, nil)),
+	)
+
+	poller.refreshRoster(context.Background())
+	poller.refreshRoster(context.Background())
+	degraded := poller.PlayerSnapshot()
+	if !degraded.SaveAvailable || degraded.SaveStale || degraded.SaveLastError != saveResolveFailed {
+		t.Fatalf("degraded save state = %#v", degraded)
+	}
+	if count := strings.Count(logs.String(), "save-roster resolve failed"); count != 1 {
+		t.Fatalf("degraded transition logged %d times, logs = %q", count, logs.String())
+	}
+	if !strings.Contains(logs.String(), "private decoder detail") {
+		t.Fatalf("server log omitted the decoder diagnostic: %q", logs.String())
+	}
+	publicJSON, err := json.Marshal(degraded)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(publicJSON), "private decoder detail") {
+		t.Fatalf("public snapshot leaked the decoder diagnostic: %s", publicJSON)
+	}
+
+	roster.snapshot.PartialError = nil
+	poller.refreshRoster(context.Background())
+	poller.refreshRoster(context.Background())
+	recovered := poller.PlayerSnapshot()
+	if !recovered.SaveAvailable || recovered.SaveStale || recovered.SaveLastError != "" {
+		t.Fatalf("recovered save state = %#v", recovered)
+	}
+	if count := strings.Count(logs.String(), "save-roster resolve recovered"); count != 1 {
+		t.Fatalf("recovery transition logged %d times, logs = %q", count, logs.String())
 	}
 }
 
