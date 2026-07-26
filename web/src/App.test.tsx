@@ -129,10 +129,19 @@ describe('App', () => {
     const filterControl = within(statusBar).getByRole('button', { name: 'Map filters' })
     const leaderboardControl = within(statusBar).getByRole('button', { name: 'Leaderboards' })
     for (const control of [filterControl, leaderboardControl]) {
-      expect(control).toHaveClass('header-panel-control', 'size-[54px]', 'max-sm:h-11', 'max-sm:w-full')
+      expect(control).toHaveClass(
+        'header-panel-control',
+        'relative',
+        'h-[54px]',
+        'w-full',
+        'min-w-0',
+        'max-sm:row-start-2',
+        'max-sm:h-11'
+      )
       expect(control).not.toHaveAttribute('aria-hidden')
       expect(control).not.toHaveAttribute('inert')
     }
+    expect(filterControl.parentElement).toBe(leaderboardControl.parentElement)
     expect(filterControl).toHaveClass('pal-selected', 'col-start-1', 'max-sm:row-start-2')
     expect(filterControl).toHaveAttribute('aria-expanded', 'true')
     expect(filterControl.querySelector('svg')).toHaveClass('tabler-icon-filter')
@@ -770,18 +779,35 @@ describe('App', () => {
     const statusBar = screen.getByRole('banner')
     const filterControl = within(statusBar).getByRole('button', { name: 'Map filters' })
     const leaderboardControl = within(statusBar).getByRole('button', { name: 'Leaderboards' })
+    const expectMobilePanelShell = (panel: HTMLElement) => {
+      expect(panel).toHaveAttribute('data-map-panel-shell')
+      expect(panel).toHaveAttribute('data-map-panel-mobile-size', 'fixed')
+      expect(panel).toHaveClass(
+        'pal-glass-panel',
+        'max-sm:inset-x-0',
+        'max-sm:bottom-0',
+        'max-sm:h-[min(52dvh,480px)]',
+        'max-sm:w-auto',
+        'max-sm:border-x-0',
+        'max-sm:border-b-0'
+      )
+    }
     expect(filterControl).toHaveAttribute('aria-expanded', 'false')
     expect(leaderboardControl).toHaveAttribute('aria-expanded', 'false')
 
     await user.click(filterControl)
     expect(filterControl).toHaveAttribute('aria-expanded', 'true')
-    expect(screen.getByRole('complementary', { name: 'Map filters' })).toBeVisible()
+    const filterPanel = screen.getByRole('complementary', { name: 'Map filters' })
+    expect(filterPanel).toBeVisible()
+    expectMobilePanelShell(filterPanel)
 
     await user.click(leaderboardControl)
     expect(filterControl).toHaveAttribute('aria-expanded', 'false')
     expect(leaderboardControl).toHaveAttribute('aria-expanded', 'true')
     expect(screen.queryByRole('complementary', { name: 'Map filters' })).not.toBeInTheDocument()
-    expect(screen.getByRole('dialog')).toHaveAttribute('id', 'leaderboard-panel')
+    const leaderboardPanel = screen.getByRole('dialog')
+    expect(leaderboardPanel).toHaveAttribute('id', 'leaderboard-panel')
+    expectMobilePanelShell(leaderboardPanel)
 
     await user.click(filterControl)
     expect(filterControl).toHaveAttribute('aria-expanded', 'true')
@@ -1034,7 +1060,7 @@ describe('App', () => {
     const leaderboard = screen.getByRole('dialog')
     expect(leaderboard).toHaveClass('top-[78px]', 'bottom-4', 'w-[350px]')
     expect(explorer).toHaveClass('top-[78px]', 'bottom-4', 'w-[350px]')
-    expect(leaderboard.querySelector('header')).toHaveClass('min-h-[78px]')
+    expect(leaderboard.querySelector('header[data-map-panel-header]')).toHaveClass('min-h-[78px]')
     expect(explorer.firstElementChild).toHaveClass('min-h-[78px]')
     expect(within(leaderboard).getByRole('heading', { name: 'Leaderboards' })).toBeVisible()
     expect(within(leaderboard).getByRole('heading', { name: 'Player levels' })).toBeVisible()
@@ -1434,9 +1460,10 @@ describe('App', () => {
     await user.click(marker)
     const inspector = screen.getByRole('dialog')
     expect(inspector).toHaveAttribute('aria-modal', 'false')
-    const inspectorHeader = inspector.querySelector('header')
+    const inspectorHeader = inspector.querySelector('header[data-map-panel-header]')
     const inspectorBody = inspector.querySelector('[data-details-body]')
     expect(inspectorHeader?.parentElement).toBe(inspector)
+    expect(inspector).toHaveAttribute('data-map-panel-mobile-size', 'content')
     expect(inspectorHeader).not.toHaveClass('sticky')
     expect(inspectorBody?.parentElement).toBe(inspector)
     expect(inspectorBody).toHaveClass('min-h-0', 'flex-1', 'overflow-y-auto')

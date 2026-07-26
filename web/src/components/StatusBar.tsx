@@ -2,6 +2,7 @@ import { IconFilter, IconTrophy } from '@tabler/icons-react'
 import { type Ref, useEffect, useId, useState } from 'react'
 import { formatUptime } from '../lib/map'
 import type { PlayerState, ServerMetrics } from '../types'
+import { MapPanelControl } from './MapPanel'
 
 interface StatusBarControls {
   filterButtonRef: Ref<HTMLButtonElement>
@@ -244,22 +245,17 @@ export function StatusBar({ playerState, offline, controls }: StatusBarProps) {
   return (
     <header className="status-commandbar pointer-events-none absolute inset-x-0 top-0 z-40 flex min-w-0 px-7 pt-3 min-[1600px]:inset-x-[324px] min-[1600px]:px-0 max-md:px-2.5 max-md:pt-2">
       <div className="status-commandbar-layout pointer-events-none mx-auto grid w-full max-w-[1364px] min-w-0 grid-cols-[54px_minmax(0,1fr)_54px] grid-rows-[54px] gap-x-2 min-[1600px]:max-w-none max-md:grid-rows-[70px] max-sm:grid-cols-2 max-sm:grid-rows-[70px_44px] max-sm:gap-y-2">
-        <button
-          ref={controls.filterButtonRef}
-          type="button"
-          className={`header-panel-control pal-glass-control pointer-events-auto relative col-start-1 row-start-1 flex size-[54px] cursor-pointer items-center justify-center self-center text-[#dceef0] max-sm:row-start-2 max-sm:h-11 max-sm:w-full max-sm:gap-2 ${
-            controls.filtersOpen ? 'pal-selected' : ''
-          }`}
-          data-panel-control="filters"
-          aria-label="Map filters"
-          aria-controls="map-filter-panel"
-          aria-describedby={controls.filterSearch.trim() ? 'map-filter-search-status' : undefined}
-          aria-expanded={controls.filtersOpen}
-          title="Map filters"
-          onClick={controls.onToggleFilters}
+        <MapPanelControl
+          buttonRef={controls.filterButtonRef}
+          controlsId="map-filter-panel"
+          describedBy={controls.filterSearch.trim() ? 'map-filter-search-status' : undefined}
+          expanded={controls.filtersOpen}
+          icon={IconFilter}
+          kind="filters"
+          label="Map filters"
+          mobileLabel="FILTERS"
+          onToggle={controls.onToggleFilters}
         >
-          <IconFilter className="size-6 max-sm:size-5" stroke={1.8} aria-hidden="true" />
-          <span className="hidden text-[11px] font-semibold tracking-[.09em] max-sm:inline">FILTERS</span>
           {controls.filterSearch.trim() ? (
             <>
               <span
@@ -271,27 +267,21 @@ export function StatusBar({ playerState, offline, controls }: StatusBarProps) {
               </span>
             </>
           ) : null}
-        </button>
+        </MapPanelControl>
 
         {statusSurface}
 
-        <button
-          ref={controls.leaderboardButtonRef}
-          type="button"
-          className={`header-panel-control pal-glass-control pointer-events-auto col-start-3 row-start-1 flex size-[54px] cursor-pointer items-center justify-center self-center text-[#d9c98e] max-sm:col-start-2 max-sm:row-start-2 max-sm:h-11 max-sm:w-full max-sm:gap-2 ${
-            controls.leaderboardOpen ? 'pal-selected' : ''
-          }`}
-          data-panel-control="leaderboards"
-          aria-label="Leaderboards"
-          aria-controls="leaderboard-panel"
-          aria-haspopup="dialog"
-          aria-expanded={controls.leaderboardOpen}
-          title="Leaderboards"
-          onClick={(event) => controls.onToggleLeaderboards(event.currentTarget)}
-        >
-          <IconTrophy className="size-6 max-sm:size-5" stroke={1.8} aria-hidden="true" />
-          <span className="hidden text-[11px] font-semibold tracking-[.09em] max-sm:inline">LEADERBOARDS</span>
-        </button>
+        <MapPanelControl
+          buttonRef={controls.leaderboardButtonRef}
+          controlsId="leaderboard-panel"
+          dialog
+          expanded={controls.leaderboardOpen}
+          icon={IconTrophy}
+          kind="leaderboards"
+          label="Leaderboards"
+          mobileLabel="LEADERBOARDS"
+          onToggle={controls.onToggleLeaderboards}
+        />
       </div>
     </header>
   )

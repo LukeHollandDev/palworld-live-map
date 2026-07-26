@@ -1,9 +1,10 @@
-import { IconChevronRight, IconX } from '@tabler/icons-react'
+import { IconChevronRight } from '@tabler/icons-react'
 import { useEffect, useRef } from 'react'
 import { buildGuildDetails, type GuildDetails as GuildDetailsModel } from '../lib/guilds'
 import { LEADERBOARDS, type LeaderboardId, leaderboardById } from '../lib/leaderboards'
 import { kindLabel } from '../lib/map'
 import type { ItemKind, MapItem, MapLayer } from '../types'
+import { MapPanelHeader, MapPanelShell } from './MapPanel'
 import { MarkerGlyph } from './MarkerGlyph'
 
 export type Detail =
@@ -115,34 +116,24 @@ export function DetailsDialog({
   }
 
   return (
-    <aside
+    <MapPanelShell
       id={leaderboard ? 'leaderboard-panel' : undefined}
-      className="pal-glass-panel surface-enter-motion absolute top-[78px] right-4 bottom-4 z-[24] flex w-[350px] flex-col overflow-hidden text-[#e5f0f2] max-sm:top-auto max-sm:right-0 max-sm:bottom-0 max-sm:left-0 max-sm:max-h-[49dvh] max-sm:w-auto max-sm:border-x-0 max-sm:border-b-0"
+      side="right"
+      mobileSize={leaderboard ? 'fixed' : 'content'}
+      className="surface-enter-motion"
       role="dialog"
       aria-modal="false"
       aria-labelledby="details-title"
     >
-      <header className="pal-panel-header relative z-[2] flex min-h-[78px] shrink-0 items-center justify-between gap-3.5 border-b pr-3.5 pl-5 [--pal-panel-accent:#72d7e5]">
-        <div>
-          <p className="m-0 mb-1 text-[10px] font-normal tracking-[.14em] text-[#b6f5fc]">{eyebrow}</p>
-          <h2
-            ref={titleRef}
-            id="details-title"
-            className="m-0 text-[22px] font-normal text-[#f3fbfc] outline-none"
-            tabIndex={-1}
-          >
-            {title}
-          </h2>
-        </div>
-        <button
-          type="button"
-          className="pal-interactive grid size-11 cursor-pointer place-items-center border-0 bg-transparent text-xl text-[#d7eef1]"
-          aria-label="Close details"
-          onClick={close}
-        >
-          <IconX className="size-5" aria-hidden="true" />
-        </button>
-      </header>
+      <MapPanelHeader
+        eyebrow={eyebrow}
+        title={title}
+        titleId="details-title"
+        titleRef={titleRef}
+        titleTabIndex={-1}
+        closeLabel="Close details"
+        onClose={close}
+      />
       <div ref={bodyRef} className="min-h-0 flex-1 overflow-y-auto overscroll-contain" data-details-body>
         <div className="grid gap-5 p-[18px] max-sm:p-3.5">
           {item ? (
@@ -165,7 +156,7 @@ export function DetailsDialog({
           ) : null}
         </div>
       </div>
-    </aside>
+    </MapPanelShell>
   )
 }
 

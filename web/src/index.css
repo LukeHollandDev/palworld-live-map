@@ -107,10 +107,14 @@
 
   .header-panel-control {
     --header-panel-accent: #72d7e5;
+
+    color: #dceef0;
   }
 
   .header-panel-control[data-panel-control="leaderboards"] {
     --header-panel-accent: #dbc46f;
+
+    color: #d9c98e;
   }
 
   .header-panel-control[aria-expanded="true"] {
@@ -220,18 +224,6 @@
 
   .filter-panel-body-motion {
     contain: paint;
-  }
-
-  .filter-panel-body-motion::before {
-    position: absolute;
-    inset: 0;
-    border: 1px solid var(--pal-glass-border);
-    border-top: 0;
-    background: var(--pal-glass-panel);
-    box-shadow: inset 0 1px rgb(217 250 255 / 5%);
-    backdrop-filter: blur(18px) saturate(120%);
-    content: "";
-    pointer-events: none;
   }
 
   @media (max-width: 639px) {
@@ -483,10 +475,7 @@
     transition-duration: 0.01ms;
   }
 
-  .filter-panel-motion,
-  .filter-panel-header-motion,
-  .filter-panel-body-motion::before,
-  .filter-panel-body-content {
+  .filter-panel-motion {
     transition-delay: 0ms;
   }
 }

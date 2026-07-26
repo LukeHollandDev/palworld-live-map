@@ -3,6 +3,7 @@ import { type ReactNode, type RefObject, useEffect, useId, useLayoutEffect, useM
 import { guildIdForBase } from '../lib/guilds'
 import { itemSearchText, markerText } from '../lib/map'
 import type { ItemKind, MapItem, MapLayer, PlayerStatus } from '../types'
+import { MapPanelHeader, MapPanelShell } from './MapPanel'
 import { MarkerGlyph } from './MarkerGlyph'
 
 interface ExplorerProps {
@@ -300,38 +301,29 @@ export function Explorer(props: ExplorerProps) {
   return (
     // biome-ignore lint/complexity/noUselessFragments: the stable wrapper keeps this large panel's markup isolated from its external header trigger
     <>
-      <aside
+      <MapPanelShell
         id="map-filter-panel"
-        className={`filter-panel-motion absolute top-[78px] bottom-4 left-4 z-[24] flex w-[350px] min-h-0 shrink-0 flex-col max-sm:top-auto max-sm:right-3 max-sm:bottom-3 max-sm:left-3 max-sm:z-[34] max-sm:h-[min(52dvh,480px)] max-sm:w-auto ${props.open ? 'is-panel-open' : 'is-panel-closed pointer-events-none'}`}
+        side="left"
+        mobileSize="fixed"
+        className={`filter-panel-motion max-sm:z-[34] ${props.open ? 'is-panel-open' : 'is-panel-closed pointer-events-none'}`}
         aria-label="Map filters"
         aria-hidden={!props.open}
         inert={!props.open}
       >
-        <div
-          className={`pal-panel-header filter-panel-header-motion relative z-[1] flex min-h-[78px] shrink-0 items-center justify-between gap-3.5 border pr-3.5 pl-5 [--pal-panel-accent:#72d7e5] ${props.open ? 'is-panel-open' : 'is-panel-closed'}`}
-        >
-          <div>
-            <p className="m-0 mb-1 text-[10px] font-normal tracking-[.14em] text-[#b6f5fc]">MAP FILTER</p>
-            <h2 className="m-0 text-[22px] font-normal text-[#f3fbfc]">Map</h2>
-          </div>
-          <button
-            ref={closeRef}
-            type="button"
-            className="pal-interactive grid size-11 cursor-pointer place-items-center border-0 bg-transparent text-xl text-[#d7eef1]"
-            aria-label="Collapse map filter"
-            aria-controls="map-filter-panel"
-            aria-expanded="true"
-            title="Collapse map filter"
-            onClick={props.onClose}
-          >
-            <IconX className="size-5" aria-hidden="true" />
-          </button>
-        </div>
+        <MapPanelHeader
+          as="div"
+          eyebrow="MAP FILTER"
+          title="Map"
+          closeButtonRef={closeRef}
+          closeLabel="Collapse map filter"
+          closeControls="map-filter-panel"
+          closeExpanded
+          closeTitle="Collapse map filter"
+          onClose={props.onClose}
+        />
 
-        <div
-          className={`filter-panel-body-motion relative flex min-h-0 flex-1 flex-col overflow-hidden ${props.open ? 'is-panel-open' : 'is-panel-closed'}`}
-        >
-          <div className="filter-panel-body-content relative z-[1] flex min-h-0 flex-1 flex-col overflow-hidden">
+        <div className="filter-panel-body-motion relative flex min-h-0 flex-1 flex-col overflow-hidden">
+          <div className="relative z-[1] flex min-h-0 flex-1 flex-col overflow-hidden">
             <search
               id="map-search-control"
               aria-label="Map search"
@@ -564,7 +556,7 @@ export function Explorer(props: ExplorerProps) {
             )}
           </div>
         </div>
-      </aside>
+      </MapPanelShell>
     </>
   )
 }
