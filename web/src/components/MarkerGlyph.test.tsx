@@ -1,88 +1,89 @@
 import { cleanup, render } from '@testing-library/react'
-import { afterEach, describe, expect, it } from 'vitest'
-import { ALL_KINDS } from '../types'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { ALL_KINDS, type ItemKind } from '../types'
 import { MarkerGlyph } from './MarkerGlyph'
+
+vi.mock('@tabler/icons-react', async () => {
+  const { createElement } = await import('react')
+  const icon = (componentName: string) => (props: Record<string, unknown>) =>
+    createElement('svg', { ...props, 'data-tabler-component': componentName })
+
+  return {
+    IconBuildingArch: icon('IconBuildingArch'),
+    IconBuildingFactory2: icon('IconBuildingFactory2'),
+    IconBuildingMonument: icon('IconBuildingMonument'),
+    IconBuildingWarehouse: icon('IconBuildingWarehouse'),
+    IconCrown: icon('IconCrown'),
+    IconHammer: icon('IconHammer'),
+    IconHeartHandshake: icon('IconHeartHandshake'),
+    IconMapPin: icon('IconMapPin'),
+    IconMessage2: icon('IconMessage2'),
+    IconNotebook: icon('IconNotebook'),
+    IconPaw: icon('IconPaw'),
+    IconSkull: icon('IconSkull'),
+    IconSparkle: icon('IconSparkle'),
+    IconTarget: icon('IconTarget'),
+    IconTower: icon('IconTower'),
+    IconUser: icon('IconUser'),
+    IconUserPin: icon('IconUserPin')
+  }
+})
+
+const EXPECTED_TABLER_COMPONENTS = {
+  players: 'IconUser',
+  bases: 'IconBuildingWarehouse',
+  workers: 'IconHammer',
+  companions: 'IconHeartHandshake',
+  'wild-pals': 'IconPaw',
+  'alpha-pals': 'IconCrown',
+  bosses: 'IconSkull',
+  bounties: 'IconTarget',
+  'oil-rigs': 'IconBuildingFactory2',
+  watchtowers: 'IconTower',
+  waypoints: 'IconMapPin',
+  'dungeon-entrances': 'IconBuildingArch',
+  effigies: 'IconBuildingMonument',
+  journals: 'IconNotebook',
+  'ancient-shrine-pickups': 'IconSparkle',
+  'npc-locations': 'IconUserPin',
+  npcs: 'IconMessage2'
+} satisfies Record<ItemKind, string>
 
 afterEach(cleanup)
 
 describe('MarkerGlyph', () => {
-  it.each(ALL_KINDS)('uses the shared %s glyph contract', (kind) => {
+  it.each(ALL_KINDS)('maps %s to its documented Tabler component and preserves the shared contract', (kind) => {
     const { container } = render(<MarkerGlyph kind={kind} />)
     const glyph = container.firstElementChild
 
+    expect(glyph).toHaveAttribute('data-tabler-component', EXPECTED_TABLER_COMPONENTS[kind])
     expect(glyph).toHaveAttribute('aria-hidden', 'true')
+    expect(glyph).toHaveAttribute('focusable', 'false')
     expect(glyph).toHaveAttribute('data-marker-kind', kind)
+    expect(glyph).not.toHaveAttribute('data-player-status')
     expect(glyph).toHaveClass('marker-glyph', `kind-${kind}`)
-
-    const [outline, fill] = [...(glyph?.querySelectorAll('path') || [])]
-    expect(outline).toHaveClass('marker-glyph-outline')
-    expect(outline).toHaveAttribute('stroke-width', '6')
-    expect(fill).toHaveClass('marker-glyph-fill')
-    expect(fill).toHaveAttribute('stroke-width', '2')
-    expect(outline?.getAttribute('d')).toBe(fill?.getAttribute('d'))
   })
 
-  it('keeps Wild and base Pal shapes at the full category footprint', () => {
-    const { container } = render(
-      <>
-        <MarkerGlyph kind="players" />
-        <MarkerGlyph kind="workers" />
-        <MarkerGlyph kind="companions" />
-        <MarkerGlyph kind="wild-pals" />
-      </>
-    )
-    const pathFor = (kind: string) =>
-      container.querySelector(`[data-marker-kind="${kind}"] .marker-glyph-fill`)?.getAttribute('d')
-
-    expect(pathFor('workers')).toBe(pathFor('players'))
-    expect(pathFor('wild-pals')).toBe(pathFor('companions'))
+  it('uses a distinct Tabler component for every item kind', () => {
+    expect(new Set(Object.values(EXPECTED_TABLER_COMPONENTS)).size).toBe(ALL_KINDS.length)
   })
 
-  it('uses distinct landmark glyphs and online states for players', () => {
+  it('preserves online and offline player states without applying them to other kinds', () => {
     const { container } = render(
       <>
-        <MarkerGlyph kind="alpha-pals" />
-        <MarkerGlyph kind="bosses" />
         <MarkerGlyph kind="players" online />
         <MarkerGlyph kind="players" online={false} />
+        <MarkerGlyph kind="workers" online />
       </>
     )
-    const pathFor = (kind: string) =>
-      container.querySelector(`[data-marker-kind="${kind}"] .marker-glyph-fill`)?.getAttribute('d')
     const players = container.querySelectorAll('[data-marker-kind="players"]')
+    const worker = container.querySelector('[data-marker-kind="workers"]')
 
-    expect(pathFor('alpha-pals')).not.toBe(pathFor('bosses'))
     expect(players[0]).toHaveClass('player-online')
     expect(players[0]).toHaveAttribute('data-player-status', 'online')
     expect(players[1]).toHaveClass('player-offline')
     expect(players[1]).toHaveAttribute('data-player-status', 'offline')
-  })
-
-  it('gives every world-catalogue category its own glyph, including static NPC locations', () => {
-    const catalogueKinds = [
-      'bounties',
-      'oil-rigs',
-      'watchtowers',
-      'waypoints',
-      'dungeon-entrances',
-      'effigies',
-      'journals',
-      'ancient-shrine-pickups',
-      'npc-locations'
-    ] as const
-    const { container } = render(
-      <>
-        {catalogueKinds.map((kind) => (
-          <MarkerGlyph key={kind} kind={kind} />
-        ))}
-        <MarkerGlyph kind="npcs" />
-      </>
-    )
-    const pathFor = (kind: string) =>
-      container.querySelector(`[data-marker-kind="${kind}"] .marker-glyph-fill`)?.getAttribute('d')
-    const cataloguePaths = catalogueKinds.map(pathFor)
-
-    expect(new Set(cataloguePaths).size).toBe(catalogueKinds.length)
-    expect(pathFor('npc-locations')).not.toBe(pathFor('npcs'))
+    expect(worker).not.toHaveClass('player-online', 'player-offline')
+    expect(worker).not.toHaveAttribute('data-player-status')
   })
 })

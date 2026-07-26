@@ -113,6 +113,33 @@ afterEach(() => {
 })
 
 describe('MapViewport zoom controls', () => {
+  it('uses decorative Tabler icons without changing control names', () => {
+    installViewportMocks()
+    const { container } = render(
+      <MapViewport
+        activeLayer={layer}
+        items={[]}
+        enabledKinds={new Set<ItemKind>()}
+        enabledPlayerStatuses={new Set(['online', 'offline'])}
+        hiddenIds={new Set<string>()}
+        search=""
+        onShowItem={() => undefined}
+        inspectorOpen={false}
+      >
+        {null}
+      </MapViewport>
+    )
+
+    const coordinatesIcon = container.querySelector('.tabler-icon-crosshair')
+    const zoomOut = screen.getByRole('button', { name: 'Zoom out' })
+    const zoomIn = screen.getByRole('button', { name: 'Zoom in' })
+    expect(coordinatesIcon).toHaveAttribute('aria-hidden', 'true')
+    expect(zoomOut.querySelector('.tabler-icon-minus')).toHaveAttribute('aria-hidden', 'true')
+    expect(zoomIn.querySelector('.tabler-icon-plus')).toHaveAttribute('aria-hidden', 'true')
+    expect(zoomOut).not.toHaveTextContent('−')
+    expect(zoomIn).not.toHaveTextContent('+')
+  })
+
   it('keeps a cached image ready when it loads before mount effects run', () => {
     installViewportMocks()
     const imageLayer = { ...layer, imageUrl: '/assets/map/palpagos.jpg?v=test' }

@@ -1,3 +1,5 @@
+import { IconBrandGithub } from '@tabler/icons-react'
+
 interface ProjectLinksProps {
   hidden: boolean
 }
@@ -25,19 +27,7 @@ export function ProjectLinks({ hidden }: ProjectLinksProps) {
         aria-label="Palworld Live Map on GitHub"
         title="View source on GitHub"
       >
-        <svg
-          className="size-[19px]"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="1.8"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          aria-hidden="true"
-        >
-          <path d="M15 22v-3.9c0-1 .1-1.4-.5-2 2.8-.3 5.7-1.4 5.7-6.2a4.8 4.8 0 0 0-1.3-3.4 4.5 4.5 0 0 0-.1-3.4s-1-.3-3.5 1.3a12 12 0 0 0-6.4 0C6.5 2.8 5.4 3.1 5.4 3.1a4.5 4.5 0 0 0-.1 3.4A4.8 4.8 0 0 0 4 9.9c0 4.8 2.9 5.9 5.7 6.2-.5.5-.6 1.1-.6 2V22" />
-          <path d="M9.1 19c-2.9.9-2.9-1.5-4.1-2" />
-        </svg>
+        <IconBrandGithub className="size-[19px]" stroke={1.8} aria-hidden="true" focusable="false" />
         <span className="sr-only">Palworld Live Map on GitHub</span>
       </a>
       <a

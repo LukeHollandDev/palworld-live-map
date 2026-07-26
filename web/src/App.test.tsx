@@ -899,8 +899,8 @@ describe('App', () => {
     expect(
       within(screen.getByRole('main')).queryByRole('button', { name: 'Open leaderboards' })
     ).not.toBeInTheDocument()
-    expect(leaderboardOpener.querySelector('svg')).not.toBeInTheDocument()
-    expect(leaderboardOpener).toHaveTextContent('Leaderboards')
+    expect(leaderboardOpener.querySelector('svg')).toHaveClass('leaderboard-header-icon', 'tabler-icon-trophy')
+    expect(leaderboardOpener.querySelector('svg')).toHaveAttribute('aria-hidden', 'true')
     expect(leaderboardOpener).toHaveClass('leaderboard-header-control')
     await user.click(leaderboardOpener)
     expect(leaderboardOpener).toHaveAttribute('aria-hidden', 'true')

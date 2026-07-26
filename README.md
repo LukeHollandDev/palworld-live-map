@@ -132,6 +132,6 @@ by opaque ID onto players identified by the REST API.
 
 ## License
 
-The Go application, web application, documentation, and other original project files are [MIT](LICENSE) unless marked otherwise. Palworld-derived map textures, screenshots, and extracted game data remain copyright Pocketpair; see the [Palworld asset provenance](assets/palworld/README.md) for extraction sources and the reproducible workflow. Inclusion in the same repository or container does not replace a component's own terms.
+The Go application, web application, documentation, and other original project files are [MIT](LICENSE) unless marked otherwise. Bundled dependencies retain their own terms; see [third-party notices](THIRD_PARTY_NOTICES.md). Palworld-derived map textures, screenshots, and extracted game data remain copyright Pocketpair; see the [Palworld asset provenance](assets/palworld/README.md) for extraction sources and the reproducible workflow. Inclusion in the same repository or container does not replace a component's own terms.
 
 Palworld Live Map is an independent, fan-made project. It is not affiliated with, endorsed by, or sponsored by Pocketpair, Inc. Palworld and related names and marks belong to their respective owners.

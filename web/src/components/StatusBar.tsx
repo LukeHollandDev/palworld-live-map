@@ -1,3 +1,4 @@
+import { IconTrophy } from '@tabler/icons-react'
 import { type Ref, useEffect, useId, useState } from 'react'
 import { formatUptime } from '../lib/map'
 import type { PlayerState, ServerMetrics } from '../types'
@@ -234,7 +235,7 @@ export function StatusBar({
             title="Leaderboards"
             onClick={(event) => onOpenLeaderboards(event.currentTarget)}
           >
-            <span>Leaderboards</span>
+            <IconTrophy className="leaderboard-header-icon" size={20} stroke={2} aria-hidden="true" />
           </button>
         )}
       </div>

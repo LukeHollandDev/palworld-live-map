@@ -1,3 +1,4 @@
+import { IconChevronRight, IconX } from '@tabler/icons-react'
 import { useEffect, useRef } from 'react'
 import { buildGuildDetails, type GuildDetails as GuildDetailsModel } from '../lib/guilds'
 import { LEADERBOARDS, type LeaderboardId, leaderboardById } from '../lib/leaderboards'
@@ -138,7 +139,7 @@ export function DetailsDialog({
           aria-label="Close details"
           onClick={close}
         >
-          ×
+          <IconX className="size-5" aria-hidden="true" />
         </button>
       </header>
       <div ref={bodyRef} className="min-h-0 flex-1 overflow-y-auto overscroll-contain" data-details-body>
@@ -383,9 +384,7 @@ function ItemLink({ item, relation, title, detail, showRelation = false, onSelec
         <span className="block truncate text-[#f0f9fa]">{title}</span>
         {detail ? <span className="mt-0.5 block truncate text-[10px] text-[#8fa4aa]">{detail}</span> : null}
       </span>
-      <span className="text-base text-[#63cddd]" aria-hidden="true">
-        ›
-      </span>
+      <IconChevronRight className="size-4 text-[#63cddd]" aria-hidden="true" />
     </button>
   )
 }
@@ -423,9 +422,7 @@ function GuildLink({
           · {plural(palCount, 'Pal')}
         </span>
       </span>
-      <span className="text-base text-[#63cddd]" aria-hidden="true">
-        ›
-      </span>
+      <IconChevronRight className="size-4 text-[#63cddd]" aria-hidden="true" />
     </button>
   )
 }

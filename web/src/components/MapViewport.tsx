@@ -1,3 +1,4 @@
+import { IconCrosshair, IconMinus, IconPlus } from '@tabler/icons-react'
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react'
 import {
   clampView,
@@ -685,17 +686,12 @@ export const MapViewport = forwardRef<MapViewportHandle, MapViewportProps>(funct
         onPointerDown={(event) => event.stopPropagation()}
       >
         <div className="pointer-events-none flex w-[184px] shrink-0 items-center gap-2 border-r border-[#cdeef3]/35 px-3 text-[11px] tracking-[.055em] whitespace-nowrap text-[#cce8eb] tabular-nums max-sm:w-[150px] max-sm:px-2">
-          <svg
+          <IconCrosshair
             className="size-3.5 shrink-0 text-[#67cad8] max-sm:hidden"
-            viewBox="0 0 20 20"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.5"
+            stroke={1.5}
             aria-hidden="true"
-          >
-            <circle cx="10" cy="10" r="3.25" />
-            <path d="M10 2v3M10 15v3M2 10h3M15 10h3" />
-          </svg>
+            focusable="false"
+          />
           <span ref={coordinatesRef}>X 0&nbsp;&nbsp;Y 0</span>
         </div>
         <fieldset
@@ -713,7 +709,7 @@ export const MapViewport = forwardRef<MapViewportHandle, MapViewportProps>(funct
               zoomAt(viewRef.current.scale / 1.35, point.x, point.y, true)
             }}
           >
-            −
+            <IconMinus className="size-5" aria-hidden="true" focusable="false" />
           </button>
           <button
             type="button"
@@ -732,7 +728,7 @@ export const MapViewport = forwardRef<MapViewportHandle, MapViewportProps>(funct
               zoomAt(viewRef.current.scale * 1.35, point.x, point.y, true)
             }}
           >
-            +
+            <IconPlus className="size-5" aria-hidden="true" focusable="false" />
           </button>
         </fieldset>
       </div>

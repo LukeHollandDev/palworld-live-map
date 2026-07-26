@@ -1,26 +1,9 @@
+import { IconChevronRight, IconFilter, IconSearch, IconX } from '@tabler/icons-react'
 import { type ReactNode, type RefObject, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { guildIdForBase } from '../lib/guilds'
 import { itemSearchText, markerText } from '../lib/map'
 import type { ItemKind, MapItem, MapLayer, PlayerStatus } from '../types'
 import { MarkerGlyph } from './MarkerGlyph'
-
-// Funnel icon from Heroicons (MIT): https://heroicons.com/
-function FilterIcon() {
-  return (
-    <svg
-      className="size-6"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.5"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <path d="M12 3c2.755 0 5.455.232 8.083.678A1.112 1.112 0 0 1 21 4.774v1.044c0 .597-.237 1.169-.659 1.591l-5.432 5.432a2.25 2.25 0 0 0-.659 1.591v2.927c0 .853-.482 1.632-1.244 2.013L9.75 21v-6.568c0-.597-.237-1.169-.659-1.591L3.659 7.409A2.25 2.25 0 0 1 3 5.818V4.774c0-.54.384-1.006.917-1.096A48.5 48.5 0 0 1 12 3Z" />
-    </svg>
-  )
-}
 
 interface ExplorerProps {
   open: boolean
@@ -327,7 +310,7 @@ export function Explorer(props: ExplorerProps) {
         tabIndex={props.open ? -1 : 0}
         onClick={props.onOpen}
       >
-        <FilterIcon />
+        <IconFilter className="size-6" aria-hidden="true" />
         {props.search.trim() ? (
           <span
             className="absolute top-1.5 right-1.5 size-1.5 rounded-full bg-[#55d4e7] shadow-[0_0_5px_rgb(85_212_231/65%)]"
@@ -359,7 +342,7 @@ export function Explorer(props: ExplorerProps) {
             title="Collapse map filter"
             onClick={props.onClose}
           >
-            ×
+            <IconX className="size-5" aria-hidden="true" />
           </button>
         </div>
 
@@ -373,18 +356,7 @@ export function Explorer(props: ExplorerProps) {
               className="pal-glass-inset relative mx-3.5 mt-3 flex h-11 shrink-0 items-center text-[#dceef0] transition-[border-color,box-shadow] focus-within:border-[#62d6e7] focus-within:shadow-[inset_0_-2px_#22c7e8]"
             >
               <span className="grid size-10 shrink-0 place-items-center text-[#65bbc7]" aria-hidden="true">
-                <svg
-                  className="size-[18px]"
-                  viewBox="0 0 20 20"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.7"
-                  strokeLinecap="round"
-                  aria-hidden="true"
-                >
-                  <circle cx="8.5" cy="8.5" r="4.75" />
-                  <path d="m12 12 4 4" />
-                </svg>
+                <IconSearch className="size-[18px]" aria-hidden="true" />
               </span>
               <label className="sr-only" htmlFor="map-search">
                 Search map locations and live objects
@@ -420,7 +392,7 @@ export function Explorer(props: ExplorerProps) {
                     props.searchInputRef.current?.focus()
                   }}
                 >
-                  ×
+                  <IconX className="size-5" aria-hidden="true" />
                 </button>
               ) : null}
             </search>
@@ -1217,13 +1189,6 @@ function DisclosureToggle({
 
 function Chevron({ expanded }: { expanded: boolean }) {
   return (
-    <svg
-      className={`size-4 transition-transform ${expanded ? 'rotate-90' : ''}`}
-      viewBox="0 0 20 20"
-      fill="none"
-      aria-hidden="true"
-    >
-      <path d="m7 4 6 6-6 6" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
+    <IconChevronRight className={`size-4 transition-transform ${expanded ? 'rotate-90' : ''}`} aria-hidden="true" />
   )
 }
