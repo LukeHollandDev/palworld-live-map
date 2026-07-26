@@ -216,7 +216,13 @@ export function Explorer(props: ExplorerProps) {
   useLayoutEffect(() => {
     if (wasOpen.current === props.open) return
     wasOpen.current = props.open
-    ;(props.open ? closeRef.current : props.filterButtonRef.current)?.focus({ preventScroll: true })
+    if (props.open) {
+      closeRef.current?.focus({ preventScroll: true })
+      return
+    }
+    if (document.activeElement instanceof Element && document.activeElement.closest('#map-filter-panel')) {
+      props.filterButtonRef.current?.focus({ preventScroll: true })
+    }
   }, [props.filterButtonRef, props.open])
 
   const toggleCategory = (group: CategoryGroup) => {

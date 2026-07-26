@@ -793,11 +793,14 @@ describe('App', () => {
     await user.click(leaderboardControl)
     expect(filterControl).toHaveAttribute('aria-expanded', 'true')
     expect(leaderboardControl).toHaveAttribute('aria-expanded', 'true')
+    const leaderboardTitle = screen.getByRole('heading', { name: 'Leaderboards' })
+    await waitFor(() => expect(leaderboardTitle).toHaveFocus())
 
     viewportWidth = 390
     window.dispatchEvent(new Event('resize'))
     await waitFor(() => expect(filterControl).toHaveAttribute('aria-expanded', 'false'))
     expect(leaderboardControl).toHaveAttribute('aria-expanded', 'true')
+    expect(leaderboardTitle).toHaveFocus()
   })
 
   it('restores saved filter categories and the active map layer', async () => {
