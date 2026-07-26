@@ -84,17 +84,17 @@
 
   .leaderboard-header-control {
     position: absolute;
-    top: calc(100% - 1px);
+    top: calc(100% - 2px);
     left: 50%;
     z-index: 3;
     display: grid;
     width: clamp(300px, 25vw, 360px);
-    height: 34px;
+    height: 35px;
     place-items: center;
-    padding: 0 0 2px;
+    padding: 1px 0 0;
     border: 0;
     background: transparent;
-    color: #d4e3e5;
+    color: #829da4;
     cursor: pointer;
     filter: drop-shadow(0 8px 12px rgb(0 0 0 / 42%));
     transform: translateX(-50%);
@@ -118,19 +118,18 @@
   }
 
   .leaderboard-header-control::after {
-    inset: 1px;
-    background: var(--pal-glass-surface);
+    inset: 0 1px 1px;
+    background: rgb(12 18 21 / 96%);
     backdrop-filter: blur(14px) saturate(125%);
   }
 
   .leaderboard-header-control > span {
     position: relative;
     z-index: 1;
-    font-size: 11px;
-    font-weight: 750;
-    letter-spacing: 0.16em;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.14em;
     line-height: 1;
-    transform: translateY(-1px);
   }
 
   .leaderboard-header-control:hover,
@@ -148,22 +147,12 @@
     background: rgb(35 47 52 / 96%);
   }
 
-  .leaderboard-header-control.is-leaderboard-open {
-    pointer-events: none;
-    opacity: 0;
-    transform: translate(-50%, 4px);
-  }
-
   @media (width < 48rem) {
     .leaderboard-header-control {
       right: -1px;
       left: -1px;
       width: auto;
       transform: none;
-    }
-
-    .leaderboard-header-control.is-leaderboard-open {
-      transform: translateY(4px);
     }
   }
 

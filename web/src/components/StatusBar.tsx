@@ -229,8 +229,6 @@ export function StatusBar({
             aria-label="Open leaderboards"
             aria-haspopup="dialog"
             aria-expanded={leaderboardOpen}
-            aria-hidden={leaderboardOpen}
-            inert={leaderboardOpen}
             title="Leaderboards"
             onClick={(event) => onOpenLeaderboards(event.currentTarget)}
           >
