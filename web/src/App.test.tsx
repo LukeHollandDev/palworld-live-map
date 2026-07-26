@@ -131,10 +131,13 @@ describe('App', () => {
       'href',
       'https://github.com/LukeHollandDev/palworld-live-map'
     )
-    expect(screen.getByRole('link', { name: "Luke Holland's website" })).toHaveAttribute(
-      'href',
-      'https://lukeholland.dev'
-    )
+    expect(screen.queryByRole('link', { name: "Luke Holland's website" })).not.toBeInTheDocument()
+    expect(screen.queryByText('Built by Luke')).not.toBeInTheDocument()
+    expect(
+      within(screen.getByRole('navigation', { name: 'Project links' })).getByRole('button', {
+        name: 'Open leaderboards'
+      })
+    ).toHaveTextContent('LEADERBOARDS')
 
     const explorer = screen.getByRole('complementary', { name: 'Map filters' })
     await user.click(within(explorer).getByRole('button', { name: 'View Luke · Lv 55' }))
@@ -893,21 +896,22 @@ describe('App', () => {
     expect(screen.getByRole('button', { name: 'Zoe · Lv 60' })).toBeInTheDocument()
 
     const leaderboardOpener = screen.getByRole('button', { name: 'Open leaderboards' })
-    expect(within(screen.getByRole('banner')).getByRole('button', { name: 'Open leaderboards' })).toBe(
-      leaderboardOpener
-    )
+    const projectLinks = screen.getByRole('navigation', { name: 'Project links' })
+    expect(within(projectLinks).getByRole('button', { name: 'Open leaderboards' })).toBe(leaderboardOpener)
     expect(
-      within(screen.getByRole('main')).queryByRole('button', { name: 'Open leaderboards' })
+      within(screen.getByRole('banner')).queryByRole('button', { name: 'Open leaderboards' })
     ).not.toBeInTheDocument()
+    expect(within(screen.getByRole('main')).getByRole('button', { name: 'Open leaderboards' })).toBe(leaderboardOpener)
     expect(leaderboardOpener.querySelector('svg')).not.toBeInTheDocument()
     expect(leaderboardOpener).toHaveTextContent('LEADERBOARDS')
-    expect(leaderboardOpener).toHaveClass('leaderboard-header-control')
+    expect(leaderboardOpener).toHaveClass('leaderboard-footer-control')
     await user.click(leaderboardOpener)
     expect(leaderboardOpener).toHaveAttribute('aria-expanded', 'true')
     expect(leaderboardOpener).not.toHaveAttribute('aria-hidden')
     expect(leaderboardOpener).not.toHaveAttribute('inert')
-    expect(leaderboardOpener).toHaveClass('is-leaderboard-open')
     expect(screen.getByRole('button', { name: 'Open leaderboards' })).toBe(leaderboardOpener)
+    expect(projectLinks).toBeVisible()
+    expect(projectLinks).toHaveAttribute('aria-hidden', 'false')
     const leaderboard = screen.getByRole('dialog')
     expect(leaderboard).toHaveClass('top-[78px]', 'bottom-4', 'w-[350px]')
     expect(explorer).toHaveClass('top-[78px]', 'bottom-4', 'w-[350px]')

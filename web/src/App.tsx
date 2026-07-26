@@ -441,13 +441,7 @@ function LiveMap({ config }: { config: PublicConfig }) {
 
   return (
     <div className="relative h-dvh overflow-hidden bg-[#171a1d] text-[#f4f5f5]">
-      <StatusBar
-        playerState={playerState}
-        offline={Boolean(players.error)}
-        leaderboardButtonRef={leaderboardButtonRef}
-        leaderboardOpen={detail?.kind === 'leaderboard'}
-        onOpenLeaderboards={(focus) => showLeaderboard('player-level', focus)}
-      />
+      <StatusBar playerState={playerState} offline={Boolean(players.error)} />
       <main className="absolute inset-0 overflow-hidden bg-[#0d161e]">
         <Explorer {...explorerProps} open={filtersOpen} onOpen={() => setFiltersOpen(true)} />
         <div className="relative size-full min-h-0 min-w-0 overflow-hidden">
@@ -462,7 +456,12 @@ function LiveMap({ config }: { config: PublicConfig }) {
             onShowItem={showItem}
             inspectorOpen={Boolean(detail)}
           >
-            <ProjectLinks hidden={Boolean(detail)} />
+            <ProjectLinks
+              hidden={Boolean(detail && detail.kind !== 'leaderboard')}
+              leaderboardButtonRef={leaderboardButtonRef}
+              leaderboardOpen={detail?.kind === 'leaderboard'}
+              onOpenLeaderboards={(focus) => showLeaderboard('player-level', focus)}
+            />
             <DetailsDialog
               detail={detail}
               items={items}

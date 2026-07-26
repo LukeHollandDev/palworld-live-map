@@ -1,13 +1,10 @@
-import { type Ref, useEffect, useId, useState } from 'react'
+import { useEffect, useId, useState } from 'react'
 import { formatUptime } from '../lib/map'
 import type { PlayerState, ServerMetrics } from '../types'
 
 interface StatusBarProps {
   playerState: PlayerState | null
   offline: boolean
-  leaderboardButtonRef?: Ref<HTMLButtonElement>
-  leaderboardOpen?: boolean
-  onOpenLeaderboards?: (focus: HTMLButtonElement) => void
 }
 
 function updateAge(lastSuccessAt?: string): string {
@@ -144,13 +141,7 @@ function Metrics({
   )
 }
 
-export function StatusBar({
-  playerState,
-  offline,
-  leaderboardButtonRef,
-  leaderboardOpen = false,
-  onOpenLeaderboards
-}: StatusBarProps) {
+export function StatusBar({ playerState, offline }: StatusBarProps) {
   const [age, setAge] = useState(() => updateAge(playerState?.lastSuccessAt))
 
   useEffect(() => {
@@ -221,20 +212,6 @@ export function StatusBar({
             </p>
           )}
         </div>
-        {onOpenLeaderboards && (
-          <button
-            ref={leaderboardButtonRef}
-            type="button"
-            className={`leaderboard-header-control ${leaderboardOpen ? 'is-leaderboard-open' : ''}`}
-            aria-label="Open leaderboards"
-            aria-haspopup="dialog"
-            aria-expanded={leaderboardOpen}
-            title="Leaderboards"
-            onClick={(event) => onOpenLeaderboards(event.currentTarget)}
-          >
-            <span>LEADERBOARDS</span>
-          </button>
-        )}
       </div>
     </header>
   )

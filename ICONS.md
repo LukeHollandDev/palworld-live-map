@@ -59,9 +59,8 @@ Use `aria-hidden="true"` for decorative icons. The containing button, link, or l
 
 ## Interface icon mapping
 
-The detached header leaderboard control intentionally uses the uppercase
-`LEADERBOARDS` text label rather than an icon so it matches the header's metric
-typography.
+The map footer leaderboard control intentionally uses the uppercase
+`LEADERBOARDS` text label rather than an icon.
 
 | Current role | Tabler replacement |
 | --- | --- |
@@ -122,8 +121,8 @@ Do not pass category colours as inline component properties unless necessary. Ke
 
 ### 3. Migrate interface controls
 
-- Keep the detached header leaderboard control as the uppercase `LEADERBOARDS`
-  text label; do not assign it an icon.
+- Keep the map footer leaderboard control as the uppercase `LEADERBOARDS` text
+  label; do not assign it an icon.
 - Replace filter, search, close, clear, and chevron artwork in `web/src/components/Explorer.tsx`.
 - Replace coordinate, zoom-in, and zoom-out artwork in `web/src/components/MapViewport.tsx`.
 - Replace the details close glyph in `web/src/components/DetailsDialog.tsx`.
@@ -165,7 +164,6 @@ Do not pass category colours as inline component properties unless necessary. Ke
 
 - `web/package.json`
 - `web/package-lock.json`
-- `web/src/components/StatusBar.tsx`
 - `web/src/components/DetailsDialog.tsx`
 - `web/src/components/Explorer.tsx`
 - `web/src/components/MapViewport.tsx`
