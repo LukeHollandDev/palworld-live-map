@@ -711,6 +711,7 @@ describe('App', () => {
     expect(searchbox).toHaveAttribute('placeholder', 'Filter map results…')
     expect(screen.queryByText('/')).not.toBeInTheDocument()
     await user.type(searchbox, 'missing')
+    expect(filterControl).toHaveAccessibleDescription('Current search: missing')
     expect(screen.getAllByRole('button', { name: 'Clear search' })).toHaveLength(1)
     expect(screen.getByText('No online players or companion Pals match “missing”.')).toBeInTheDocument()
 
@@ -750,6 +751,7 @@ describe('App', () => {
 
     await user.keyboard('{Escape}')
     expect(screen.getByRole('searchbox')).toHaveValue('')
+    expect(filterControl).not.toHaveAttribute('aria-describedby')
     expect(within(filterPanel).getByRole('button', { name: 'Expand NPC Locations section' })).toBeVisible()
     await user.keyboard('{Escape}')
     await waitFor(() => expect(filterControl).toHaveFocus())
@@ -758,7 +760,8 @@ describe('App', () => {
   })
 
   it('keeps the two mobile panel controls from opening overlapping sheets', async () => {
-    vi.spyOn(window, 'innerWidth', 'get').mockReturnValue(390)
+    let viewportWidth = 390
+    vi.spyOn(window, 'innerWidth', 'get').mockImplementation(() => viewportWidth)
     mockAPI()
     const user = userEvent.setup()
     render(<App />)
@@ -785,6 +788,16 @@ describe('App', () => {
     expect(leaderboardControl).toHaveAttribute('aria-expanded', 'false')
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
     expect(screen.getByRole('complementary', { name: 'Map filters' })).toBeVisible()
+
+    viewportWidth = 1024
+    await user.click(leaderboardControl)
+    expect(filterControl).toHaveAttribute('aria-expanded', 'true')
+    expect(leaderboardControl).toHaveAttribute('aria-expanded', 'true')
+
+    viewportWidth = 390
+    window.dispatchEvent(new Event('resize'))
+    await waitFor(() => expect(filterControl).toHaveAttribute('aria-expanded', 'false'))
+    expect(leaderboardControl).toHaveAttribute('aria-expanded', 'true')
   })
 
   it('restores saved filter categories and the active map layer', async () => {

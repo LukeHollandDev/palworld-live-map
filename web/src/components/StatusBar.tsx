@@ -253,6 +253,7 @@ export function StatusBar({ playerState, offline, controls }: StatusBarProps) {
           data-panel-control="filters"
           aria-label="Map filters"
           aria-controls="map-filter-panel"
+          aria-describedby={controls.filterSearch.trim() ? 'map-filter-search-status' : undefined}
           aria-expanded={controls.filtersOpen}
           title="Map filters"
           onClick={controls.onToggleFilters}
@@ -260,10 +261,15 @@ export function StatusBar({ playerState, offline, controls }: StatusBarProps) {
           <IconFilter className="size-6 max-sm:size-5" stroke={1.8} aria-hidden="true" />
           <span className="hidden text-[11px] font-semibold tracking-[.09em] max-sm:inline">FILTERS</span>
           {controls.filterSearch.trim() ? (
-            <span
-              className="absolute top-1.5 right-1.5 size-1.5 rounded-full bg-[#55d4e7] shadow-[0_0_5px_rgb(85_212_231/65%)]"
-              aria-hidden="true"
-            />
+            <>
+              <span
+                className="absolute top-1.5 right-1.5 size-1.5 rounded-full bg-[#55d4e7] shadow-[0_0_5px_rgb(85_212_231/65%)]"
+                aria-hidden="true"
+              />
+              <span id="map-filter-search-status" className="sr-only">
+                Current search: {controls.filterSearch.trim()}
+              </span>
+            </>
           ) : null}
         </button>
 

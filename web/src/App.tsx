@@ -211,6 +211,15 @@ function LiveMap({ config }: { config: PublicConfig }) {
   }, [])
 
   useEffect(() => {
+    const reconcileMobilePanels = () => {
+      if (window.innerWidth < 640 && detail?.kind === 'leaderboard') setFiltersOpen(false)
+    }
+    reconcileMobilePanels()
+    window.addEventListener('resize', reconcileMobilePanels)
+    return () => window.removeEventListener('resize', reconcileMobilePanels)
+  }, [detail?.kind])
+
+  useEffect(() => {
     if (!detail) return
     if (detail.kind === 'leaderboard') return
     if (detail.kind === 'guild' ? detailedGuildExists : detailedItemLayerId === activeLayer.id) return
