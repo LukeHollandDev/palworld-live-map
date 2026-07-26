@@ -63,7 +63,7 @@ docker run --rm -p 127.0.0.1:8080:8080 -e DEMO_MODE=true \
   ghcr.io/lukehollanddev/palworld-live-map:latest
 ```
 
-Docker is the supported deployment method. See [Development](DEVELOPMENT.md#run-from-source) to run from source.
+Docker is the supported deployment method. See [Development](DEVELOPMENT.md#run-locally) to run from source.
 
 ## Run with Palworld Server Docker
 
