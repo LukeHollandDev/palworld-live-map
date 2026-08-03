@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "gameVersion": "1.0.1.100619",
+  "gameVersion": "1.0.2.101103",
   "generator": "palworld-asset-exporter/4",
   "decoder": "CUE4Parse/1.2.2.202607",
   "mappings": {
@@ -11,8 +11,8 @@
   "paks": [
     {
       "file": "Pal-Windows.pak",
-      "bytes": 40526106335,
-      "sha256": "fe2d7b8548d5be0649b6bb3e49aadc79529c2e7d138baaacece3a3563a864227"
+      "bytes": 40525057755,
+      "sha256": "a82fee669e60558db5adc409c8607bb6c06b8a4d4c984317f9a37415461e7119"
     }
   ],
   "sources": [
