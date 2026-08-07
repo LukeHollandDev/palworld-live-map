@@ -1,5 +1,5 @@
 ARG GO_VERSION=1.26.5
-ARG NODE_VERSION=24
+ARG NODE_VERSION=24.18.0
 
 # The palworld-save-reader release this image ships as its save decoder.
 ARG SAVE_READER_VERSION=v0.1.0

@@ -27,7 +27,9 @@ Field Alpha and tower-boss locations are versioned data under [`assets/palworld`
 
 ## Run Locally
 
-Install Go 1.26.5 or newer, Node.js 24 or newer, and GNU Make. Production deployments should use the container described in the main README.
+Install Go 1.26.5 or newer, Node.js 24.18.0, and GNU Make. The repository
+includes `.nvmrc` and `.node-version` files for compatible version managers.
+Production deployments should use the container described in the main README.
 
 ```bash
 cp .env.example .env
