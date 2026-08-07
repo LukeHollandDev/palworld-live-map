@@ -24,8 +24,8 @@
       },
       "CUE4Parse": {
         "type": "Transitive",
-        "resolved": "1.2.2.202607",
-        "contentHash": "Ib4wDgajCPXwzR6kPZ6tTUVpHRRVqrPYHBjMz+IYhGwLNt3JgK9QB0es7RntK0YPD3VaI8FFIt16qSkORqp45A==",
+        "resolved": "1.2.2.202608",
+        "contentHash": "oJd7SFkLYKT5AsPmAW30WMGWIwq4S2GZayB5ZEU8kWtJsjCa96XWl8YZOfkFmMIIj6O2zYChwhX5otAd8ROMtQ==",
         "dependencies": {
           "Blake3": "2.2.1",
           "BouncyCastle.Cryptography": "2.6.2",
@@ -43,6 +43,7 @@
           "Serilog.Sinks.Console": "6.1.1",
           "SubstreamSharp": "1.0.3",
           "System.IO.Hashing": "10.0.8",
+          "System.Numerics.Tensors": "10.0.10",
           "VGAudio": "2.2.1",
           "Zlib-ng.NET": "1.2.0",
           "ZstdSharp.Port": "0.8.8"
@@ -50,13 +51,13 @@
       },
       "CUE4Parse-Conversion": {
         "type": "Transitive",
-        "resolved": "1.2.2.202607",
-        "contentHash": "t9fCR4hP6Pa4HehfQ1J1BGVBHXhDN1yW1P5duSMl37wgsLd1ZXm86EmZf/LqrXgbk8ddMzLL5rVtSMNXbELNZw==",
+        "resolved": "1.2.2.202608",
+        "contentHash": "yXyHta02ZMSdiBpPPwaiTXcKgLmu+/bJfwQMtEmKiHbOXNNvqVzCHItOfMntJyLS8sKNf2DBKhUGvJOUjcalww==",
         "dependencies": {
           "AssetRipper.TextureDecoder": "2.6.2",
-          "CUE4Parse": "1.2.2.202607",
-          "SharpGLTF.Core": "1.0.0-alpha0023",
-          "SharpGLTF.Toolkit": "1.0.0-alpha0023",
+          "CUE4Parse": "1.2.2.202608",
+          "SharpGLTF.Core": "1.0.6",
+          "SharpGLTF.Toolkit": "1.0.6",
           "SixLabors.ImageSharp": "[3.1.12]",
           "SkiaSharp": "[2.88.9]"
         }
@@ -206,15 +207,23 @@
       },
       "SharpGLTF.Core": {
         "type": "Transitive",
-        "resolved": "1.0.0-alpha0023",
-        "contentHash": "MmFWb+8a187XKC4oEhZrAvpqB8Cs2Ma6cK87HNn8P91aIETSRVBTVHXcECE4BFk0gueAoooiBCyCdSdUm9fnrA=="
+        "resolved": "1.0.6",
+        "contentHash": "m3qIvUnpvRRfQ0fp0TFfpPk+vsHkCIOf/uIVJ19fe9dwa29KCO/PeHVXKAph8nsFxFLXitTIIqCa5W8JGLMhBg=="
+      },
+      "SharpGLTF.Runtime": {
+        "type": "Transitive",
+        "resolved": "1.0.6",
+        "contentHash": "MVb0p0gzwnjHB03b0kMhf9bVUd6gSvs/jBpTkL6rMa0RtzSGARbCvZkpGbHXjxgSTncprEuzV4nAaaAucifc3Q==",
+        "dependencies": {
+          "SharpGLTF.Core": "1.0.6"
+        }
       },
       "SharpGLTF.Toolkit": {
         "type": "Transitive",
-        "resolved": "1.0.0-alpha0023",
-        "contentHash": "9umelLunAhr+Jj66GDDFrJlO5MQ0pZXRSZk3SfAeZD/iKu/qz7Nlpnh+e8IKqJI8DyU8jHCI9v6HFjazZiBfsQ==",
+        "resolved": "1.0.6",
+        "contentHash": "wb9Ebb4uwXevL4WiLlry29RWIYlxa+NiAa0BB8iSR7VbmgSa5Ij/QaPNlKi1jjA4oL8aEygg5V76zY1SJfIS+Q==",
         "dependencies": {
-          "SharpGLTF.Core": "1.0.0-alpha0023"
+          "SharpGLTF.Runtime": "1.0.6"
         }
       },
       "SixLabors.ImageSharp": {
@@ -259,6 +268,11 @@
         "resolved": "10.0.8",
         "contentHash": "+dJsbPJ3FyUbTZNplFj0RCKePFizmv6ewDV46JE9q/IVH4c3xTCftHfHelLsAKf0jryIPqgMb5GpS0x7TAY3mg=="
       },
+      "System.Numerics.Tensors": {
+        "type": "Transitive",
+        "resolved": "10.0.10",
+        "contentHash": "9Ildb4Y9maDztB0ZRGxsNShbpCQ2Tjv2dr4IjskBxpTGhH7aIz1+oC+Hl833ASs/htWwsH6myNe+sRpeyCzeMQ=="
+      },
       "VGAudio": {
         "type": "Transitive",
         "resolved": "2.2.1",
@@ -280,8 +294,8 @@
       "palworldassetexporter": {
         "type": "Project",
         "dependencies": {
-          "CUE4Parse": "[1.2.2.202607, )",
-          "CUE4Parse-Conversion": "[1.2.2.202607, )",
+          "CUE4Parse": "[1.2.2.202608, )",
+          "CUE4Parse-Conversion": "[1.2.2.202608, )",
           "Microsoft.Bcl.Memory": "[10.0.10, )",
           "Newtonsoft.Json": "[13.0.4, )",
           "SixLabors.ImageSharp": "[3.1.12, )",
