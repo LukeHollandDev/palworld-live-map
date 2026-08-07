@@ -1015,6 +1015,7 @@ describe('App', () => {
 
   it('unchecks every filter and keeps later data hidden across reloads', async () => {
     let objectRequests = 0
+    let includeEffigy = false
     const base = (responses['/api/objects'] as { objects: Array<Record<string, unknown>> }).objects[0]
     const effigy = {
       id: 'late-effigy',
@@ -1030,7 +1031,7 @@ describe('App', () => {
       }
       if (path === '/api/objects') {
         objectRequests++
-        const objects = objectRequests === 1 ? [base] : [base, effigy]
+        const objects = includeEffigy ? [base, effigy] : [base]
         return { ...(responses[path] as Record<string, unknown>), objects, total: objects.length }
       }
       return responses[path]
@@ -1049,7 +1050,9 @@ describe('App', () => {
     expect(screen.queryByRole('button', { name: 'Luke · Lv 55' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Home' })).not.toBeInTheDocument()
 
-    await waitFor(() => expect(objectRequests).toBeGreaterThan(1))
+    const requestsBeforeEffigy = objectRequests
+    includeEffigy = true
+    await waitFor(() => expect(objectRequests).toBeGreaterThan(requestsBeforeEffigy))
     const effigyFilter = within(explorer).getByRole('checkbox', { name: 'Show Pal Effigies' })
     expect(effigyFilter).toBeEnabled()
     expect(effigyFilter).not.toBeChecked()
