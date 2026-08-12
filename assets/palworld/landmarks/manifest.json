@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "gameVersion": "1.0.2.101103",
+  "gameVersion": "1.0.3.101283",
   "generator": "palworld-asset-exporter/4",
   "decoder": "CUE4Parse/1.2.2.202608",
   "mappings": {
@@ -11,8 +11,8 @@
   "paks": [
     {
       "file": "Pal-Windows.pak",
-      "bytes": 40525057755,
-      "sha256": "a82fee669e60558db5adc409c8607bb6c06b8a4d4c984317f9a37415461e7119"
+      "bytes": 40527155723,
+      "sha256": "c0a7d3a756ec57d3ca38d81b252d8645532bfae300c26d18426515c670531bdf"
     }
   ],
   "sources": [
@@ -932,7 +932,7 @@
       "id": "tower:REGION_WorldTree_Boss",
       "kind": "bosses",
       "name": "Zenara \u0026 Astralym",
-      "detail": "Within the Seal",
+      "detail": "Sealed Sanctum",
       "level": 80,
       "x": 495634.25,
       "y": -756824.375
