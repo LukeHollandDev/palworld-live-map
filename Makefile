@@ -2,7 +2,7 @@ override PROJECT_ROOT := $(abspath $(dir $(lastword $(MAKEFILE_LIST))))
 WEB_NPM := npm --prefix "$(PROJECT_ROOT)/web"
 BINARY := $(PROJECT_ROOT)/bin/palworld-live-map
 
-.PHONY: ci build check test web-install web-lint web-typecheck web-test web-assets web-build web-check exporter-check image run demo game-assets maps clean distclean
+.PHONY: ci build check test web-install web-lint web-typecheck web-test web-assets web-build web-check exporter-check image run demo game-assets game-assets-diff maps clean distclean
 
 ci: check exporter-check
 
@@ -51,6 +51,11 @@ demo: web-build
 
 game-assets:
 	"$(PROJECT_ROOT)/exporter/export.sh"
+	$(MAKE) game-assets-diff
+
+game-assets-diff:
+	@status=0; output=$${MAP_OUTPUT_DIR:-build/maps}; git -C "$(PROJECT_ROOT)" diff --no-index -- assets/palworld/maps "$$output" || status=$$?; if [ "$$status" -eq 0 ]; then printf 'No map asset changes.\n'; fi; test "$$status" -le 1
+	@status=0; output=$${LANDMARK_OUTPUT_DIR:-build/landmarks}; git -C "$(PROJECT_ROOT)" diff --no-index -- assets/palworld/landmarks "$$output" || status=$$?; if [ "$$status" -eq 0 ]; then printf 'No landmark asset changes.\n'; fi; test "$$status" -le 1
 
 maps: game-assets
 

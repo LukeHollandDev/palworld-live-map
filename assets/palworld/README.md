@@ -24,10 +24,9 @@ Generate fresh files from an installed game:
 
 ```sh
 make game-assets
-diff -u assets/palworld/maps/manifest.json build/maps/manifest.json
-diff -u assets/palworld/landmarks/manifest.json build/landmarks/manifest.json
-diff -ru assets/palworld/landmarks/catalogue build/landmarks/catalogue
 ```
+
+The target prints a unified diff between the generated output and the bundled assets. Differences are an expected review result and do not fail the target; comparison errors still do. To compare an existing export without running the exporter again, use `make game-assets-diff`.
 
 Review the generated files before replacing the bundled assets.
 
