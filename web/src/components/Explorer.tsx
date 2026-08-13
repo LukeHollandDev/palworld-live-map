@@ -2,6 +2,7 @@ import { IconChevronRight, IconSearch, IconX } from '@tabler/icons-react'
 import { type ReactNode, type RefObject, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { guildIdForBase } from '../lib/guilds'
 import { itemSearchText, markerText } from '../lib/map'
+import { DEFAULT_ENABLED_PLAYER_STATUSES, FILTERABLE_KINDS } from '../lib/preferences'
 import type { ItemKind, MapItem, MapLayer, PlayerStatus } from '../types'
 import { MapPanelHeader, MapPanelShell } from './MapPanel'
 import { MarkerGlyph } from './MarkerGlyph'
@@ -21,6 +22,7 @@ interface ExplorerProps {
   expandedBases: Set<string>
   dataNotices: string[]
   onSearchChange: (value: string) => void
+  onCheckAll: () => void
   onUncheckAll: () => void
   onToggleKinds: (kinds: ItemKind[], visible: boolean) => void
   onTogglePlayerStatus: (status: PlayerStatus, visible: boolean) => void
@@ -299,6 +301,10 @@ export function Explorer(props: ExplorerProps) {
   }
   const onlinePlayers = index.byKind.players.filter((player) => player.online !== false)
   const offlinePlayers = index.byKind.players.filter((player) => player.online === false)
+  const allFiltersChecked =
+    FILTERABLE_KINDS.every((kind) => props.enabledKinds.has(kind)) &&
+    DEFAULT_ENABLED_PLAYER_STATUSES.every((status) => props.enabledPlayerStatuses.has(status)) &&
+    props.hiddenIds.size === 0
 
   return (
     // biome-ignore lint/complexity/noUselessFragments: the stable wrapper keeps this large panel's markup isolated from its external header trigger
@@ -394,11 +400,19 @@ export function Explorer(props: ExplorerProps) {
                 )
               })}
             </fieldset>
-            <div className="mx-3.5 mb-2 flex shrink-0 justify-end">
+            <div className="mx-3.5 mb-2 flex shrink-0 justify-end gap-1.5">
               <button
                 type="button"
-                className="pal-interactive min-h-7 cursor-pointer border border-[#8bb7bd]/25 bg-[#26363b]/55 px-2.5 text-[11px] text-[#b7cdd1] transition-colors hover:border-[#7fd7e3]/50 hover:text-[#e5f8fa] disabled:cursor-default disabled:opacity-40"
-                disabled={props.enabledKinds.size === 0}
+                className="pal-interactive min-h-7 cursor-pointer border border-[#8bb7bd]/25 bg-[#26363b]/55 px-2.5 text-[11px] text-[#b7cdd1] transition-colors enabled:hover:border-[#7fd7e3]/50 enabled:hover:text-[#e5f8fa] disabled:cursor-default disabled:opacity-40"
+                disabled={allFiltersChecked}
+                onClick={props.onCheckAll}
+              >
+                Check all
+              </button>
+              <button
+                type="button"
+                className="pal-interactive min-h-7 cursor-pointer border border-[#8bb7bd]/25 bg-[#26363b]/55 px-2.5 text-[11px] text-[#b7cdd1] transition-colors enabled:hover:border-[#7fd7e3]/50 enabled:hover:text-[#e5f8fa] disabled:cursor-default disabled:opacity-40"
+                disabled={props.enabledKinds.size === 0 && props.enabledPlayerStatuses.size === 0}
                 onClick={props.onUncheckAll}
               >
                 Uncheck all

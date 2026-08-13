@@ -448,6 +448,11 @@ func (s *Source) projectPlayers(ctx context.Context, players []savesidecar.Playe
 		player.CaptureTotal = nonNegativeInt64(raw.CaptureTotal)
 		player.UniquePalsCaptured = nonNegativeInt(raw.UniquePalsCaptured)
 		player.PaldeckUnlocked = nonNegativeInt(raw.PaldeckUnlocked)
+		player.ArenaRankPoints = nonNegativeInt(raw.ArenaRankPoints)
+		player.FastTravelUnlocked = nonNegativeInt(raw.FastTravelUnlocked)
+		player.AreasDiscovered = nonNegativeInt(raw.AreasDiscovered)
+		player.BossDefeats = nonNegativeInt(raw.BossDefeats)
+		player.TowerDefeats = nonNegativeInt(raw.TowerDefeats)
 		idCounts[id]++
 		candidates = append(candidates, candidate{id: id, player: player})
 	}

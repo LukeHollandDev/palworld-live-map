@@ -20,7 +20,7 @@ const (
 	defaultBinaryName           = "palworld-save-reader"
 	playerPresetName            = "player-details"
 	resolveRosterKind           = "roster"
-	resolveVersion              = 2
+	resolveVersion              = 3
 	maxPlayerFiles              = 10_000
 	maxOutputBytes              = 16 << 20
 	maxStderrBytes              = 8 << 10
@@ -233,11 +233,16 @@ func (r *Reader) ReadSnapshot(ctx context.Context, dir string) (*Snapshot, error
 		if match.Character != nil {
 			snapshot.Players[index].Name = match.Character.Nickname
 			snapshot.Players[index].Level = match.Character.Level
+			snapshot.Players[index].ArenaRankPoints = nonNegativeInt(match.Character.ArenaRankPoints)
 		}
 		if match.Guild != nil {
 			snapshot.Players[index].GuildID = match.Guild.ID
 			snapshot.Players[index].GuildName = match.Guild.Name
 		}
+		snapshot.Players[index].FastTravelUnlocked = nonNegativeInt(match.FastTravelUnlocked)
+		snapshot.Players[index].AreasDiscovered = nonNegativeInt(match.AreasDiscovered)
+		snapshot.Players[index].BossDefeats = nonNegativeInt(match.BossDefeats)
+		snapshot.Players[index].TowerDefeats = nonNegativeInt(match.TowerDefeats)
 		if snapshot.Players[index].Name != "" {
 			snapshot.Stats.NamesResolved++
 		} else {
@@ -291,8 +296,8 @@ func DecodePlayer(data []byte) (Player, error) {
 	return player, nil
 }
 
-// resolveRoster reads the compact name, level, and guild document keyed by
-// canonical player GUID.
+// resolveRoster reads the compact identity and leaderboard-progress document
+// keyed by canonical player GUID.
 func (r *Reader) resolveRoster(ctx context.Context, dir string) (map[string]resolvedPlayer, error) {
 	data, err := r.run(ctx, "--resolve", resolveRosterKind, "--saves", dir)
 	if err != nil {
@@ -420,6 +425,14 @@ func paldeckUnlocked(entries []flagEntry) *int {
 		}
 	}
 	return &total
+}
+
+func nonNegativeInt(value *int) *int {
+	if value == nil || *value < 0 {
+		return nil
+	}
+	validated := *value
+	return &validated
 }
 
 func unrealDateTime(ticks uint64) (time.Time, bool) {

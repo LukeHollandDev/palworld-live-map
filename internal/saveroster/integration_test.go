@@ -16,7 +16,7 @@ import (
 // save. Everything else in this package stubs the decoder, which proves the
 // selection and projection logic but not the contract between the two
 // programs: the executable name, the --list-presets probe, the player-details
-// preset's field names, and the JSON shape savesidecar parses.
+// preset's field names, and the resolve-v3 JSON shape savesidecar parses.
 //
 // Real saves cannot live in this repository -- they carry player names, account
 // identifiers, coordinates and progression -- so the test reads them from a
@@ -75,7 +75,7 @@ func TestReaderAndRosterAgainstRealSave(t *testing.T) {
 	// Positions are what the map draws. A player who decoded but landed on no
 	// map layer means the preset's LastTransform is being read wrongly, which
 	// an "it returned some players" assertion would not catch.
-	positioned, named, guilded := 0, 0, 0
+	positioned, named, guilded, progressResolved, arenaRanked := 0, 0, 0, 0, 0
 	for _, player := range snapshot.Players {
 		if player.ID == "" {
 			t.Fatal("roster contains a player with no public ID")
@@ -88,6 +88,13 @@ func TestReaderAndRosterAgainstRealSave(t *testing.T) {
 		}
 		if player.GuildKey != "" {
 			guilded++
+		}
+		if player.FastTravelUnlocked != nil && player.AreasDiscovered != nil &&
+			player.BossDefeats != nil && player.TowerDefeats != nil {
+			progressResolved++
+		}
+		if player.ArenaRankPoints != nil {
+			arenaRanked++
 		}
 	}
 	if positioned == 0 {
@@ -102,6 +109,10 @@ func TestReaderAndRosterAgainstRealSave(t *testing.T) {
 	if guilded == 0 {
 		t.Fatal("no player resolved to a guild; the resolve guild shape has drifted")
 	}
-	t.Logf("decoded %d players, %d positioned, %d named, %d guilded, snapshot at %s",
-		len(snapshot.Players), positioned, named, guilded, snapshot.SnapshotAt.Format(time.RFC3339))
+	if progressResolved == 0 {
+		t.Fatal("no player has exploration or clear counters; the resolve-v3 roster shape has drifted")
+	}
+	t.Logf("decoded %d players, %d positioned, %d named, %d guilded, %d with progress, %d with Arena RP, snapshot at %s",
+		len(snapshot.Players), positioned, named, guilded, progressResolved, arenaRanked,
+		snapshot.SnapshotAt.Format(time.RFC3339))
 }

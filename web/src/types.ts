@@ -72,6 +72,11 @@ export interface Player {
   captureTotal?: number
   uniquePalsCaptured?: number
   paldeckUnlocked?: number
+  arenaRankPoints?: number
+  fastTravelUnlocked?: number
+  areasDiscovered?: number
+  bossDefeats?: number
+  towerDefeats?: number
   x: number
   y: number
   map: string
@@ -106,6 +111,11 @@ export interface MapItem {
   captureTotal?: number
   uniquePalsCaptured?: number
   paldeckUnlocked?: number
+  arenaRankPoints?: number
+  fastTravelUnlocked?: number
+  areasDiscovered?: number
+  bossDefeats?: number
+  towerDefeats?: number
   x: number
   y: number
   map: string

@@ -3,6 +3,7 @@ ARG NODE_VERSION=24.18.0
 
 # The palworld-save-reader release this image ships as its save decoder.
 ARG SAVE_READER_VERSION=v0.1.0
+ARG SAVE_READER_REVISION=fb88288814f55ceaeb298a1242e96114f30672cc
 
 # Web build
 FROM --platform=$BUILDPLATFORM node:${NODE_VERSION}-alpine AS web
@@ -39,18 +40,25 @@ FROM --platform=$BUILDPLATFORM golang:${GO_VERSION}-bookworm AS reader
 ARG TARGETOS
 ARG TARGETARCH
 ARG SAVE_READER_VERSION
+ARG SAVE_READER_REVISION
 
 WORKDIR /reader
 
+COPY patches/palworld-save-reader-v0.1.0-leaderboards.patch /tmp/palworld-save-reader-leaderboards.patch
+
 RUN git clone --branch "${SAVE_READER_VERSION}" --depth 1 \
       https://github.com/LukeHollandDev/palworld-save-reader.git . \
+    && test "$(git rev-parse HEAD)" = "${SAVE_READER_REVISION}" \
+    && git apply --check /tmp/palworld-save-reader-leaderboards.patch \
+    && git apply /tmp/palworld-save-reader-leaderboards.patch \
     && make release-build \
       GOOS="${TARGETOS}" \
       GOARCH="${TARGETARCH}" \
-      VERSION="${SAVE_READER_VERSION}" \
+      VERSION="${SAVE_READER_VERSION}+live-map.1" \
       OUTPUT=/out/palworld-save-reader \
     && mkdir -p /out/licenses \
     && cp LICENSE NOTICE /out/licenses/ \
+    && cp /tmp/palworld-save-reader-leaderboards.patch /out/licenses/live-map-leaderboards.patch \
     && mkdir -p /out/licenses/LICENSES \
     && cp LICENSES/Apache-2.0.txt /out/licenses/LICENSES/
 

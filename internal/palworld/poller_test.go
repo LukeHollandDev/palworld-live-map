@@ -182,11 +182,14 @@ func TestPollerEmptySnapshotsUseNonNullSlices(t *testing.T) {
 
 func TestPollerMergesPersistentRosterWithOnlinePlayers(t *testing.T) {
 	snapshotAt := time.Date(2026, time.July, 21, 10, 11, 12, 0, time.UTC)
-	captureTotal, uniqueCaptured, paldeckUnlocked := int64(4321), 117, 119
+	captureTotal := int64(4321)
+	uniqueCaptured, paldeckUnlocked := 117, 119
+	arenaRankPoints, fastTravelUnlocked, areasDiscovered := 875, 64, 23
+	bossDefeats, towerDefeats := 31, 7
 	roster := &stubRoster{snapshot: RosterSnapshot{
 		SnapshotAt: snapshotAt,
 		Players: []Player{
-			{ID: "player:one", Name: "Alice", GuildKey: "guild:one", GuildName: "Builders", Level: 49, X: 10, Y: 20, Map: "palpagos", LastSeenAt: snapshotAt.Add(-time.Minute), CaptureTotal: &captureTotal, UniquePalsCaptured: &uniqueCaptured, PaldeckUnlocked: &paldeckUnlocked},
+			{ID: "player:one", Name: "Alice", GuildKey: "guild:one", GuildName: "Builders", Level: 49, X: 10, Y: 20, Map: "palpagos", LastSeenAt: snapshotAt.Add(-time.Minute), CaptureTotal: &captureTotal, UniquePalsCaptured: &uniqueCaptured, PaldeckUnlocked: &paldeckUnlocked, ArenaRankPoints: &arenaRankPoints, FastTravelUnlocked: &fastTravelUnlocked, AreasDiscovered: &areasDiscovered, BossDefeats: &bossDefeats, TowerDefeats: &towerDefeats},
 			{ID: "player:two", Name: "Bob", GuildKey: "guild:one", GuildName: "Builders", Level: 51, X: 30, Y: 40, Map: "palpagos", LastSeenAt: snapshotAt.Add(-time.Hour)},
 		},
 	}}
@@ -205,7 +208,12 @@ func TestPollerMergesPersistentRosterWithOnlinePlayers(t *testing.T) {
 	alice, bob := state.Players[0], state.Players[1]
 	if !alice.Online || alice.Level != 50 || alice.X != 100 || alice.GuildName != "Builders" || alice.LastSeenAt.IsZero() ||
 		alice.CaptureTotal == nil || *alice.CaptureTotal != captureTotal || alice.UniquePalsCaptured == nil || *alice.UniquePalsCaptured != uniqueCaptured ||
-		alice.PaldeckUnlocked == nil || *alice.PaldeckUnlocked != paldeckUnlocked {
+		alice.PaldeckUnlocked == nil || *alice.PaldeckUnlocked != paldeckUnlocked ||
+		alice.ArenaRankPoints == nil || *alice.ArenaRankPoints != arenaRankPoints ||
+		alice.FastTravelUnlocked == nil || *alice.FastTravelUnlocked != fastTravelUnlocked ||
+		alice.AreasDiscovered == nil || *alice.AreasDiscovered != areasDiscovered ||
+		alice.BossDefeats == nil || *alice.BossDefeats != bossDefeats ||
+		alice.TowerDefeats == nil || *alice.TowerDefeats != towerDefeats {
 		t.Fatalf("merged online player = %#v", alice)
 	}
 	if bob.Online || bob.Level != 51 || bob.X != 30 || bob.GuildKey != "guild:one" {
@@ -289,10 +297,15 @@ func TestMergePlayersIsDeterministicAndDoesNotMergeEmptyIDs(t *testing.T) {
 }
 
 func TestMergePlayersUsesUnnamedSaveDetailsWithoutPublishingAnonymousPlayers(t *testing.T) {
-	captureTotal, uniqueCaptured, paldeckUnlocked := int64(321), 45, 46
+	captureTotal := int64(321)
+	uniqueCaptured, paldeckUnlocked := 45, 46
+	arenaRankPoints, fastTravelUnlocked, areasDiscovered := 700, 32, 18
+	bossDefeats, towerDefeats := 12, 4
 	saved := Player{
 		ID: "player:one", LastSeenAt: time.Date(2026, time.July, 25, 10, 0, 0, 0, time.UTC),
 		CaptureTotal: &captureTotal, UniquePalsCaptured: &uniqueCaptured, PaldeckUnlocked: &paldeckUnlocked,
+		ArenaRankPoints: &arenaRankPoints, FastTravelUnlocked: &fastTravelUnlocked, AreasDiscovered: &areasDiscovered,
+		BossDefeats: &bossDefeats, TowerDefeats: &towerDefeats,
 	}
 	if players := mergePlayers([]Player{saved}, nil); len(players) != 0 {
 		t.Fatalf("anonymous saved players were published: %#v", players)
@@ -304,7 +317,12 @@ func TestMergePlayersUsesUnnamedSaveDetailsWithoutPublishingAnonymousPlayers(t *
 	if len(players) != 1 || players[0].Name != "Alice" || !players[0].Online ||
 		players[0].CaptureTotal == nil || *players[0].CaptureTotal != captureTotal ||
 		players[0].UniquePalsCaptured == nil || *players[0].UniquePalsCaptured != uniqueCaptured ||
-		players[0].PaldeckUnlocked == nil || *players[0].PaldeckUnlocked != paldeckUnlocked {
+		players[0].PaldeckUnlocked == nil || *players[0].PaldeckUnlocked != paldeckUnlocked ||
+		players[0].ArenaRankPoints == nil || *players[0].ArenaRankPoints != arenaRankPoints ||
+		players[0].FastTravelUnlocked == nil || *players[0].FastTravelUnlocked != fastTravelUnlocked ||
+		players[0].AreasDiscovered == nil || *players[0].AreasDiscovered != areasDiscovered ||
+		players[0].BossDefeats == nil || *players[0].BossDefeats != bossDefeats ||
+		players[0].TowerDefeats == nil || *players[0].TowerDefeats != towerDefeats {
 		t.Fatalf("online player was not enriched: %#v", players)
 	}
 }

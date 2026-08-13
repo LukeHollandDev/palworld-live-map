@@ -431,6 +431,17 @@ function LiveMap({ config }: { config: PublicConfig }) {
     })
   }
 
+  const checkAll = () => {
+    setEnabledKinds(new Set(FILTERABLE_KINDS))
+    setEnabledPlayerStatuses(new Set(DEFAULT_ENABLED_PLAYER_STATUSES))
+    setHiddenIds(new Set())
+    setSeenKinds((current) => {
+      const next = new Set(current)
+      for (const kind of FILTERABLE_KINDS) next.add(kind)
+      return next
+    })
+  }
+
   const toggleSetValue = (setter: React.Dispatch<React.SetStateAction<Set<string>>>, id: string) => {
     setter((current) => {
       const next = new Set(current)
@@ -502,6 +513,7 @@ function LiveMap({ config }: { config: PublicConfig }) {
     expandedBases,
     dataNotices,
     onSearchChange: setSearch,
+    onCheckAll: checkAll,
     onUncheckAll: uncheckAll,
     onToggleKinds: toggleKinds,
     onTogglePlayerStatus: togglePlayerStatus,

@@ -28,6 +28,17 @@ type demoPlayer struct {
 	phase         float64
 }
 
+type demoSaveStats struct {
+	captureTotal       int64
+	uniquePalsCaptured int
+	paldeckUnlocked    int
+	arenaRankPoints    int
+	fastTravelUnlocked int
+	areasDiscovered    int
+	bossDefeats        int
+	towerDefeats       int
+}
+
 var (
 	demoCoastBaseID  = opaqueID("object", "demo-base-coast")
 	demoFrostBaseID  = opaqueID("object", "demo-base-frost")
@@ -46,6 +57,29 @@ var demoPlayers = []demoPlayer{
 	{id: demoEmberID, name: "Ember", guildKey: demoGuildKey, guildName: "Aurora Expedition", level: 55, mapID: "palpagos", centerX: -500000, centerY: -165000, radiusX: 20000, radiusY: 14000, periodSeconds: 220, phase: 1.7},
 	{id: demoJuniperID, name: "Juniper", guildKey: demoGuildKey, guildName: "Aurora Expedition", level: 51, mapID: "palpagos", centerX: 90000, centerY: 100000, radiusX: 16000, radiusY: 12000, periodSeconds: 200, phase: 3.2},
 	{id: demoOrbitID, name: "Orbit", guildKey: demoTreeGuildKey, guildName: "World Tree Survey", level: 60, mapID: "world-tree", centerX: 518000, centerY: -645000, radiusX: 16000, radiusY: 12000, periodSeconds: 160, phase: .8},
+}
+
+var demoSaveStatsByPlayerID = map[string]demoSaveStats{
+	demoMossID: {
+		captureTotal: 1864, uniquePalsCaptured: 171, paldeckUnlocked: 184,
+		arenaRankPoints: 2375, fastTravelUnlocked: 83, areasDiscovered: 54, bossDefeats: 34, towerDefeats: 8,
+	},
+	demoEmberID: {
+		captureTotal: 2731, uniquePalsCaptured: 165, paldeckUnlocked: 176,
+		arenaRankPoints: 3120, fastTravelUnlocked: 77, areasDiscovered: 51, bossDefeats: 31, towerDefeats: 7,
+	},
+	demoJuniperID: {
+		captureTotal: 1290, uniquePalsCaptured: 152, paldeckUnlocked: 163,
+		arenaRankPoints: 1480, fastTravelUnlocked: 69, areasDiscovered: 47, bossDefeats: 26, towerDefeats: 6,
+	},
+	demoOrbitID: {
+		captureTotal: 4025, uniquePalsCaptured: 187, paldeckUnlocked: 195,
+		arenaRankPoints: 4210, fastTravelUnlocked: 91, areasDiscovered: 61, bossDefeats: 40, towerDefeats: 9,
+	},
+	demoSableID: {
+		captureTotal: 1542, uniquePalsCaptured: 158, paldeckUnlocked: 169,
+		arenaRankPoints: 1895, fastTravelUnlocked: 72, areasDiscovered: 49, bossDefeats: 29, towerDefeats: 6,
+	},
 }
 
 var demoObjects = []WorldObject{
@@ -110,13 +144,39 @@ func (d *DemoSource) Roster(ctx context.Context) (RosterSnapshot, error) {
 	players := demoPlayersAt(now.Sub(d.started).Seconds())
 	for index := range players {
 		players[index].Online = false
+		applyDemoSaveStats(&players[index])
 	}
-	players = append(players, Player{
+	sable := Player{
 		ID: demoSableID, Name: "Sable", GuildKey: demoGuildKey, GuildName: "Aurora Expedition",
 		Level: 53, LastSeenAt: now.Add(-2*time.Hour - 17*time.Minute),
 		X: -338000, Y: 91000, Map: "palpagos",
-	})
+	}
+	applyDemoSaveStats(&sable)
+	players = append(players, sable)
 	return RosterSnapshot{SnapshotAt: now.Add(-30 * time.Second), Players: players}, nil
+}
+
+func applyDemoSaveStats(player *Player) {
+	stats, found := demoSaveStatsByPlayerID[player.ID]
+	if !found {
+		return
+	}
+	player.CaptureTotal = demoInt64(stats.captureTotal)
+	player.UniquePalsCaptured = demoInt(stats.uniquePalsCaptured)
+	player.PaldeckUnlocked = demoInt(stats.paldeckUnlocked)
+	player.ArenaRankPoints = demoInt(stats.arenaRankPoints)
+	player.FastTravelUnlocked = demoInt(stats.fastTravelUnlocked)
+	player.AreasDiscovered = demoInt(stats.areasDiscovered)
+	player.BossDefeats = demoInt(stats.bossDefeats)
+	player.TowerDefeats = demoInt(stats.towerDefeats)
+}
+
+func demoInt(value int) *int {
+	return &value
+}
+
+func demoInt64(value int64) *int64 {
+	return &value
 }
 
 func demoPlayersAt(elapsed float64) []Player {

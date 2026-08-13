@@ -439,6 +439,21 @@ func mergePersistedPlayer(player, persisted Player) Player {
 	if player.PaldeckUnlocked == nil {
 		player.PaldeckUnlocked = persisted.PaldeckUnlocked
 	}
+	if player.ArenaRankPoints == nil {
+		player.ArenaRankPoints = persisted.ArenaRankPoints
+	}
+	if player.FastTravelUnlocked == nil {
+		player.FastTravelUnlocked = persisted.FastTravelUnlocked
+	}
+	if player.AreasDiscovered == nil {
+		player.AreasDiscovered = persisted.AreasDiscovered
+	}
+	if player.BossDefeats == nil {
+		player.BossDefeats = persisted.BossDefeats
+	}
+	if player.TowerDefeats == nil {
+		player.TowerDefeats = persisted.TowerDefeats
+	}
 	return player
 }
 

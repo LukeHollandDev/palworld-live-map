@@ -17,9 +17,9 @@ Credentials, network details, and upstream identifiers are excluded from public 
 
 Player and metric data use `POLL_INTERVAL`; world objects use `WORLD_POLL_INTERVAL`; server metadata refreshes once per minute. Results are cached independently so an upstream failure does not discard the last successful snapshot.
 
-Optional save enrichment runs the external [`palworld-save-reader`](https://github.com/LukeHollandDev/palworld-save-reader) binary against the selected immutable backup generation: its `player-details` preset once per player file for progress counters, then the compact `--resolve roster` pass for names, levels, and guilds from `Level.sav`. The app aggregates both under fixed bounds and joins them to REST-visible players by opaque ID; save records with no REST counterpart become offline players. The reader checks the `Level.sav` size and modification time after decoding; it does not independently recheck every player file or `LevelMeta.sav`.
+Optional save enrichment runs the external [`palworld-save-reader`](https://github.com/LukeHollandDev/palworld-save-reader) binary against the selected immutable backup generation: its `player-details` preset once per player file for capture and Paldeck counters, then the compact `--resolve roster` pass for names, levels, guilds, Arena RP, fast-travel points, discovered areas, and boss/tower defeat flags. The app aggregates both under fixed bounds and joins them to REST-visible players by opaque ID; save records with no REST counterpart become offline players. Missing individual stats remain unknown and are omitted from their leaderboard. The reader checks the `Level.sav` size and modification time after decoding; it does not independently recheck every player file or `LevelMeta.sav`.
 
-The container image builds the pinned decoder in its own stage and installs it beside the server binary. Source runs use the same layout under the ignored `bin` directory.
+The container image builds the pinned decoder in its own stage, applies the repository-maintained resolve-v3 leaderboard patch, and installs it beside the server binary. Source runs use the same patched reader and layout under the ignored `bin` directory; an unpatched v0.1.0 reader emits resolve v2 and its roster enrichment is deliberately rejected.
 
 Field Alpha and tower-boss locations are versioned data under [`assets/palworld`](assets/palworld). The frontend lives in [`web`](web) and uses React, TypeScript, Vite, Tailwind CSS, Biome, and Vitest.
 
@@ -39,12 +39,11 @@ make run
 
 Open <http://localhost:8080>.
 
-To exercise save enrichment, install the pinned decoder beside the local app
-binary. Run this from the repository root:
+To exercise save enrichment, build the pinned and patched decoder beside the
+local app binary. Run this from the repository root:
 
 ```bash
-GOBIN="$PWD/bin" go install \
-  github.com/LukeHollandDev/palworld-save-reader/cmd/palworld-save-reader@v0.1.0
+make save-reader
 ```
 
 Then set `SAVE_DATA_ENABLED=true` and `PALWORLD_SAVE_ROOT` in `.env`. The app
@@ -104,6 +103,7 @@ Run `make game-assets` to regenerate map artwork and encounter data from a local
 | `make test`           | Run frontend and Go tests                                             |
 | `make check`          | Run frontend checks/build, Go formatting, vet, and race-enabled tests |
 | `make build`          | Build frontend assets and the local Go binary                         |
+| `make save-reader`    | Build the pinned, patched local save decoder                           |
 | `make image`          | Build the production container image locally                          |
 | `make exporter-check` | Test and compile the asset exporter                                   |
 

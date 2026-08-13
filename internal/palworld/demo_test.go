@@ -64,6 +64,29 @@ func TestDemoSourceIsDeterministicAndMovesPlayersAndCompanions(t *testing.T) {
 	}
 }
 
+func TestDemoRosterProvidesEveryLeaderboardStat(t *testing.T) {
+	current := time.Date(2026, 7, 18, 12, 0, 0, 0, time.UTC)
+	source := newDemoSource(func() time.Time { return current })
+
+	roster, err := source.Roster(context.Background())
+	if err != nil {
+		t.Fatalf("Roster() error = %v", err)
+	}
+	if len(roster.Players) != len(demoPlayers)+1 {
+		t.Fatalf("Roster() returned %d players, want %d", len(roster.Players), len(demoPlayers)+1)
+	}
+	for _, player := range roster.Players {
+		if player.CaptureTotal == nil || player.UniquePalsCaptured == nil || player.PaldeckUnlocked == nil ||
+			player.ArenaRankPoints == nil || player.FastTravelUnlocked == nil || player.AreasDiscovered == nil ||
+			player.BossDefeats == nil || player.TowerDefeats == nil {
+			t.Fatalf("demo roster player is missing leaderboard stats: %#v", player)
+		}
+		if *player.CaptureTotal < int64(*player.UniquePalsCaptured) || *player.UniquePalsCaptured > *player.PaldeckUnlocked {
+			t.Fatalf("demo roster player has implausible capture progress: %#v", player)
+		}
+	}
+}
+
 func TestDemoSourceProvidesAllPublicDataKinds(t *testing.T) {
 	current := time.Date(2026, 7, 18, 12, 0, 0, 0, time.UTC)
 	source := newDemoSource(func() time.Time { return current })

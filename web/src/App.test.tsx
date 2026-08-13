@@ -207,7 +207,12 @@ describe('App', () => {
             lastSeenAt,
             captureTotal: 4321,
             uniquePalsCaptured: 117,
-            paldeckUnlocked: 119
+            paldeckUnlocked: 119,
+            arenaRankPoints: 2840,
+            fastTravelUnlocked: 73,
+            areasDiscovered: 48,
+            bossDefeats: 27,
+            towerDefeats: 6
           },
           {
             id: 'player-legacy',
@@ -235,8 +240,13 @@ describe('App', () => {
     for (const [label, value] of [
       ['Last seen', expectedLastSeen],
       ['Captures', (4321).toLocaleString()],
-      ['Unique Pals captured', (117).toLocaleString()],
-      ['Paldeck unlocked', (119).toLocaleString()]
+      ['Species captured', (117).toLocaleString()],
+      ['Paldeck unlocked', (119).toLocaleString()],
+      ['Arena RP', (2840).toLocaleString()],
+      ['Fast-travel points', (73).toLocaleString()],
+      ['Areas discovered', (48).toLocaleString()],
+      ['Boss clears', (27).toLocaleString()],
+      ['Tower clears', (6).toLocaleString()]
     ]) {
       const term = within(inspector).getByText(label)
       expect(term.nextElementSibling).toHaveTextContent(value)
@@ -248,7 +258,17 @@ describe('App', () => {
 
     inspector = screen.getByRole('dialog')
     expect(within(inspector).getByText('Status').nextElementSibling).toHaveTextContent('Offline')
-    for (const label of ['Last seen', 'Captures', 'Unique Pals captured', 'Paldeck unlocked']) {
+    for (const label of [
+      'Last seen',
+      'Captures',
+      'Species captured',
+      'Paldeck unlocked',
+      'Arena RP',
+      'Fast-travel points',
+      'Areas discovered',
+      'Boss clears',
+      'Tower clears'
+    ]) {
       expect(within(inspector).queryByText(label)).not.toBeInTheDocument()
     }
   })
@@ -1079,14 +1099,16 @@ describe('App', () => {
       }
     })
     const user = userEvent.setup()
-    render(<App />)
+    const firstRender = render(<App />)
     await screen.findByRole('heading', { name: 'Test Realm' })
     const explorer = screen.getByRole('complementary', { name: 'Map filters' })
     const playerVisibility = within(explorer).getByRole('checkbox', { name: 'Show Luke · Lv 55' })
     const siblingVisibility = within(explorer).getByRole('checkbox', { name: 'Show Anne · Lv 20' })
     const categoryVisibility = within(explorer).getByRole('checkbox', { name: 'Show Online Players' })
+    const checkAll = within(explorer).getByRole('button', { name: 'Check all' })
 
     await user.click(within(explorer).getByRole('button', { name: 'Uncheck all' }))
+    expect(checkAll).toBeEnabled()
     expect(playerVisibility).toBeEnabled()
     expect(playerVisibility).not.toBeChecked()
 
@@ -1107,6 +1129,31 @@ describe('App', () => {
     expect(siblingVisibility).not.toBeChecked()
     expect(screen.getByRole('button', { name: 'Luke · Lv 55' })).toBeVisible()
     expect(screen.queryByRole('button', { name: 'Anne · Lv 20' })).not.toBeInTheDocument()
+
+    await user.click(checkAll)
+    expect(checkAll).toBeDisabled()
+    expect(categoryVisibility).toBeChecked()
+    expect(playerVisibility).toBeChecked()
+    expect(siblingVisibility).toBeChecked()
+    expect(screen.getByRole('button', { name: 'Luke · Lv 55' })).toBeVisible()
+    expect(screen.getByRole('button', { name: 'Anne · Lv 20' })).toBeVisible()
+
+    const saved = JSON.parse(window.localStorage.getItem('palworld-live-map.filters.v1') || '{}') as {
+      enabledKinds?: string[]
+      enabledPlayerStatuses?: string[]
+      hiddenIds?: string[]
+    }
+    expect(saved.enabledPlayerStatuses).toEqual(expect.arrayContaining(['online', 'offline']))
+    expect(saved.hiddenIds).toEqual([])
+
+    firstRender.unmount()
+    render(<App />)
+    await screen.findByRole('heading', { name: 'Test Realm' })
+    const restoredExplorer = screen.getByRole('complementary', { name: 'Map filters' })
+    expect(within(restoredExplorer).getByRole('button', { name: 'Check all' })).toBeDisabled()
+    expect(within(restoredExplorer).getByRole('checkbox', { name: 'Show Online Players' })).toBeChecked()
+    expect(within(restoredExplorer).getByRole('checkbox', { name: 'Show Luke · Lv 55' })).toBeChecked()
+    expect(within(restoredExplorer).getByRole('checkbox', { name: 'Show Anne · Lv 20' })).toBeChecked()
   })
 
   it('finds online players by guild name in the explorer and on the map', async () => {
@@ -1267,6 +1314,37 @@ describe('App', () => {
     expect(explorer.querySelector('[data-map-panel-header]')).toHaveClass('min-h-[78px]')
     expect(within(leaderboard).getByRole('heading', { name: 'Leaderboards' })).toBeVisible()
     expect(within(leaderboard).getByRole('heading', { name: 'Player levels' })).toBeVisible()
+    const leaderboardPicker = within(leaderboard).getByRole('button', { name: 'Leaderboard type Player levels' })
+    expect(leaderboardPicker).toHaveTextContent('Player levels')
+    expect(leaderboardPicker).toHaveAttribute('aria-expanded', 'false')
+    await user.click(leaderboardPicker)
+    let leaderboardTypes = within(leaderboard).getByRole('listbox', { name: 'Leaderboard types' })
+    expect(within(leaderboardTypes).getAllByRole('option')).toHaveLength(8)
+    await user.click(within(leaderboardTypes).getByRole('option', { name: 'Paldeck discoveries' }))
+    expect(within(leaderboard).getByRole('heading', { name: 'Paldeck discoveries' })).toBeVisible()
+    expect(leaderboardPicker).toHaveAccessibleName('Leaderboard type Paldeck discoveries')
+    expect(leaderboardPicker).toHaveFocus()
+    await user.click(leaderboardPicker)
+    leaderboardTypes = within(leaderboard).getByRole('listbox', { name: 'Leaderboard types' })
+    expect(leaderboardPicker).toHaveAttribute('aria-controls', leaderboardTypes.id)
+    const selectedPaldeckOption = within(leaderboardTypes).getByRole('option', { name: 'Paldeck discoveries' })
+    expect(selectedPaldeckOption).toHaveAttribute('aria-selected', 'true')
+    await waitFor(() => expect(selectedPaldeckOption).toHaveFocus())
+    await user.keyboard('{End}')
+    await waitFor(() => expect(within(leaderboardTypes).getByRole('option', { name: 'Tower clears' })).toHaveFocus())
+    await user.keyboard('{Home}')
+    await waitFor(() => expect(within(leaderboardTypes).getByRole('option', { name: 'Player levels' })).toHaveFocus())
+    await user.keyboard('{Escape}')
+    expect(within(leaderboard).queryByRole('listbox', { name: 'Leaderboard types' })).not.toBeInTheDocument()
+    await waitFor(() => expect(leaderboardPicker).toHaveFocus())
+    expect(leaderboard).toBeVisible()
+    await user.click(leaderboardPicker)
+    leaderboardTypes = within(leaderboard).getByRole('listbox', { name: 'Leaderboard types' })
+    fireEvent.pointerDown(within(leaderboard).getByRole('heading', { name: 'Paldeck discoveries' }))
+    expect(within(leaderboard).queryByRole('listbox', { name: 'Leaderboard types' })).not.toBeInTheDocument()
+    await user.click(leaderboardPicker)
+    leaderboardTypes = within(leaderboard).getByRole('listbox', { name: 'Leaderboard types' })
+    await user.click(within(leaderboardTypes).getByRole('option', { name: 'Player levels' }))
     expect(
       within(leaderboard).getByRole('button', { name: 'View leaderboard rank 1: Zoe · Lv 60, Offline' })
     ).toBeVisible()

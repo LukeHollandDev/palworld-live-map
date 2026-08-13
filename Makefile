@@ -2,13 +2,16 @@ override PROJECT_ROOT := $(abspath $(dir $(lastword $(MAKEFILE_LIST))))
 WEB_NPM := npm --prefix "$(PROJECT_ROOT)/web"
 BINARY := $(PROJECT_ROOT)/bin/palworld-live-map
 
-.PHONY: ci build check test web-install web-lint web-typecheck web-test web-assets web-build web-check exporter-check image run demo game-assets game-assets-diff maps clean distclean
+.PHONY: ci build save-reader check test web-install web-lint web-typecheck web-test web-assets web-build web-check exporter-check image run demo game-assets game-assets-diff maps clean distclean
 
 ci: check exporter-check
 
 build: web-build
 	mkdir -p "$(dir $(BINARY))"
 	go build -o "$(BINARY)" ./cmd/palworld-live-map
+
+save-reader:
+	sh "$(PROJECT_ROOT)/tools/build-save-reader.sh"
 
 check: web-check web-assets
 	test -z "$$(gofmt -l .)"

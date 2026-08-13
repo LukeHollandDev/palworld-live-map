@@ -6,10 +6,11 @@
 // output.
 //
 // Two decoder calls make up the contract. The player-details preset runs once
-// per player.sav and yields progress counters. A single compact roster pass over the
-// generation yields the display name, level, and guild that live in Level.sav
-// and appear in no preset; without it every save record is anonymous and the
-// poller cannot publish offline players.
+// per player.sav and yields capture and Paldeck progress. A single compact
+// roster pass over the generation yields identity, Arena RP, exploration, and
+// clear counters without resolving owned collections; without its Level.sav
+// identity data every save record is anonymous and the poller cannot publish
+// offline players.
 package savesidecar
 
 import "time"
@@ -26,9 +27,9 @@ type Snapshot struct {
 // until saveroster projects it into the public ID space: PlayerID and GuildID
 // are raw save GUIDs and must never reach a public snapshot unprojected.
 //
-// Name, Level, and the guild fields come from the roster pass and are empty
-// when it fails or omits the record; the remaining fields come from the
-// player-details preset.
+// Name, Level, guild, ArenaRankPoints, and the exploration/clear counters come
+// from the roster pass and are empty when it fails or omits the record. Position,
+// capture, Paldeck, and last-seen fields come from the player-details preset.
 type Player struct {
 	PlayerID string
 	X        *float64
@@ -43,6 +44,11 @@ type Player struct {
 	CaptureTotal       *int64
 	UniquePalsCaptured *int
 	PaldeckUnlocked    *int
+	ArenaRankPoints    *int
+	FastTravelUnlocked *int
+	AreasDiscovered    *int
+	BossDefeats        *int
+	TowerDefeats       *int
 }
 
 // Stats records per-generation aggregation quality without retaining save
@@ -110,14 +116,19 @@ type resolveDocument struct {
 }
 
 type resolvedPlayer struct {
-	PlayerUID string             `json:"playerUId"`
-	Character *resolvedCharacter `json:"character"`
-	Guild     *resolvedGuild     `json:"guild"`
+	PlayerUID          string             `json:"playerUId"`
+	Character          *resolvedCharacter `json:"character"`
+	Guild              *resolvedGuild     `json:"guild"`
+	FastTravelUnlocked *int               `json:"fastTravelUnlocked"`
+	AreasDiscovered    *int               `json:"areasDiscovered"`
+	BossDefeats        *int               `json:"bossDefeats"`
+	TowerDefeats       *int               `json:"towerDefeats"`
 }
 
 type resolvedCharacter struct {
-	Nickname string `json:"nickname"`
-	Level    int    `json:"level"`
+	Nickname        string `json:"nickname"`
+	Level           int    `json:"level"`
+	ArenaRankPoints *int   `json:"arenaRankPoints"`
 }
 
 type resolvedGuild struct {

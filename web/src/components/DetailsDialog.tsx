@@ -1,5 +1,5 @@
-import { IconChevronRight } from '@tabler/icons-react'
-import { useEffect, useRef } from 'react'
+import { IconCheck, IconChevronDown, IconChevronRight } from '@tabler/icons-react'
+import { useEffect, useId, useRef, useState } from 'react'
 import { buildGuildDetails, type GuildDetails as GuildDetailsModel } from '../lib/guilds'
 import { LEADERBOARDS, type LeaderboardId, leaderboardById } from '../lib/leaderboards'
 import { kindLabel } from '../lib/map'
@@ -76,7 +76,7 @@ export function DetailsDialog({
       ? `item:${detail.itemId}`
       : detail.kind === 'guild'
         ? `guild:${detail.guildId}`
-        : `leaderboard:${detail.leaderboardId}`
+        : 'leaderboard'
     : undefined
 
   useEffect(() => {
@@ -91,7 +91,7 @@ export function DetailsDialog({
   useEffect(() => {
     if (!detail) return
     const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key !== 'Escape') return
+      if (event.key !== 'Escape' || event.defaultPrevented) return
       onClose()
       restoreFocus(returnFocus, fallbackFocus)
     }
@@ -177,23 +177,7 @@ function LeaderboardDetails({
   const entries = leaderboard.entries(items)
   return (
     <>
-      <nav className="grid gap-1.5" aria-label="Leaderboard types">
-        {LEADERBOARDS.map((candidate) => (
-          <button
-            key={candidate.id}
-            type="button"
-            className={`min-h-11 cursor-pointer border px-3 text-left text-xs transition-colors focus-visible:border-[#8de9f5] focus-visible:outline-none ${
-              candidate.id === leaderboard.id
-                ? 'pal-selected shadow-[inset_3px_0_#72d7e5]'
-                : 'pal-glass-inset pal-interactive text-[#9fb0b5]'
-            }`}
-            aria-current={candidate.id === leaderboard.id ? 'page' : undefined}
-            onClick={() => onSelectLeaderboard(candidate.id)}
-          >
-            {candidate.title}
-          </button>
-        ))}
-      </nav>
+      <LeaderboardPicker leaderboardId={leaderboard.id} onSelectLeaderboard={onSelectLeaderboard} />
       <section>
         <SectionTitle>{leaderboard.title}</SectionTitle>
         <p className="mt-0 mb-3 text-xs leading-5 text-[#9fb0b5]">{leaderboard.description}</p>
@@ -226,10 +210,175 @@ function LeaderboardDetails({
             })}
           </ol>
         ) : (
-          <p className="m-0 text-[13px] text-[#8f989d]">No players are currently known.</p>
+          <p className="m-0 text-[13px] text-[#8f989d]">No leaderboard data is currently available.</p>
         )}
       </section>
     </>
+  )
+}
+
+function LeaderboardPicker({
+  leaderboardId,
+  onSelectLeaderboard
+}: {
+  leaderboardId: LeaderboardId
+  onSelectLeaderboard: (leaderboardId: LeaderboardId) => void
+}) {
+  const selected = leaderboardById(leaderboardId)
+  const selectedIndex = LEADERBOARDS.findIndex((candidate) => candidate.id === selected.id)
+  const [open, setOpen] = useState(false)
+  const [activeIndex, setActiveIndex] = useState(selectedIndex)
+  const wrapperRef = useRef<HTMLFieldSetElement>(null)
+  const triggerRef = useRef<HTMLButtonElement>(null)
+  const optionRefs = useRef<Array<HTMLButtonElement | null>>([])
+  const labelId = useId()
+  const selectedValueId = useId()
+  const listboxId = useId()
+
+  useEffect(() => {
+    if (!open) return
+    const frame = window.requestAnimationFrame(() => {
+      const option = optionRefs.current[activeIndex]
+      option?.focus({ preventScroll: true })
+      option?.scrollIntoView?.({ block: 'nearest' })
+    })
+    return () => window.cancelAnimationFrame(frame)
+  }, [activeIndex, open])
+
+  useEffect(() => {
+    if (!open) return
+    const closeOnPointerDown = (event: PointerEvent) => {
+      if (wrapperRef.current?.contains(event.target as Node)) return
+      setOpen(false)
+    }
+    document.addEventListener('pointerdown', closeOnPointerDown)
+    return () => document.removeEventListener('pointerdown', closeOnPointerDown)
+  }, [open])
+
+  useEffect(() => {
+    if (!open) setActiveIndex(selectedIndex)
+  }, [open, selectedIndex])
+
+  const closeAndFocusTrigger = () => {
+    setOpen(false)
+    triggerRef.current?.focus({ preventScroll: true })
+  }
+
+  const selectLeaderboard = (id: LeaderboardId, index: number) => {
+    setOpen(false)
+    setActiveIndex(index)
+    onSelectLeaderboard(id)
+    triggerRef.current?.focus({ preventScroll: true })
+  }
+
+  const focusOption = (index: number) => {
+    const normalized = (index + LEADERBOARDS.length) % LEADERBOARDS.length
+    setActiveIndex(normalized)
+    const option = optionRefs.current[normalized]
+    option?.focus({ preventScroll: true })
+    option?.scrollIntoView?.({ block: 'nearest' })
+  }
+
+  const openAt = (index: number) => {
+    setActiveIndex(index)
+    setOpen(true)
+  }
+
+  return (
+    <fieldset
+      ref={wrapperRef}
+      className="relative m-0 min-w-0 border-0 p-0"
+      onBlur={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setOpen(false)
+      }}
+      onKeyDownCapture={(event) => {
+        if (!open || event.key !== 'Escape') return
+        event.preventDefault()
+        event.stopPropagation()
+        closeAndFocusTrigger()
+      }}
+    >
+      <legend id={labelId} className="sr-only">
+        Leaderboard type
+      </legend>
+      <button
+        ref={triggerRef}
+        type="button"
+        aria-labelledby={`${labelId} ${selectedValueId}`}
+        aria-controls={listboxId}
+        aria-expanded={open}
+        aria-haspopup="listbox"
+        className={`pal-glass-inset pal-interactive flex min-h-11 w-full min-w-0 cursor-pointer items-center justify-between gap-3 px-3 text-left text-sm text-[#e7f6f8] focus-visible:border-[#8de9f5] focus-visible:outline-none ${
+          open ? 'pal-selected' : ''
+        }`}
+        onClick={() => (open ? setOpen(false) : openAt(selectedIndex))}
+        onKeyDown={(event) => {
+          if (!['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) return
+          event.preventDefault()
+          if (event.key === 'Home') openAt(0)
+          else if (event.key === 'End') openAt(LEADERBOARDS.length - 1)
+          else openAt(selectedIndex)
+        }}
+      >
+        <span id={selectedValueId} className="truncate">
+          {selected.title}
+        </span>
+        <IconChevronDown
+          aria-hidden="true"
+          className={`shrink-0 text-[#8fcbd3] transition-transform ${open ? 'rotate-180' : ''}`}
+          size={18}
+          stroke={1.8}
+        />
+      </button>
+      {open ? (
+        <div
+          id={listboxId}
+          role="listbox"
+          aria-label="Leaderboard types"
+          className="absolute inset-x-0 top-[calc(100%+4px)] z-40 grid max-h-[min(22rem,calc(100dvh-14rem))] gap-1 overflow-y-auto border border-[#72d7e5]/45 bg-[#0d1519] p-1 shadow-[0_14px_30px_rgb(0_0_0/45%),inset_0_1px_rgb(217_250_255/7%)] max-sm:static max-sm:mt-1 max-sm:max-h-[42dvh]"
+        >
+          {LEADERBOARDS.map((candidate, index) => {
+            const isSelected = candidate.id === selected.id
+            return (
+              <button
+                key={candidate.id}
+                ref={(node) => {
+                  optionRefs.current[index] = node
+                }}
+                type="button"
+                role="option"
+                aria-selected={isSelected}
+                tabIndex={index === activeIndex ? 0 : -1}
+                className={`pal-interactive flex min-h-10 w-full cursor-pointer items-center justify-between gap-3 border px-3 text-left text-sm focus-visible:border-[#8de9f5] focus-visible:outline-none ${
+                  isSelected
+                    ? 'pal-selected shadow-[inset_3px_0_#72d7e5]'
+                    : 'border-transparent bg-transparent text-[#b6c6ca] hover:border-[#84cfd9]/35 hover:bg-[#273439]/75 hover:text-white hover:shadow-[inset_3px_0_#4c9fab] focus-visible:bg-[#273439]/75 focus-visible:text-white focus-visible:shadow-[inset_3px_0_#4c9fab]'
+                }`}
+                onClick={() => selectLeaderboard(candidate.id, index)}
+                onKeyDown={(event) => {
+                  if (event.key === 'ArrowDown') {
+                    event.preventDefault()
+                    focusOption(index + 1)
+                  } else if (event.key === 'ArrowUp') {
+                    event.preventDefault()
+                    focusOption(index - 1)
+                  } else if (event.key === 'Home') {
+                    event.preventDefault()
+                    focusOption(0)
+                  } else if (event.key === 'End') {
+                    event.preventDefault()
+                    focusOption(LEADERBOARDS.length - 1)
+                  }
+                }}
+              >
+                <span>{candidate.title}</span>
+                {isSelected ? <IconCheck aria-hidden="true" className="shrink-0 text-[#8de9f5]" size={17} /> : null}
+              </button>
+            )
+          })}
+        </div>
+      ) : null}
+    </fieldset>
   )
 }
 
@@ -567,8 +716,13 @@ function ItemDetails({
     entries.push(['Status', item.online === false ? 'Offline' : 'Online'])
     entries.push(['Last seen', lastSeen(item.lastSeenAt)])
     entries.push(['Captures', item.captureTotal?.toLocaleString()])
-    entries.push(['Unique Pals captured', item.uniquePalsCaptured?.toLocaleString()])
+    entries.push(['Species captured', item.uniquePalsCaptured?.toLocaleString()])
     entries.push(['Paldeck unlocked', item.paldeckUnlocked?.toLocaleString()])
+    entries.push(['Arena RP', item.arenaRankPoints?.toLocaleString()])
+    entries.push(['Fast-travel points', item.fastTravelUnlocked?.toLocaleString()])
+    entries.push(['Areas discovered', item.areasDiscovered?.toLocaleString()])
+    entries.push(['Boss clears', item.bossDefeats?.toLocaleString()])
+    entries.push(['Tower clears', item.towerDefeats?.toLocaleString()])
   }
   if (item.detail && item.kind !== 'players') {
     entries.push([DETAIL_LABELS[item.kind], item.detail])

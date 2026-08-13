@@ -170,10 +170,14 @@ func TestReaderResolvesNamesLevelsAndGuilds(t *testing.T) {
 		t.Fatal(err)
 	}
 	argFile := filepath.Join(t.TempDir(), "resolve-arguments")
-	resolved := `{"resolveVersion":2,"kind":"roster","roster":[{
+	resolved := `{"resolveVersion":3,"kind":"roster","roster":[{
 		"playerUId":"AAAAAAAA-0000-0000-0000-000000000000",
-		"character":{"nickname":"Sable","level":42},
-		"guild":{"id":"5aa6910c-e317-4a73-be66-6d55190b9dbf","name":"Aurora"}
+		"character":{"nickname":"Sable","level":42,"arenaRankPoints":1875},
+		"guild":{"id":"5aa6910c-e317-4a73-be66-6d55190b9dbf","name":"Aurora"},
+		"fastTravelUnlocked":73,
+		"areasDiscovered":48,
+		"bossDefeats":27,
+		"towerDefeats":6
 	}]}`
 	binary := writeFakeDecoderWithResolve(t, testPresets, `
 printf '%s\n' "$@" > `+shellQuote(argFile)+`
@@ -194,6 +198,13 @@ printf '%s' `+shellQuote(resolved)+`
 	}
 	if player.GuildID != "5aa6910c-e317-4a73-be66-6d55190b9dbf" || player.GuildName != "Aurora" {
 		t.Fatalf("player = %#v, want the resolved guild", player)
+	}
+	if player.ArenaRankPoints == nil || *player.ArenaRankPoints != 1875 ||
+		player.FastTravelUnlocked == nil || *player.FastTravelUnlocked != 73 ||
+		player.AreasDiscovered == nil || *player.AreasDiscovered != 48 ||
+		player.BossDefeats == nil || *player.BossDefeats != 27 ||
+		player.TowerDefeats == nil || *player.TowerDefeats != 6 {
+		t.Fatalf("player = %#v, want resolved leaderboard progress", player)
 	}
 	if snapshot.Stats.NamesResolved != 1 || snapshot.Stats.ResolveFailed {
 		t.Fatalf("stats = %#v", snapshot.Stats)
@@ -220,7 +231,7 @@ func TestReaderKeepsPresetDataWhenResolveFails(t *testing.T) {
 	for _, resolveBody := range map[string]string{
 		"exits non-zero": `echo boom >&2; exit 1`,
 		"emits garbage":  `printf '%s' '{not-json'`,
-		"wrong kind":     `printf '%s' '{"resolveVersion":2,"kind":"guilds","roster":[]}'`,
+		"wrong kind":     `printf '%s' '{"resolveVersion":3,"kind":"guilds","roster":[]}'`,
 		"wrong version":  `printf '%s' '{"resolveVersion":999,"kind":"roster","roster":[]}'`,
 	} {
 		binary := writeFakeDecoderWithResolve(t, testPresets, resolveBody,
@@ -252,7 +263,7 @@ func TestResolveDropsNamesForDuplicateGUIDs(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	resolved := `{"resolveVersion":2,"kind":"roster","roster":[
+	resolved := `{"resolveVersion":3,"kind":"roster","roster":[
 		{"playerUId":"aaaaaaaa-0000-0000-0000-000000000000","character":{"nickname":"First","level":1}},
 		{"playerUId":"AAAAAAAA00000000000000000000AAAA","character":{"nickname":"Other","level":2}},
 		{"playerUId":"aaaaaaaa-0000-0000-0000-000000000000","character":{"nickname":"Second","level":2}}
@@ -313,7 +324,7 @@ func writeFakeDecoderWithPresets(t *testing.T, presets, body string) string {
 
 // emptyResolveBody names nobody, which is what every test that predates the
 // resolve pass expects: preset behaviour unchanged, no offline players.
-const emptyResolveBody = `printf '%s' '{"resolveVersion":2,"kind":"roster","roster":[]}'`
+const emptyResolveBody = `printf '%s' '{"resolveVersion":3,"kind":"roster","roster":[]}'`
 
 func writeFakeDecoderWithResolve(t *testing.T, presets, resolveBody, body string) string {
 	t.Helper()

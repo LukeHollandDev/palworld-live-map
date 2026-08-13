@@ -11,13 +11,15 @@ Give your Palworld community a live view of players, guilds, bases, Pals, in-gam
 ## Features
 
 - Interactive maps of Palpagos and the World Tree
-- Live player locations and a player-level leaderboard
+- Live player locations and save-backed leaderboards for level, captures,
+  Paldeck discoveries, Arena RP, exploration, and boss/tower clears
 - Guild bases, members, and assigned worker Pals
 - Current companion Pals linked to their players
 - Search and filters for players, guilds, Pals, bases, and in-game locations
 - Live player count, server FPS, uptime, base count, in-game day, and connection status
 - Optional save integration adds offline players, saved locations, levels,
-  guilds, capture totals, Paldeck progress, and last-seen times
+  guilds, capture totals, Paldeck progress, Arena RP, fast-travel points,
+  discovered areas, boss/tower clears, and last-seen times
 - Configurable refresh intervals and world-object layers
 - Demo mode with fictional moving players and world objects
 
@@ -124,7 +126,8 @@ To enable save integration, mount the server's `SaveGames/0` directory read-only
 and set `SAVE_DATA_ENABLED=true`. The image includes the pinned
 [`palworld-save-reader`](https://github.com/LukeHollandDev/palworld-save-reader)
 automatically. Save records add offline players and progression without exposing
-raw account, player, or guild identifiers.
+raw account, player, or guild identifiers. Leaderboards omit an individual stat
+when that value is unavailable rather than treating it as zero.
 
 Save decoding can use substantial memory, so leave container headroom. A
 decoding problem does not interrupt the live map: online players and available

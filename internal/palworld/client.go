@@ -48,6 +48,11 @@ type Player struct {
 	CaptureTotal       *int64    `json:"captureTotal,omitempty"`
 	UniquePalsCaptured *int      `json:"uniquePalsCaptured,omitempty"`
 	PaldeckUnlocked    *int      `json:"paldeckUnlocked,omitempty"`
+	ArenaRankPoints    *int      `json:"arenaRankPoints,omitempty"`
+	FastTravelUnlocked *int      `json:"fastTravelUnlocked,omitempty"`
+	AreasDiscovered    *int      `json:"areasDiscovered,omitempty"`
+	BossDefeats        *int      `json:"bossDefeats,omitempty"`
+	TowerDefeats       *int      `json:"towerDefeats,omitempty"`
 	X                  float64   `json:"x"`
 	Y                  float64   `json:"y"`
 	Map                string    `json:"map"`

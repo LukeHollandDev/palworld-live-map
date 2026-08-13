@@ -347,7 +347,11 @@ func TestRosterProjectsAndSanitizesPlayers(t *testing.T) {
 	notFinite := math.NaN()
 	validY := 1.0
 	lastSeen := time.Date(2026, 7, 20, 23, 59, 0, 0, time.FixedZone("server", -7*3600))
-	captureTotal, uniqueCaptured, paldeckUnlocked := int64(4321), 117, 119
+	captureTotal := int64(4321)
+	uniqueCaptured, paldeckUnlocked := 117, 119
+	arenaRankPoints, fastTravelUnlocked, areasDiscovered := 875, 64, 23
+	bossDefeats, towerDefeats := 31, 7
+	negativeMetric := -1
 	snapshotAt := time.Date(2026, 7, 21, 12, 0, 0, 0, time.FixedZone("server", 3600))
 	rawPlayerOne := strings.Repeat("a", 32)
 	rawPlayerTwo := strings.Repeat("b", 32)
@@ -356,8 +360,8 @@ func TestRosterProjectsAndSanitizesPlayers(t *testing.T) {
 	reader := &fakeSnapshotReader{snapshot: &savesidecar.Snapshot{
 		SnapshotAt: snapshotAt,
 		Players: []savesidecar.Player{
-			{PlayerID: rawPlayerOne, X: &x, Y: &y, LastSeenAt: &lastSeen, CaptureTotal: &captureTotal, UniquePalsCaptured: &uniqueCaptured, PaldeckUnlocked: &paldeckUnlocked},
-			{PlayerID: rawPlayerTwo, X: &notFinite, Y: &validY},
+			{PlayerID: rawPlayerOne, X: &x, Y: &y, LastSeenAt: &lastSeen, CaptureTotal: &captureTotal, UniquePalsCaptured: &uniqueCaptured, PaldeckUnlocked: &paldeckUnlocked, ArenaRankPoints: &arenaRankPoints, FastTravelUnlocked: &fastTravelUnlocked, AreasDiscovered: &areasDiscovered, BossDefeats: &bossDefeats, TowerDefeats: &towerDefeats},
+			{PlayerID: rawPlayerTwo, X: &notFinite, Y: &validY, ArenaRankPoints: &negativeMetric, FastTravelUnlocked: &negativeMetric, AreasDiscovered: &negativeMetric, BossDefeats: &negativeMetric, TowerDefeats: &negativeMetric},
 			{PlayerID: strings.Repeat("2", 32)},
 			{PlayerID: rawCollisionOne},
 			{PlayerID: rawCollisionTwo},
@@ -390,11 +394,18 @@ func TestRosterProjectsAndSanitizesPlayers(t *testing.T) {
 		first.GuildKey != "" || first.GuildName != "" ||
 		first.X != x || first.Y != y || first.Map != "palpagos" || !first.LastSeenAt.Equal(lastSeen) || first.LastSeenAt.Location() != time.UTC ||
 		first.CaptureTotal == nil || *first.CaptureTotal != captureTotal || first.UniquePalsCaptured == nil || *first.UniquePalsCaptured != uniqueCaptured ||
-		first.PaldeckUnlocked == nil || *first.PaldeckUnlocked != paldeckUnlocked {
+		first.PaldeckUnlocked == nil || *first.PaldeckUnlocked != paldeckUnlocked ||
+		first.ArenaRankPoints == nil || *first.ArenaRankPoints != arenaRankPoints ||
+		first.FastTravelUnlocked == nil || *first.FastTravelUnlocked != fastTravelUnlocked ||
+		first.AreasDiscovered == nil || *first.AreasDiscovered != areasDiscovered ||
+		first.BossDefeats == nil || *first.BossDefeats != bossDefeats ||
+		first.TowerDefeats == nil || *first.TowerDefeats != towerDefeats {
 		t.Fatalf("first projected player = %#v", first)
 	}
 	if second.ID != "player:two" || second.Name != "" || second.Level != 0 ||
-		second.GuildKey != "" || second.GuildName != "" || second.Map != "" || second.X != 0 || second.Y != 0 {
+		second.GuildKey != "" || second.GuildName != "" || second.Map != "" || second.X != 0 || second.Y != 0 ||
+		second.ArenaRankPoints != nil || second.FastTravelUnlocked != nil || second.AreasDiscovered != nil ||
+		second.BossDefeats != nil || second.TowerDefeats != nil {
 		t.Fatalf("second projected player = %#v", second)
 	}
 	if !roster.SnapshotAt.Equal(snapshotAt) || roster.SnapshotAt.Location() != time.UTC {
