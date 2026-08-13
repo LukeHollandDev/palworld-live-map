@@ -8,7 +8,8 @@ Thanks for helping improve Palworld Live Map. Keep changes focused, easy to revi
 2. Make one cohesive change per pull request.
 3. Run `make check`; run `make image` when changing the production container and `make exporter-check` when changing the Palworld Asset Exporter.
 4. Update documentation, examples, and tests with behavior or configuration changes.
-5. Open a pull request that explains the problem, the chosen approach, and how it was verified. Include screenshots for visible UI changes.
+5. For visible UI, demo-data, map-artwork, or walkthrough changes, run `make demo-media` and commit the regenerated `assets/images/demo.png`, `demo.gif`, and `demo.mp4`. Update the walkthrough when a new overview-worthy feature is not already demonstrated.
+6. Open a pull request that explains the problem, the chosen approach, and how it was verified. The regenerated demo is the visual evidence for UI changes; include extra screenshots only when they clarify states the walkthrough does not cover.
 
 Do not commit credentials, private server responses, player identifiers, IP addresses, save data, or local environment files. Public API changes must continue to exclude REST credentials and upstream account/network identifiers.
 

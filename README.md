@@ -6,7 +6,9 @@
 
 Give your Palworld community a live view of players, guilds, bases, Pals, in-game locations, and server health. It runs against your dedicated server's official APIs, stays read-only, and needs no client mods.
 
-![Palworld Live Map showing players, Pals, bases, and map filters](assets/images/demo.png)
+[![Animated Palworld Live Map demo showing filters, search, a guild base and its Pals, leaderboards, map navigation, and both world regions](assets/images/demo.gif)](assets/images/demo.mp4)
+
+Select the animated preview to open the full-resolution demo video.
 
 ## Features
 
@@ -26,8 +28,6 @@ Give your Palworld community a live view of players, guilds, bases, Pals, in-gam
 ## Find anything on the map
 
 Open the map filter to choose which markers are shown and search for players, guilds, Pals, bases, or in-game landmarks. Select a result to jump to its location and open its details.
-
-![Palworld Live Map showing map filters and guild details](assets/images/demo-details.png)
 
 ## Run with Docker
 

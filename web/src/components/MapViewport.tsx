@@ -501,6 +501,13 @@ export const MapViewport = forwardRef<MapViewportHandle, MapViewportProps>(funct
         event.currentTarget.style.cursor = 'grabbing'
       }}
       onPointerMove={(event) => {
+        if (
+          event.target instanceof Element &&
+          event.target.closest(
+            'button:not(.map-marker), input, textarea, select, aside, search, [role="search"], [role="dialog"]'
+          )
+        )
+          return
         const rect = event.currentTarget.getBoundingClientRect()
         const current = viewRef.current
         const world = toWorld(
@@ -692,7 +699,7 @@ export const MapViewport = forwardRef<MapViewportHandle, MapViewportProps>(funct
             aria-hidden="true"
             focusable="false"
           />
-          <span ref={coordinatesRef}>X 0&nbsp;&nbsp;Y 0</span>
+          <span ref={coordinatesRef}>X —&nbsp;&nbsp;Y —</span>
         </div>
         <fieldset
           className="m-0 flex h-full border-0 p-0"

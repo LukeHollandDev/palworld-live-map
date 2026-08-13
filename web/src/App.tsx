@@ -5,8 +5,9 @@ import { MapViewport, type MapViewportHandle } from './components/MapViewport'
 import { ProjectLinks } from './components/ProjectLinks'
 import { StatusBar } from './components/StatusBar'
 import { usePolling } from './hooks/usePolling'
-import { guildIdForBase } from './lib/guilds'
+import { buildGuildDetails, guildIdForBase } from './lib/guilds'
 import type { LeaderboardId } from './lib/leaderboards'
+import { itemSearchText } from './lib/map'
 import {
   DEFAULT_ENABLED_KINDS,
   DEFAULT_ENABLED_PLAYER_STATUSES,
@@ -250,7 +251,8 @@ function LiveMap({ config }: { config: PublicConfig }) {
 
   const showGuild = (guildId: string, focus: HTMLElement) => {
     pendingFocusRef.current = null
-    setSearch('')
+    const query = search.trim().toLowerCase()
+    if (query && !buildGuildDetails(guildId, items).name.toLowerCase().includes(query)) setSearch('')
     setReturnFocus(focus)
     mapRef.current?.clearSelection()
     setDetail({ kind: 'guild', guildId })
@@ -568,7 +570,8 @@ function LiveMap({ config }: { config: PublicConfig }) {
               returnFocus={returnFocus}
               fallbackFocus={leaderboardButtonRef.current}
               onSelectItem={(item, focus) => {
-                setSearch('')
+                const query = search.trim().toLowerCase()
+                if (query && !itemSearchText(item).includes(query)) setSearch('')
                 focusItem(item, returnFocus?.isConnected ? returnFocus : leaderboardButtonRef.current || focus)
               }}
               onSelectGuild={(guildId, focus) => {

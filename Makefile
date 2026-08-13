@@ -2,7 +2,7 @@ override PROJECT_ROOT := $(abspath $(dir $(lastword $(MAKEFILE_LIST))))
 WEB_NPM := npm --prefix "$(PROJECT_ROOT)/web"
 BINARY := $(PROJECT_ROOT)/bin/palworld-live-map
 
-.PHONY: ci build save-reader check test web-install web-lint web-typecheck web-test web-assets web-build web-check exporter-check image run demo game-assets game-assets-diff maps clean distclean
+.PHONY: ci build save-reader check test web-install web-lint web-typecheck web-test web-assets web-build web-check exporter-check image run demo demo-media game-assets game-assets-diff maps clean distclean
 
 ci: check exporter-check
 
@@ -51,6 +51,9 @@ run: build
 
 demo: web-build
 	DEMO_MODE=true go run ./cmd/palworld-live-map
+
+demo-media: web-build
+	$(WEB_NPM) run demo:media
 
 game-assets:
 	"$(PROJECT_ROOT)/exporter/export.sh"
