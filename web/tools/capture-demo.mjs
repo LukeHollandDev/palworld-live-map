@@ -12,11 +12,10 @@ const imageDirectory = join(projectRoot, 'assets/images')
 const serverBinary = join(buildDirectory, 'palworld-live-map')
 const rawVideo = join(buildDirectory, 'demo.webm')
 const posterImage = join(buildDirectory, 'demo.png')
-const mp4Video = join(buildDirectory, 'demo.mp4')
 const gifVideo = join(buildDirectory, 'demo.gif')
 const captureWidth = 1440
 const captureHeight = 900
-const maximumGifBytes = 10 * 1024 * 1024
+const maximumGifBytes = 10_000_000
 
 let appProcess
 let browser
@@ -285,42 +284,21 @@ async function encodeMedia() {
     '-y',
     '-i',
     rawVideo,
-    '-vf',
-    'fps=30,format=yuv420p',
-    '-c:v',
-    'libx264',
-    '-crf',
-    '24',
-    '-preset',
-    'medium',
-    '-movflags',
-    '+faststart',
-    '-an',
-    mp4Video
-  ])
-  await run('ffmpeg', [
-    '-hide_banner',
-    '-loglevel',
-    'error',
-    '-y',
-    '-i',
-    rawVideo,
     '-filter_complex',
-    'fps=4,scale=1000:-2:flags=lanczos,split[frames][paletteframes];[paletteframes]palettegen=max_colors=36:stats_mode=diff[palette];[frames][palette]paletteuse=dither=bayer:bayer_scale=3:diff_mode=rectangle',
+    'fps=4,scale=1000:-2:flags=lanczos,split[frames][paletteframes];[paletteframes]palettegen=max_colors=28:stats_mode=diff[palette];[frames][palette]paletteuse=dither=bayer:bayer_scale=3:diff_mode=rectangle',
     '-loop',
     '0',
     gifVideo
   ])
   const gif = await stat(gifVideo)
   if (gif.size > maximumGifBytes)
-    throw new Error(`Generated GIF is ${(gif.size / 1024 / 1024).toFixed(1)} MiB; expected at most 10 MiB`)
+    throw new Error(`Generated GIF is ${(gif.size / 1_000_000).toFixed(1)} MB; expected at most 10 MB`)
 }
 
 async function publishMedia() {
   await mkdir(imageDirectory, { recursive: true })
   await Promise.all([
     copyFile(posterImage, join(imageDirectory, 'demo.png')),
-    copyFile(mp4Video, join(imageDirectory, 'demo.mp4')),
     copyFile(gifVideo, join(imageDirectory, 'demo.gif'))
   ])
 }
@@ -350,8 +328,7 @@ async function main() {
   await recordWalkthrough(baseUrl)
   await encodeMedia()
   await publishMedia()
-  const [mp4, gif] = await Promise.all([stat(mp4Video), stat(gifVideo)])
-  console.log(`Generated assets/images/demo.mp4 (${(mp4.size / 1024 / 1024).toFixed(1)} MiB)`)
+  const gif = await stat(gifVideo)
   console.log(`Generated assets/images/demo.gif (${(gif.size / 1024 / 1024).toFixed(1)} MiB)`)
 }
 

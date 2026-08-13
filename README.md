@@ -6,9 +6,7 @@
 
 Give your Palworld community a live view of players, guilds, bases, Pals, in-game locations, and server health. It runs against your dedicated server's official APIs, stays read-only, and needs no client mods.
 
-[![Animated Palworld Live Map demo showing filters, search, a guild base and its Pals, leaderboards, map navigation, and both world regions](assets/images/demo.gif)](assets/images/demo.mp4)
-
-Select the animated preview to open the full-resolution demo video.
+![Animated Palworld Live Map demo showing filters, search, a guild base and its Pals, leaderboards, map navigation, and both world regions](assets/images/demo.gif)
 
 ## Features
 

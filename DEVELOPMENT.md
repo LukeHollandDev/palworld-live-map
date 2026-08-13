@@ -69,8 +69,8 @@ make demo
 ### Regenerate the README demo
 
 The README demo is a reproducible browser recording of the fictional demo mode.
-Install FFmpeg and the pinned Chromium build once, then generate all three
-committed media files:
+Install FFmpeg and the pinned Chromium build once, then generate both committed
+media files:
 
 ```bash
 npm --prefix web exec -- playwright install chromium
@@ -84,14 +84,13 @@ details, assigned Pals, save-backed leaderboards, both regions, landmarks, and
 map zoom. It publishes:
 
 - `assets/images/demo.png`: full-resolution poster frame;
-- `assets/images/demo.gif`: 1000px-wide inline README preview, kept below 10 MiB;
-- `assets/images/demo.mp4`: full-resolution H.264 video opened by the preview.
+- `assets/images/demo.gif`: 1000px-wide inline README preview, kept below GitHub's 10 MB limit;
 
 The raw WebM recording and temporary server binary are written to the ignored
 `build/demo-media` directory. Published assets are replaced only after capture
-and both encodes succeed.
+and GIF encoding succeed.
 
-Regenerate and commit all three media files whenever a change affects visible UI,
+Regenerate and commit both media files whenever a change affects visible UI,
 demo data, map artwork, or the interactions shown in the walkthrough. If a new
 user-facing feature should appear in the project overview, update
 `web/tools/capture-demo.mjs` to demonstrate it before regenerating the media.
@@ -134,7 +133,7 @@ Run `make game-assets` to regenerate map artwork and encounter data from a local
 | `make test`           | Run frontend and Go tests                                             |
 | `make check`          | Run frontend checks/build, Go formatting, vet, and race-enabled tests |
 | `make build`          | Build frontend assets and the local Go binary                         |
-| `make demo-media`     | Regenerate the committed README poster, GIF, and MP4                  |
+| `make demo-media`     | Regenerate the committed README poster and GIF                        |
 | `make save-reader`    | Build the pinned, patched local save decoder                           |
 | `make image`          | Build the production container image locally                          |
 | `make exporter-check` | Test and compile the asset exporter                                   |
