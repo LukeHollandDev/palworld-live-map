@@ -4,9 +4,11 @@ The map artwork and static world catalogue in this directory are generated from 
 
 ## Maps
 
-[`maps/palpagos.jpg`](maps/palpagos.jpg) and [`maps/world-tree.jpg`](maps/world-tree.jpg) are native 8192×8192 overview textures converted to JPEG. The browser samples each image's outer pixel so the surrounding viewport uses the same background colour.
+[`maps/palpagos.jpg`](maps/palpagos.jpg) and [`maps/world-tree.jpg`](maps/world-tree.jpg) are native 8192×8192 overview textures converted to JPEG. The browser normally renders deterministic 512px WebP tile pyramids generated from those sources by [`tools/generate-map-tiles.py`](../../tools/generate-map-tiles.py), retaining the JPEGs as compatibility fallbacks. The 680 generated tiles are ignored by Git: normal local builds create them on demand, and production container builds create them in an isolated image stage.
 
-[`maps/manifest.json`](maps/manifest.json) records the Unreal object paths, source PAK and mappings hashes, dimensions, conversion tool version, coordinate bounds, and output hashes.
+[`maps/manifest.json`](maps/manifest.json) records the Unreal object paths, source PAK and mappings hashes, dimensions, conversion tool version, coordinate bounds, source output hashes, and the dimensions, byte counts, and hashes of every generated tile.
+
+The canonical `make game-assets` workflow creates these pyramids before showing the asset diff. It provisions the pinned Pillow wheel in the ignored `build/map-tiles-venv` directory and rejects a codec version that would produce different bytes. `make map-tiles` refreshes the ignored local build inputs; `make game-map-tiles MAP_OUTPUT_DIR=/path/to/maps` processes an existing game export. Both commands hash-check an existing pyramid and return quickly when it is current. The manifest records both the Pillow and libwebp encoder versions; review the resulting hashes alongside the source asset update.
 
 ## Static World Catalogue
 
@@ -26,7 +28,7 @@ Generate fresh files from an installed game:
 make game-assets
 ```
 
-The target prints a unified diff between the generated output and the bundled assets. Differences are an expected review result and do not fail the target; comparison errors still do. To compare an existing export without running the exporter again, use `make game-assets-diff`.
+The target generates the WebP tile pyramids, then prints a unified diff between the generated output and the bundled assets. Differences are an expected review result and do not fail the target; comparison errors still do. To compare an existing export without running the exporter again, use `make game-assets-diff`; it first regenerates the tile pyramids in `MAP_OUTPUT_DIR`.
 
 Review the generated files before replacing the bundled assets.
 

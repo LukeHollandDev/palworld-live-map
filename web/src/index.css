@@ -395,6 +395,22 @@
     background-size: 100px 100px;
   }
 
+  .map-tile-layer {
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  .map-tile-layer.is-ready {
+    opacity: 1;
+  }
+
+  .map-tile {
+    display: block;
+    max-width: none;
+    backface-visibility: hidden;
+    pointer-events: none;
+  }
+
   .map-marker {
     position: absolute;
     z-index: var(--marker-stack, 2);

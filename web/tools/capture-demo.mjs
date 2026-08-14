@@ -111,7 +111,7 @@ async function checkControl(page, locator, milliseconds = 350) {
 }
 
 async function traceMapCoordinates(page) {
-  const map = page.getByRole('application', { name: /Interactive world map/ })
+  const map = page.getByRole('application', { name: /interactive world map/i })
   const bounds = await map.boundingBox()
   if (!bounds) throw new Error('Could not locate the interactive map for coordinate tracing')
   await page.mouse.move(bounds.x + bounds.width * 0.48, bounds.y + bounds.height * 0.58, { steps: 18 })
@@ -172,10 +172,28 @@ async function preloadWorldTreeArtwork(page) {
     const response = await fetch('/api/config')
     if (!response.ok) throw new Error(`/api/config returned ${response.status}`)
     const config = await response.json()
-    const imageUrl = config.layers?.find((layer) => layer.id === 'world-tree')?.imageUrl
-    if (!imageUrl) throw new Error('Demo config does not include World Tree artwork')
+    const layer = config.layers?.find((candidate) => candidate.id === 'world-tree')
+    if (!layer) throw new Error('Demo config does not include World Tree artwork')
+    if (layer.tilePyramid) {
+      const level = Math.min(...layer.tilePyramid.levels)
+      const columns = Math.ceil(level / layer.tilePyramid.tileSize)
+      await Promise.all(
+        Array.from({ length: columns * columns }, (_, index) => {
+          const x = index % columns
+          const y = Math.floor(index / columns)
+          const image = new Image()
+          image.src = layer.tilePyramid.urlTemplate
+            .replace('{size}', String(level))
+            .replace('{x}', String(x))
+            .replace('{y}', String(y))
+          return image.decode()
+        })
+      )
+      return
+    }
+    if (!layer.imageUrl) throw new Error('Demo config does not include World Tree artwork')
     const image = new Image()
-    image.src = imageUrl
+    image.src = layer.imageUrl
     await image.decode()
   })
 }
@@ -191,7 +209,7 @@ async function recordWalkthrough(baseUrl) {
   const page = await context.newPage()
   await page.goto(baseUrl, { waitUntil: 'domcontentloaded' })
   await page.getByRole('heading', { name: 'Palpagos Live Demo', exact: true }).waitFor()
-  await page.locator('.map-artwork:not(.hidden)').waitFor()
+  await page.locator('.map-tile-layer.is-ready').waitFor()
   await preloadWorldTreeArtwork(page)
   await settle(page, 900)
   await page.screenshot({ path: posterImage })
@@ -246,7 +264,7 @@ async function recordWalkthrough(baseUrl) {
 
   await clickControl(page, page.getByRole('button', { name: 'World Tree', exact: true }))
   await page.locator('button[aria-pressed="true"]').filter({ hasText: 'World Tree' }).waitFor()
-  await page.locator('.map-artwork:not(.hidden)[src*="world-tree"]').waitFor()
+  await page.locator('.map-tile-layer.is-ready .map-tile[src*="world-tree"]').first().waitFor()
   await settle(page, 1_200)
   await clickControl(page, page.getByRole('button', { name: 'Check all', exact: true }))
   await settle(page, 1_400)

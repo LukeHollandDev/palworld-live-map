@@ -38,6 +38,13 @@ jobs:
           cache: npm
           cache-dependency-path: web/package-lock.json
 
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: tools/map-tiles-requirements.txt
+
       - name: Check application and exporter
         run: make ci
 

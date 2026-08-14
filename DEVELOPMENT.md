@@ -19,7 +19,7 @@ Player and metric data use `POLL_INTERVAL`; world objects use `WORLD_POLL_INTERV
 
 Optional save enrichment runs the external [`palworld-save-reader`](https://github.com/LukeHollandDev/palworld-save-reader) binary against the selected immutable backup generation: its `player-details` preset once per player file for capture and Paldeck counters, then the compact `--resolve roster` pass for names, levels, guilds, Arena RP, fast-travel points, discovered areas, and boss/tower defeat flags. The app aggregates both under fixed bounds and joins them to REST-visible players by opaque ID; save records with no REST counterpart become offline players. Missing individual stats remain unknown and are omitted from their leaderboard. The reader checks the `Level.sav` size and modification time after decoding; it does not independently recheck every player file or `LevelMeta.sav`.
 
-The container image builds the pinned decoder in its own stage, applies the repository-maintained resolve-v3 leaderboard patch, and installs it beside the server binary. Source runs use the same patched reader and layout under the ignored `bin` directory; an unpatched v0.1.0 reader emits resolve v2 and its roster enrichment is deliberately rejected.
+The container image builds the pinned decoder in its own stage, applies the repository-maintained resolve-v3 leaderboard patch, and installs it beside the server binary. It also generates the ignored WebP map tile pyramids in a build-only Python stage; the final distroless image contains the tiles but no image tooling and starts immediately. Source runs use the same patched reader and layout under the ignored `bin` directory; an unpatched v0.1.0 reader emits resolve v2 and its roster enrichment is deliberately rejected.
 
 Field Alpha and tower-boss locations are versioned data under [`assets/palworld`](assets/palworld). The frontend lives in [`web`](web) and uses React, TypeScript, Vite, Tailwind CSS, Biome, and Vitest.
 
@@ -27,7 +27,7 @@ Field Alpha and tower-boss locations are versioned data under [`assets/palworld`
 
 ## Run Locally
 
-Install Go 1.26.5 or newer, Node.js 24.18.0, and GNU Make. The repository
+Install Go 1.26.5 or newer, Node.js 24.18.0, Python 3 with `venv` support, and GNU Make. The repository
 includes `.nvmrc` and `.node-version` files for compatible version managers.
 Production deployments should use the container described in the main README.
 
@@ -36,6 +36,11 @@ cp .env.example .env
 # Add your Palworld REST API URL and admin password to .env.
 make run
 ```
+
+The first source build installs the pinned Pillow wheel under the ignored
+`build/map-tiles-venv` directory and generates the ignored map tiles. Later
+builds validate their hashes and reuse them unless a source map or generator
+setting changed.
 
 Open <http://localhost:8080>.
 

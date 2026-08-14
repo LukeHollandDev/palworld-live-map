@@ -7,11 +7,22 @@ import { MapViewport, type MapViewportHandle } from './MapViewport'
 const VIEWPORT_WIDTH = 1200
 const VIEWPORT_HEIGHT = 600
 const MAP_SIZE = 8192
+const MARKER_BUDGET = 300
 
 const layer: MapLayer = {
   id: 'palpagos',
   name: 'Palpagos Islands',
   bounds: [100, 100, -100, -100]
+}
+
+const tiledLayer: MapLayer = {
+  ...layer,
+  imageUrl: '/assets/map/palpagos.jpg?v=source',
+  tilePyramid: {
+    tileSize: 512,
+    levels: [1024, 2048, 4096, 8192],
+    urlTemplate: '/assets/map/palpagos-z{size}-x{x}-y{y}.webp?v=tiles'
+  }
 }
 
 function readTransform(scene: HTMLElement) {
@@ -102,6 +113,35 @@ function renderViewport(items: MapItem[] = [], enabledKinds: Set<ItemKind> = new
   const scene = result.container.querySelector<HTMLElement>('.map-scene')
   if (!scene) throw new Error('Expected map scene')
   return scene
+}
+
+function markerGrid(count: number, columns: number): MapItem[] {
+  const rows = Math.ceil(count / columns)
+  return Array.from({ length: count }, (_, index) => {
+    const row = Math.floor(index / columns)
+    const column = index % columns
+    return {
+      id: `dense-${index}`,
+      kind: 'effigies',
+      name: `Dense marker ${index}`,
+      x: -95 + (row / Math.max(1, rows - 1)) * 190,
+      y: -95 + (column / Math.max(1, columns - 1)) * 190,
+      map: layer.id
+    }
+  })
+}
+
+function markerNodes(scene: HTMLElement): HTMLButtonElement[] {
+  return [...scene.querySelectorAll<HTMLButtonElement>('.map-marker')]
+}
+
+function representedItems(scene: HTMLElement): number {
+  return markerNodes(scene).reduce((total, marker) => {
+    if (!marker.classList.contains('map-cluster')) return total + 1
+    const match = marker.getAttribute('aria-label')?.match(/^Zoom to (\d+) nearby map items$/)
+    if (!match) throw new Error('Expected the cluster accessible name to contain its item count')
+    return total + Number(match[1])
+  }, 0)
 }
 
 afterEach(() => {
@@ -206,6 +246,101 @@ describe('MapViewport zoom controls', () => {
       </MapViewport>
     )
     expect(screen.getByRole('application')).toHaveClass('map-layer-world-tree')
+  })
+
+  it('loads only the fitted LOD tiles and keeps the ready layer visible across an LOD transition', () => {
+    installViewportMocks()
+    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(null)
+    const { container } = render(
+      <MapViewport
+        activeLayer={tiledLayer}
+        items={[]}
+        enabledKinds={new Set<ItemKind>()}
+        enabledPlayerStatuses={new Set(['online', 'offline'])}
+        hiddenIds={new Set<string>()}
+        search=""
+        onShowItem={() => undefined}
+        inspectorOpen={false}
+      >
+        {null}
+      </MapViewport>
+    )
+
+    expect(screen.getByRole('application')).toHaveAccessibleName(/Palpagos Islands interactive world map/)
+    let layers = [...container.querySelectorAll<HTMLElement>('.map-tile-layer')]
+    expect(layers).toHaveLength(1)
+    expect(layers[0]).toHaveAttribute('data-map-tile-level', '1024')
+    let tiles = [...layers[0].querySelectorAll<HTMLImageElement>('.map-tile')]
+    expect(tiles).toHaveLength(4)
+    expect(tiles.map(({ src }) => new URL(src).pathname)).toEqual([
+      '/assets/map/palpagos-z1024-x0-y0.webp',
+      '/assets/map/palpagos-z1024-x1-y0.webp',
+      '/assets/map/palpagos-z1024-x0-y1.webp',
+      '/assets/map/palpagos-z1024-x1-y1.webp'
+    ])
+    for (const tile of tiles) fireEvent.load(tile)
+    expect(layers[0]).toHaveClass('is-ready')
+
+    const viewport = screen.getByRole('application')
+    for (let step = 0; step < 6; step++)
+      fireEvent.wheel(viewport, { clientX: VIEWPORT_WIDTH / 2, clientY: VIEWPORT_HEIGHT / 2, deltaY: -100 })
+
+    layers = [...container.querySelectorAll<HTMLElement>('.map-tile-layer')]
+    expect(layers).toHaveLength(2)
+    expect(layers[0]).toHaveAttribute('data-map-tile-level', '1024')
+    expect(layers[0]).toHaveClass('is-ready')
+    expect(layers[1]).toHaveAttribute('data-map-tile-level', '2048')
+    expect(layers[1]).not.toHaveClass('is-ready')
+
+    for (let step = 0; step < 6; step++)
+      fireEvent.wheel(viewport, { clientX: VIEWPORT_WIDTH / 2, clientY: VIEWPORT_HEIGHT / 2, deltaY: -100 })
+
+    layers = [...container.querySelectorAll<HTMLElement>('.map-tile-layer')]
+    expect(layers).toHaveLength(2)
+    expect(layers[0]).toHaveAttribute('data-map-tile-level', '1024')
+    expect(layers[0]).toHaveClass('is-ready')
+    expect(layers[1]).toHaveAttribute('data-map-tile-level', '4096')
+    expect(layers[1]).not.toHaveClass('is-ready')
+    tiles = [...layers[1].querySelectorAll<HTMLImageElement>('.map-tile')]
+    expect(tiles.length).toBeGreaterThan(0)
+    expect(tiles.length).toBeLessThanOrEqual(36)
+    for (const tile of tiles) fireEvent.load(tile)
+
+    layers = [...container.querySelectorAll<HTMLElement>('.map-tile-layer')]
+    expect(layers).toHaveLength(1)
+    expect(layers[0]).toHaveAttribute('data-map-tile-level', '4096')
+    expect(layers[0]).toHaveClass('is-ready')
+  })
+
+  it('falls back to the source artwork when a requested tile fails', () => {
+    installViewportMocks()
+    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(null)
+    const { container } = render(
+      <MapViewport
+        activeLayer={tiledLayer}
+        items={[]}
+        enabledKinds={new Set<ItemKind>()}
+        enabledPlayerStatuses={new Set(['online', 'offline'])}
+        hiddenIds={new Set<string>()}
+        search=""
+        onShowItem={() => undefined}
+        inspectorOpen={false}
+      >
+        {null}
+      </MapViewport>
+    )
+
+    const failedTile = container.querySelector<HTMLImageElement>('.map-tile')
+    if (!failedTile) throw new Error('Expected a requested map tile')
+    fireEvent.error(failedTile)
+
+    const fallback = container.querySelector<HTMLImageElement>('.map-artwork')
+    expect(fallback).toHaveAttribute('src', tiledLayer.imageUrl)
+    expect(fallback).toHaveClass('hidden')
+    fireEvent.load(fallback as HTMLImageElement)
+    expect(fallback).toHaveClass('block')
+    expect(container.querySelector('.fallback-grid')).not.toBeInTheDocument()
+    expect(screen.queryByText('Map artwork is not installed.')).not.toBeInTheDocument()
   })
 
   it('removes visually hidden controls from keyboard and assistive technology navigation', () => {
@@ -454,6 +589,93 @@ describe('MapViewport zoom controls', () => {
     expect(vi.getTimerCount()).toBe(1)
     cleanup()
     expect(vi.getTimerCount()).toBe(0)
+  })
+})
+
+describe('MapViewport marker clustering', () => {
+  it('renders exactly the marker budget as individual markers', () => {
+    installViewportMocks()
+    const scene = renderViewport(markerGrid(MARKER_BUDGET, 20), new Set<ItemKind>(['effigies']))
+
+    expect(markerNodes(scene)).toHaveLength(MARKER_BUDGET)
+    expect(scene.querySelectorAll('.map-cluster')).toHaveLength(0)
+  })
+
+  it('keeps dense zoom levels within budget without dropping represented items', () => {
+    installViewportMocks()
+    const items = markerGrid(1_600, 40)
+    const scene = renderViewport(items, new Set<ItemKind>(['effigies']))
+    const viewport = screen.getByRole('application')
+
+    expect(representedItems(scene)).toBe(items.length)
+
+    let sawClusters = false
+    let sawIndividualView = false
+    for (let step = 0; step < 16; step++) {
+      const markers = markerNodes(scene)
+      const clusters = scene.querySelectorAll('.map-cluster')
+      expect(markers.length).toBeLessThanOrEqual(MARKER_BUDGET)
+      sawClusters ||= clusters.length > 0
+      sawIndividualView ||= clusters.length === 0 && markers.length > 0
+
+      if (step < 15) {
+        fireEvent.wheel(viewport, {
+          clientX: VIEWPORT_WIDTH / 2,
+          clientY: VIEWPORT_HEIGHT / 2,
+          deltaY: -100
+        })
+      }
+    }
+
+    expect(sawClusters).toBe(true)
+    expect(sawIndividualView).toBe(true)
+  })
+
+  it('keeps a selected marker individual and inside the total budget', () => {
+    installViewportMocks()
+    const items = markerGrid(1_600, 40)
+    const target = items[Math.floor(items.length / 2)]
+    const ref = createRef<MapViewportHandle>()
+    const { container } = render(
+      <MapViewport
+        ref={ref}
+        activeLayer={layer}
+        items={items}
+        enabledKinds={new Set<ItemKind>(['effigies'])}
+        enabledPlayerStatuses={new Set(['online', 'offline'])}
+        hiddenIds={new Set<string>()}
+        search=""
+        onShowItem={() => undefined}
+        inspectorOpen={false}
+      >
+        <button type="button" onClick={(event) => ref.current?.focusItem(target, event.currentTarget)}>
+          Focus dense target
+        </button>
+      </MapViewport>
+    )
+    const scene = container.querySelector<HTMLElement>('.map-scene')
+    if (!scene) throw new Error('Expected map scene')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Focus dense target' }))
+
+    expect(screen.getByRole('button', { name: target.name })).toHaveClass('selected')
+    expect(scene.querySelectorAll('.map-cluster').length).toBeGreaterThan(0)
+    expect(markerNodes(scene).length).toBeLessThanOrEqual(MARKER_BUDGET)
+    expect(representedItems(scene)).toBe(items.length)
+  })
+
+  it('keeps the marker budget after zooming into a cluster', () => {
+    const advanceFrame = installViewportMocks()
+    const scene = renderViewport(markerGrid(1_600, 40), new Set<ItemKind>(['effigies']))
+    const cluster = scene.querySelector<HTMLButtonElement>('.map-cluster')
+    if (!cluster) throw new Error('Expected a marker cluster')
+    const fitted = readTransform(scene)
+
+    fireEvent.click(cluster)
+    advanceFrame(420)
+
+    expect(readTransform(scene).scale).toBeGreaterThan(fitted.scale)
+    expect(markerNodes(scene).length).toBeLessThanOrEqual(MARKER_BUDGET)
   })
 })
 

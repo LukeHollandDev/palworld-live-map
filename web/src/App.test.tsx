@@ -102,6 +102,118 @@ describe('App', () => {
     expect(await screen.findByRole('heading', { name: 'Test Realm' })).toBeVisible()
   })
 
+  it('renders from configuration while the world catalogue hydrates in the background', async () => {
+    let resolveCatalogue: (response: Response) => void = () => {
+      throw new Error('Catalogue request did not start')
+    }
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: string | URL | Request) => {
+        const path =
+          typeof input === 'string' ? input : input instanceof URL ? input.pathname : new URL(input.url).pathname
+        if (path === '/assets/test-world-catalogue.json') {
+          return new Promise<Response>((resolve) => {
+            resolveCatalogue = resolve
+          })
+        }
+        const body = responses[path]
+        return body
+          ? new Response(JSON.stringify(body), { status: 200, headers: { 'Content-Type': 'application/json' } })
+          : new Response(null, { status: 404 })
+      })
+    )
+
+    render(<App />)
+
+    expect(await screen.findByRole('heading', { name: 'Test Realm' })).toBeVisible()
+    expect(screen.queryByText('Loading map…')).not.toBeInTheDocument()
+    expect(screen.getByText('Alpha Pals (0)')).toBeVisible()
+
+    resolveCatalogue(
+      new Response(
+        JSON.stringify({
+          ...(responses['/assets/test-world-catalogue.json'] as object),
+          locations: [
+            {
+              id: 'hydrated-alpha',
+              kind: 'alpha-pals',
+              name: 'Hydrated Alpha',
+              x: 12,
+              y: 22,
+              map: 'palpagos'
+            }
+          ]
+        }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } }
+      )
+    )
+    expect(await screen.findByText('Alpha Pals (1)')).toBeVisible()
+    expect(screen.getByRole('checkbox', { name: 'Show Alpha Pals' })).not.toBeChecked()
+    expect(screen.queryByRole('button', { name: 'Hydrated Alpha' })).not.toBeInTheDocument()
+  })
+
+  it('keeps the configured map usable and retries a failed catalogue independently', async () => {
+    let catalogueRequests = 0
+    mockAPI((path) => {
+      if (path !== '/assets/test-world-catalogue.json') return responses[path]
+      if (catalogueRequests++ === 0) return new Error('temporarily unavailable')
+      return {
+        ...(responses[path] as object),
+        locations: [
+          {
+            id: 'retried-alpha',
+            kind: 'alpha-pals',
+            name: 'Retried Alpha',
+            x: 12,
+            y: 22,
+            map: 'palpagos'
+          }
+        ]
+      }
+    })
+    const user = userEvent.setup()
+    render(<App />)
+
+    expect(await screen.findByRole('heading', { name: 'Test Realm' })).toBeVisible()
+    expect(screen.queryByText('Map unavailable')).not.toBeInTheDocument()
+    expect(screen.getByText('Additional static map locations are temporarily unavailable.')).toBeVisible()
+
+    await user.click(screen.getByRole('button', { name: 'Retry catalogue' }))
+    expect(await screen.findByText('Alpha Pals (1)')).toBeVisible()
+    expect(screen.queryByRole('button', { name: 'Retry catalogue' })).not.toBeInTheDocument()
+    expect(catalogueRequests).toBe(2)
+  })
+
+  it('aborts catalogue hydration when the app unmounts', async () => {
+    let catalogueSignal: AbortSignal | undefined
+    let markCatalogueStarted: () => void = () => undefined
+    const catalogueStarted = new Promise<void>((resolve) => {
+      markCatalogueStarted = resolve
+    })
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
+        const path =
+          typeof input === 'string' ? input : input instanceof URL ? input.pathname : new URL(input.url).pathname
+        if (path === '/assets/test-world-catalogue.json') {
+          catalogueSignal = init?.signal instanceof AbortSignal ? init.signal : undefined
+          markCatalogueStarted()
+          return new Promise<Response>(() => undefined)
+        }
+        const body = responses[path]
+        return body
+          ? new Response(JSON.stringify(body), { status: 200, headers: { 'Content-Type': 'application/json' } })
+          : new Response(null, { status: 404 })
+      })
+    )
+
+    const view = render(<App />)
+    await catalogueStarted
+    view.unmount()
+
+    expect(catalogueSignal?.aborted).toBe(true)
+  })
+
   it('renders live server data and opens player details', async () => {
     mockAPI()
     const user = userEvent.setup()
@@ -294,7 +406,7 @@ describe('App', () => {
     expect(warning).toHaveAttribute('aria-live', 'polite')
   })
 
-  it('auto-enables every populated category while leaving extra sections collapsed', async () => {
+  it('keeps fresh filter defaults sparse when additional categories first receive content', async () => {
     const landmarks = [
       {
         id: 'alpha-default',
@@ -372,12 +484,12 @@ describe('App', () => {
 
     for (const category of ['Alpha Pals', 'Tower Bosses']) {
       const checkbox = within(explorer).getByRole('checkbox', { name: `Show ${category}` })
-      // Populated categories are shown on the map automatically, even though their
-      // sections stay collapsed to keep the list tidy.
-      expect(checkbox).toBeChecked()
+      expect(checkbox).not.toBeChecked()
       expect(checkbox).toBeEnabled()
       expect(within(explorer).getByRole('button', { name: `Expand ${category} section` })).toBeVisible()
     }
+    expect(screen.queryByRole('button', { name: 'Alpha Default' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Boss Default' })).not.toBeInTheDocument()
     for (const retiredCategory of ['Companion Pals', 'Wild Pals', 'Live NPCs']) {
       expect(within(explorer).queryByText(new RegExp(retiredCategory, 'i'))).not.toBeInTheDocument()
     }
@@ -817,6 +929,9 @@ describe('App', () => {
 
     await user.keyboard('{Escape}')
     expect(screen.getByRole('searchbox')).toHaveValue('')
+    expect(screen.getByRole('searchbox')).toHaveFocus()
+    expect(screen.getByRole('searchbox')).not.toHaveAttribute('aria-describedby')
+    expect(within(filterPanel).queryByRole('status', { name: 'Search results' })).not.toBeInTheDocument()
     expect(filterControl).not.toHaveAttribute('aria-describedby')
     expect(within(filterPanel).getByRole('button', { name: 'Expand NPC Locations section' })).toBeVisible()
     await user.keyboard('{Escape}')
@@ -1428,12 +1543,16 @@ describe('App', () => {
 
     expect(within(explorer).getByText('Alpha Pals (1)')).toBeVisible()
     expect(within(explorer).getByText('Tower Bosses (1)')).toBeVisible()
-    // Both landmark categories are populated, so they are shown automatically while
-    // their sections stay collapsed.
+    // Fresh preferences keep static categories available but opt-in.
     expect(within(explorer).getByRole('button', { name: 'Expand Alpha Pals section' })).toBeVisible()
     expect(within(explorer).getByRole('button', { name: 'Expand Tower Bosses section' })).toBeVisible()
-    expect(within(explorer).getByRole('checkbox', { name: 'Show Alpha Pals' })).toBeChecked()
-    expect(within(explorer).getByRole('checkbox', { name: 'Show Tower Bosses' })).toBeChecked()
+    expect(within(explorer).getByRole('checkbox', { name: 'Show Alpha Pals' })).not.toBeChecked()
+    expect(within(explorer).getByRole('checkbox', { name: 'Show Tower Bosses' })).not.toBeChecked()
+    expect(screen.queryByRole('button', { name: 'Penking · Lv 15' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Zoe & Grizzbolt · Lv 10' })).not.toBeInTheDocument()
+
+    await user.click(within(explorer).getByRole('checkbox', { name: 'Show Alpha Pals' }))
+    await user.click(within(explorer).getByRole('checkbox', { name: 'Show Tower Bosses' }))
     expect(screen.getByRole('button', { name: 'Penking · Lv 15' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Zoe & Grizzbolt · Lv 10' })).toBeInTheDocument()
 
@@ -1609,9 +1728,11 @@ describe('App', () => {
       expect(within(explorer).getByText(`${title} (1)`)).toBeVisible()
     }
     expect(within(explorer).queryByText(/Live NPCs/)).not.toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Legacy Alpha' })).toBeVisible()
-    expect(screen.getByRole('button', { name: 'Pinch · Lv 57' })).toBeVisible()
-    expect(screen.queryByRole('button', { name: 'Stale Bounty · Lv 1' })).not.toBeInTheDocument()
+    await user.click(within(explorer).getByRole('button', { name: 'Expand Alpha Pals section' }))
+    await user.click(within(explorer).getByRole('button', { name: 'Expand Bounties section' }))
+    expect(within(explorer).getByRole('button', { name: 'View Legacy Alpha' })).toBeVisible()
+    expect(within(explorer).getByRole('button', { name: 'View Pinch · Lv 57' })).toBeVisible()
+    expect(within(explorer).queryByRole('button', { name: 'View Stale Bounty · Lv 1' })).not.toBeInTheDocument()
 
     await user.click(within(explorer).getByRole('button', { name: 'Expand NPC Locations section' }))
     expect(
@@ -1634,12 +1755,75 @@ describe('App', () => {
     await screen.findByRole('heading', { name: 'Test Realm' })
 
     const collapse = screen.getByRole('button', { name: 'Collapse Online Players section' })
+    const content = document.getElementById(collapse.getAttribute('aria-controls') || '')
+    if (!content) throw new Error('Expected the online-player disclosure content')
+    expect(within(content).getByRole('button', { name: 'View Luke · Lv 55' })).toBeInTheDocument()
     await user.click(collapse)
     expect(collapse).toHaveAttribute('aria-expanded', 'false')
-    expect(screen.queryByRole('button', { name: 'View Luke · Lv 55' })).not.toBeInTheDocument()
+    expect(collapse).toHaveFocus()
+    expect(content).toBeEmptyDOMElement()
 
     await user.click(screen.getByRole('button', { name: 'Expand Online Players section' }))
-    expect(screen.getByRole('button', { name: 'View Luke · Lv 55' })).toBeInTheDocument()
+    expect(within(content).getByRole('button', { name: 'View Luke · Lv 55' })).toBeInTheDocument()
+  })
+
+  it('only builds guild hierarchy rows while the Guilds section is expanded', async () => {
+    mockAPI()
+    const user = userEvent.setup()
+    render(<App />)
+    await screen.findByRole('heading', { name: 'Test Realm' })
+
+    const expand = screen.getByRole('button', { name: 'Expand Guilds section' })
+    const contentId = expand.getAttribute('aria-controls')
+    if (!contentId) throw new Error('Expected the Guilds disclosure to control a content container')
+    const content = document.getElementById(contentId)
+    if (!content) throw new Error('Expected the Guilds content container to stay mounted')
+    expect(content).toBeEmptyDOMElement()
+
+    await user.click(expand)
+    expect(within(content).getByRole('button', { name: 'View guild Home' })).toBeInTheDocument()
+
+    const collapse = screen.getByRole('button', { name: 'Collapse Guilds section' })
+    await user.click(collapse)
+    expect(collapse).toHaveFocus()
+    expect(content).toBeEmptyDOMElement()
+  })
+
+  it('only mounts simple category rows while their section is expanded', async () => {
+    mockAPI((path) =>
+      path === '/assets/test-world-catalogue.json'
+        ? {
+            ...(responses[path] as Record<string, unknown>),
+            locations: [
+              {
+                id: 'alpha-lazy-row',
+                kind: 'alpha-pals',
+                name: 'Lazy Alpha',
+                level: 42,
+                x: 15,
+                y: 25,
+                map: 'palpagos'
+              }
+            ]
+          }
+        : responses[path]
+    )
+    const user = userEvent.setup()
+    render(<App />)
+    await screen.findByRole('heading', { name: 'Test Realm' })
+
+    const expand = screen.getByRole('button', { name: 'Expand Alpha Pals section' })
+    const contentId = expand.getAttribute('aria-controls')
+    if (!contentId) throw new Error('Expected the category disclosure to control a content container')
+    const content = document.getElementById(contentId)
+    if (!content) throw new Error('Expected the category content container to stay mounted')
+    expect(content).toBeEmptyDOMElement()
+
+    await user.click(expand)
+    expect(within(content).getByRole('button', { name: 'View Lazy Alpha · Lv 42' })).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Collapse Alpha Pals section' }))
+    expect(content).toBeEmptyDOMElement()
   })
 
   it('nests companion Pals under online players and exposes them in player details', async () => {
@@ -1910,7 +2094,8 @@ describe('App', () => {
     const explorer = screen.getByRole('complementary', { name: 'Map filters' })
     const effigyVisibility = within(explorer).getByRole('checkbox', { name: 'Show Pal Effigies' })
     await waitFor(() => expect(effigyVisibility).toBeEnabled())
-    expect(effigyVisibility).toBeChecked()
+    expect(effigyVisibility).not.toBeChecked()
+    await user.click(effigyVisibility)
     await user.click(within(explorer).getByRole('button', { name: 'Expand Pal Effigies section' }))
     await waitFor(() =>
       expect(screen.getAllByRole('button', { name: /Zoom to \d+ nearby map items/ }).length).toBeGreaterThan(0)
@@ -2013,8 +2198,11 @@ describe('App', () => {
     await user.type(screen.getByRole('searchbox'), 'Companion')
 
     const explorer = screen.getByRole('complementary', { name: 'Map filters' })
-    expect(within(explorer).getAllByRole('button', { name: /View Companion \d+/ })).toHaveLength(250)
-    expect(within(explorer).getByText('50 more companion matches. Refine your search to inspect them.')).toBeVisible()
+    expect(within(explorer).getAllByRole('button', { name: /View Companion \d+/ })).toHaveLength(200)
+    expect(within(explorer).getByRole('status', { name: 'Search results' })).toHaveTextContent(
+      'Showing 200 of 300 matches for “Companion”. Refine your search to inspect 100 more.'
+    )
+    expect(within(explorer).queryByText(/more companion matches/)).not.toBeInTheDocument()
     expect(within(explorer).queryByRole('checkbox', { name: 'Show Companion Pals' })).not.toBeInTheDocument()
   })
 
@@ -2048,10 +2236,102 @@ describe('App', () => {
     await screen.findByRole('heading', { name: 'Test Realm' })
     await user.type(screen.getByRole('searchbox'), 'Worker')
 
-    expect(screen.getAllByRole('button', { name: /View Worker \d+/ })).toHaveLength(250)
+    const explorer = screen.getByRole('complementary', { name: 'Map filters' })
+    expect(within(explorer).getAllByRole('button', { name: /View Worker \d+/ })).toHaveLength(200)
+    expect(within(explorer).getByRole('status', { name: 'Search results' })).toHaveTextContent(
+      'Showing 200 of 300 matches for “Worker”. Refine your search to inspect 100 more.'
+    )
     expect(screen.getByText('300 assigned Pals')).toBeVisible()
-    expect(
-      screen.getByText('50 more assigned Pals omitted. Refine your search or expand fewer bases to inspect them.')
-    ).toBeVisible()
+    expect(within(explorer).queryByText(/more assigned Pals omitted/)).not.toBeInTheDocument()
+  })
+
+  it('fairly budgets broad search results across categories and preserves exact-result navigation', async () => {
+    const companions = Array.from({ length: 90 }, (_, index) => ({
+      id: `shared-companion-${index}`,
+      kind: 'companions',
+      name: `Shared Result Companion ${index.toString().padStart(3, '0')}`,
+      ownerId: 'player-luke',
+      x: index / 10,
+      y: index / 10,
+      map: 'palpagos'
+    }))
+    const base = {
+      id: 'base-dense',
+      kind: 'bases',
+      name: 'Dense Base',
+      baseId: 'base-dense',
+      guildKey: 'guild-dense',
+      x: 0,
+      y: 0,
+      map: 'palpagos'
+    }
+    const workers = Array.from({ length: 90 }, (_, index) => ({
+      id: `shared-worker-${index}`,
+      kind: 'workers',
+      name: `Shared Result Worker ${index.toString().padStart(3, '0')}`,
+      baseId: base.id,
+      x: index / 10,
+      y: index / 10,
+      map: 'palpagos'
+    }))
+    const effigies = Array.from({ length: 90 }, (_, index) => ({
+      id: `shared-effigy-${index}`,
+      kind: 'effigies',
+      name: `Shared Result Effigy ${index.toString().padStart(3, '0')}`,
+      x: index / 10,
+      y: index / 10,
+      map: 'palpagos'
+    }))
+    const exactTarget = {
+      id: 'shared-exact-target',
+      kind: 'npc-locations',
+      name: 'Shared Result Exact Target',
+      detail: 'Merchant',
+      x: 25,
+      y: 25,
+      map: 'palpagos'
+    }
+    mockAPI((path) => {
+      if (path === '/assets/test-world-catalogue.json') {
+        return { ...(responses[path] as Record<string, unknown>), locations: [exactTarget] }
+      }
+      if (path === '/api/objects') {
+        const objects = [base, ...companions, ...workers, ...effigies]
+        return { ...(responses[path] as Record<string, unknown>), objects, total: objects.length }
+      }
+      return responses[path]
+    })
+
+    const user = userEvent.setup()
+    render(<App />)
+    await screen.findByRole('heading', { name: 'Test Realm' })
+    const explorer = screen.getByRole('complementary', { name: 'Map filters' })
+    const searchbox = within(explorer).getByRole('searchbox')
+    await user.type(searchbox, 'Shared Result')
+
+    expect(within(explorer).getAllByRole('button', { name: /^View Shared Result/ })).toHaveLength(200)
+    const status = within(explorer).getByRole('status', { name: 'Search results' })
+    expect(status).toHaveTextContent(
+      'Showing 200 of 271 matches for “Shared Result”. Refine your search to inspect 71 more.'
+    )
+    expect(status).toHaveAttribute('aria-live', 'polite')
+    expect(status).toHaveAttribute('aria-atomic', 'true')
+    expect(searchbox).toHaveAttribute('aria-describedby', status.id)
+    expect(within(explorer).getAllByRole('status', { name: 'Search results' })).toHaveLength(1)
+    expect(within(explorer).getAllByText(/Refine your search to inspect/)).toHaveLength(1)
+    expect(within(explorer).getAllByRole('button', { name: /View Shared Result Companion/ }).length).toBeGreaterThan(0)
+    expect(within(explorer).getAllByRole('button', { name: /View Shared Result Worker/ }).length).toBeGreaterThan(0)
+    expect(within(explorer).getAllByRole('button', { name: /View Shared Result Effigy/ }).length).toBeGreaterThan(0)
+    expect(within(explorer).getByRole('button', { name: 'View Shared Result Exact Target' })).toBeVisible()
+
+    await user.clear(searchbox)
+    await user.type(searchbox, 'Shared Result Exact Target')
+    expect(within(explorer).getByRole('status', { name: 'Search results' })).toHaveTextContent(
+      '1 match for “Shared Result Exact Target”.'
+    )
+    await user.click(within(explorer).getByRole('button', { name: 'View Shared Result Exact Target' }))
+
+    const inspector = screen.getByRole('dialog', { name: 'Shared Result Exact Target' })
+    expect(within(inspector).getByText('NPC LOCATION DETAILS')).toBeVisible()
   })
 })

@@ -1,5 +1,6 @@
 ARG GO_VERSION=1.26.5
 ARG NODE_VERSION=24.18.0
+ARG PYTHON_VERSION=3.13.5
 
 # The palworld-save-reader release this image ships as its save decoder.
 ARG SAVE_READER_VERSION=v0.1.0
@@ -15,6 +16,18 @@ RUN npm install
 COPY web ./
 RUN npm run build
 
+# Map assets. Generated tiles stay out of Git and are created once while the
+# image is built, keeping the final distroless runtime small and quick to boot.
+FROM --platform=$BUILDPLATFORM python:${PYTHON_VERSION}-slim-bookworm AS map-assets
+
+WORKDIR /src
+
+COPY tools/map-tiles-requirements.txt tools/generate-map-tiles.py ./tools/
+COPY assets/palworld/maps ./assets/palworld/maps
+RUN python -m pip install --disable-pip-version-check --no-cache-dir \
+      --only-binary=Pillow --requirement tools/map-tiles-requirements.txt \
+    && python tools/generate-map-tiles.py --if-needed assets/palworld/maps
+
 # Go build
 FROM --platform=$BUILDPLATFORM golang:${GO_VERSION}-bookworm AS build
 
@@ -27,6 +40,7 @@ COPY go.mod ./
 RUN go mod download
 
 COPY assets ./assets
+COPY --from=map-assets /src/assets/palworld/maps ./assets/palworld/maps
 COPY cmd ./cmd
 COPY internal ./internal
 COPY web/embed.go ./web/

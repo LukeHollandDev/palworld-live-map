@@ -59,6 +59,42 @@ export interface SceneBounds {
   bottom: number
 }
 
+export interface SpatialEntry<T> {
+  value: T
+  position: Point
+}
+
+export interface SpatialGrid<T> {
+  cellSize: number
+  cells: Map<string, SpatialEntry<T>[]>
+  count: number
+  minimumCellX: number
+  maximumCellX: number
+  minimumCellY: number
+  maximumCellY: number
+}
+
+export interface MapTilePyramid {
+  tileSize: number
+  levels: number[]
+  urlTemplate: string
+}
+
+export interface MapTile {
+  key: string
+  url: string
+  x: number
+  y: number
+  size: number
+  pixelSize: number
+}
+
+export interface MapTileSelection {
+  signature: string
+  level: number
+  tiles: MapTile[]
+}
+
 export function sceneSize(pixelRatio = window.devicePixelRatio || 1): number {
   return MAP_PIXEL_SIZE / Math.max(1, pixelRatio)
 }
@@ -109,6 +145,105 @@ export function sceneViewportBounds(view: View, width: number, height: number, o
 
 export function isScenePointVisible(point: Point, bounds: SceneBounds): boolean {
   return point.x >= bounds.left && point.x <= bounds.right && point.y >= bounds.top && point.y <= bounds.bottom
+}
+
+function spatialCellKey(x: number, y: number): string {
+  return `${x}:${y}`
+}
+
+export function buildSpatialGrid<T>(entries: SpatialEntry<T>[], cellSize = 256): SpatialGrid<T> {
+  const cells = new Map<string, SpatialEntry<T>[]>()
+  let minimumCellX = Number.POSITIVE_INFINITY
+  let maximumCellX = Number.NEGATIVE_INFINITY
+  let minimumCellY = Number.POSITIVE_INFINITY
+  let maximumCellY = Number.NEGATIVE_INFINITY
+  for (const entry of entries) {
+    const cellX = Math.floor(entry.position.x / cellSize)
+    const cellY = Math.floor(entry.position.y / cellSize)
+    minimumCellX = Math.min(minimumCellX, cellX)
+    maximumCellX = Math.max(maximumCellX, cellX)
+    minimumCellY = Math.min(minimumCellY, cellY)
+    maximumCellY = Math.max(maximumCellY, cellY)
+    const key = spatialCellKey(cellX, cellY)
+    const cell = cells.get(key)
+    if (cell) cell.push(entry)
+    else cells.set(key, [entry])
+  }
+  return { cellSize, cells, count: entries.length, minimumCellX, maximumCellX, minimumCellY, maximumCellY }
+}
+
+export function querySpatialGrid<T>(grid: SpatialGrid<T>, bounds: SceneBounds): SpatialEntry<T>[] {
+  if (!grid.count) return []
+  const minimumX = Math.max(grid.minimumCellX, Math.floor(bounds.left / grid.cellSize))
+  const maximumX = Math.min(grid.maximumCellX, Math.floor(bounds.right / grid.cellSize))
+  const minimumY = Math.max(grid.minimumCellY, Math.floor(bounds.top / grid.cellSize))
+  const maximumY = Math.min(grid.maximumCellY, Math.floor(bounds.bottom / grid.cellSize))
+  const matches: SpatialEntry<T>[] = []
+  for (let cellY = minimumY; cellY <= maximumY; cellY++) {
+    for (let cellX = minimumX; cellX <= maximumX; cellX++) {
+      const cell = grid.cells.get(spatialCellKey(cellX, cellY))
+      if (!cell) continue
+      for (const entry of cell) {
+        if (isScenePointVisible(entry.position, bounds)) matches.push(entry)
+      }
+    }
+  }
+  return matches
+}
+
+export function selectMapTileLevel(
+  levels: readonly number[],
+  sceneScale: number,
+  devicePixelRatio: number,
+  size: number
+): number {
+  if (!levels.length) throw new Error('A map tile pyramid must contain at least one level')
+  const sorted = [...levels].sort((left, right) => left - right)
+  const requiredPixels = Math.max(1, size * sceneScale * Math.max(1, devicePixelRatio))
+  return sorted.find((level) => level >= requiredPixels) ?? sorted[sorted.length - 1]
+}
+
+export function selectVisibleMapTiles(
+  pyramid: MapTilePyramid,
+  view: View,
+  width: number,
+  height: number,
+  size: number,
+  devicePixelRatio = window.devicePixelRatio || 1,
+  overscanTiles = 1
+): MapTileSelection {
+  const level = selectMapTileLevel(pyramid.levels, view.scale, devicePixelRatio, size)
+  const columns = Math.ceil(level / pyramid.tileSize)
+  const tileSceneSize = size / columns
+  const bounds = sceneViewportBounds(view, width, height)
+  const minimumX = Math.max(0, Math.floor(bounds.left / tileSceneSize) - overscanTiles)
+  const maximumX = Math.min(columns - 1, Math.floor(bounds.right / tileSceneSize) + overscanTiles)
+  const minimumY = Math.max(0, Math.floor(bounds.top / tileSceneSize) - overscanTiles)
+  const maximumY = Math.min(columns - 1, Math.floor(bounds.bottom / tileSceneSize) + overscanTiles)
+  const tiles: MapTile[] = []
+  if (minimumX <= maximumX && minimumY <= maximumY) {
+    for (let y = minimumY; y <= maximumY; y++) {
+      for (let x = minimumX; x <= maximumX; x++) {
+        const url = pyramid.urlTemplate
+          .replace('{size}', String(level))
+          .replace('{x}', String(x))
+          .replace('{y}', String(y))
+        tiles.push({
+          key: `${level}:${x}:${y}`,
+          url,
+          x: x * tileSceneSize,
+          y: y * tileSceneSize,
+          size: tileSceneSize,
+          pixelSize: pyramid.tileSize
+        })
+      }
+    }
+  }
+  return {
+    signature: `${pyramid.urlTemplate}|${level}|${minimumX}:${minimumY}:${maximumX}:${maximumY}`,
+    level,
+    tiles
+  }
 }
 
 export function formatUptime(seconds: number): string {

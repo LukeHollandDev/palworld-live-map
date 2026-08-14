@@ -6,6 +6,7 @@ The Palworld Asset Exporter regenerates the map artwork and static world catalog
 
 - `build/maps/palpagos.jpg` and `build/maps/world-tree.jpg`, the overview textures
 - `build/maps/manifest.json`, source and output hashes plus export metadata
+- `build/maps/*.webp`, 512px multiresolution map tiles added by the repository's `make game-assets` workflow
 - `build/landmarks/manifest.json`, the original 90 Field Alphas and nine tower bosses
 - `build/landmarks/catalogue/manifest.json`, provenance, scan metadata, dataset counts, and SHA-256 hashes
 - `build/landmarks/catalogue/encounter-additions.json`, 33 human bounties and three oil rigs
@@ -21,21 +22,24 @@ Nothing is copied into `assets/palworld/maps` or `assets/palworld/landmarks` aut
 
 - A current Palworld installation
 - Docker, with the engine running
+- Python 3 with `venv` support when using `make game-assets` to produce review-ready map tiles
 
-Nothing else. No .NET or C# tooling, and no separate mappings download; the image bundles everything and Docker builds and runs it for you.
+No .NET or C# tooling and no separate mappings download are required; the image bundles those dependencies and Docker builds and runs the exporter for you.
 
 ## Running
 
 Everything depends on `PALWORLD_ROOT`, the directory containing the game's `Pal` and `Engine` folders. It defaults to the standard CrossOver Steam bottle path on macOS, so from the repository root:
 
 ```bash
-./exporter/export.sh
+make game-assets
 ```
+
+`make game-assets` runs the Docker exporter, provisions the pinned Pillow wheel in `build/map-tiles-venv`, generates the WebP tile pyramids, and prints a unified diff against the bundled assets. The lower-level `./exporter/export.sh` command emits the source JPEGs and schema-v1 provenance manifest only; run `make game-map-tiles` afterward before promoting that map output.
 
 For any other installation, point it at the game:
 
 ```bash
-PALWORLD_ROOT="/path/to/Palworld" ./exporter/export.sh
+PALWORLD_ROOT="/path/to/Palworld" make game-assets
 ```
 
 Output directories are redirected the same way:
@@ -44,13 +48,13 @@ Output directories are redirected the same way:
 PALWORLD_ROOT="/path/to/Palworld" \
 MAP_OUTPUT_DIR="$PWD/my-exported-maps" \
 LANDMARK_OUTPUT_DIR="$PWD/my-exported-landmarks" \
-./exporter/export.sh
+make game-assets
 ```
 
 The game version is always read from `Pal/Config/DefaultGame.ini` inside the mounted PAK. For automation, `PALWORLD_GAME_VERSION` may be supplied as an optional assertion. It never overrides the PAK value, and the export stops unless both match exactly:
 
 ```bash
-PALWORLD_GAME_VERSION="1.0.1.100619" ./exporter/export.sh
+PALWORLD_GAME_VERSION="1.0.1.100619" make game-assets
 ```
 
 ## Configuration

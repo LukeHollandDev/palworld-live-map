@@ -358,7 +358,7 @@ func (c *Client) WorldObjects(ctx context.Context) ([]WorldObject, error) {
 	ownerIDs, relations := c.worldPlayerRelations(*payload.ActorData)
 	identityCounts := make(map[string]int, min(len(*payload.ActorData), maxWorldObjects))
 	for _, actor := range *payload.ActorData {
-		if candidate, ok := parseWorldActor(actor); ok {
+		if candidate, ok := parseWorldActor(actor); ok && publishableWorldObject(candidate.object.Kind) {
 			identityCounts[candidate.identity]++
 		}
 	}
@@ -366,7 +366,7 @@ func (c *Client) WorldObjects(ctx context.Context) ([]WorldObject, error) {
 	supportedCount := 0
 	for _, actor := range *payload.ActorData {
 		candidate, ok := parseWorldActor(actor)
-		if !ok {
+		if !ok || !publishableWorldObject(candidate.object.Kind) {
 			continue
 		}
 		if identityCounts[candidate.identity] != 1 {
@@ -400,6 +400,13 @@ func (c *Client) WorldObjects(ctx context.Context) ([]WorldObject, error) {
 		return objects, &WorldObjectLimitError{Limit: maxWorldObjects, Total: supportedCount}
 	}
 	return objects, nil
+}
+
+// Wild Pals and ambient NPCs duplicate richer, complete catalogue layers and
+// are intentionally not consumed by the browser. Excluding them here keeps
+// them from occupying the retained-object budget or crossing the network.
+func publishableWorldObject(kind string) bool {
+	return kind == "bases" || kind == "workers" || kind == "companions"
 }
 
 // worldPlayerRelations builds joins from the game-data snapshot without

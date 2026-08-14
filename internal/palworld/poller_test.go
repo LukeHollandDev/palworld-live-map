@@ -151,7 +151,7 @@ func TestPollerWorldStatusTransitionsAreExplicit(t *testing.T) {
 }
 
 func TestPollerPublishesExplicitTruncatedWorldResult(t *testing.T) {
-	objects := []WorldObject{{ID: "object:one", Kind: "npcs", Name: "Merchant"}}
+	objects := []WorldObject{{ID: "object:one", Kind: "bases", Name: "Home"}}
 	source := &stubSource{
 		objects:   objects,
 		objectErr: &WorldObjectLimitError{Limit: maxWorldObjects, Total: maxWorldObjects + 25},
@@ -161,6 +161,26 @@ func TestPollerPublishesExplicitTruncatedWorldResult(t *testing.T) {
 	snapshot := poller.ObjectSnapshot()
 	if !snapshot.Available || snapshot.Stale || snapshot.Unsupported || !snapshot.Truncated || snapshot.Total != maxWorldObjects+25 || snapshot.LastError != "object-limit" || len(snapshot.Objects) != 1 {
 		t.Fatalf("snapshot = %#v", snapshot)
+	}
+}
+
+func TestPollerFiltersUnusedLiveObjectsAndKeepsSemanticRevisionStable(t *testing.T) {
+	source := &stubSource{objects: []WorldObject{
+		{ID: "base", Kind: "bases", Name: "Home"},
+		{ID: "worker", Kind: "workers", Name: "Anubis"},
+		{ID: "companion", Kind: "companions", Name: "Lamball"},
+		{ID: "wild", Kind: "wild-pals", Name: "Wild Lamball"},
+		{ID: "npc", Kind: "npcs", Name: "Merchant"},
+	}}
+	poller := testPoller(source)
+	poller.refreshWorld(context.Background())
+	first, revision, changed := poller.ObjectSnapshotSince(0)
+	if !changed || len(first.Objects) != 3 || first.Total != 3 {
+		t.Fatalf("filtered snapshot = %#v, revision %d, changed %v", first, revision, changed)
+	}
+	poller.refreshWorld(context.Background())
+	if _, nextRevision, changed := poller.ObjectSnapshotSince(revision); changed || nextRevision != revision {
+		t.Fatalf("unchanged refresh advanced revision %d -> %d", revision, nextRevision)
 	}
 }
 

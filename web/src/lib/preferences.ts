@@ -33,6 +33,13 @@ export const FILTERABLE_KINDS = ALL_KINDS.filter((kind) => !RETIRED_FILTER_KINDS
 export const DEFAULT_ENABLED_KINDS = ['players', 'bases', 'workers'] as const satisfies readonly ItemKind[]
 export const DEFAULT_ENABLED_PLAYER_STATUSES = ['online', 'offline'] as const satisfies readonly PlayerStatus[]
 
+function defaultSeenKinds() {
+  // Current categories are already known on a fresh install. Marking them seen
+  // prevents the first catalogue/object responses from silently replacing the
+  // deliberately sparse default with every populated filter enabled.
+  return new Set<ItemKind>(FILTERABLE_KINDS)
+}
+
 export interface FilterPreferences {
   activeLayerId?: string
   enabledKinds?: Set<ItemKind>
@@ -57,7 +64,8 @@ export function loadFilterPreferences(): FilterPreferences {
     if (!raw)
       return {
         enabledKinds: new Set(DEFAULT_ENABLED_KINDS),
-        enabledPlayerStatuses: new Set(DEFAULT_ENABLED_PLAYER_STATUSES)
+        enabledPlayerStatuses: new Set(DEFAULT_ENABLED_PLAYER_STATUSES),
+        seenKinds: defaultSeenKinds()
       }
     const value = JSON.parse(raw) as Record<string, unknown>
     let enabledKinds = Array.isArray(value.enabledKinds) ? new Set(value.enabledKinds.filter(isItemKind)) : undefined
@@ -84,7 +92,7 @@ export function loadFilterPreferences(): FilterPreferences {
       enabledPlayerStatuses: Array.isArray(value.enabledPlayerStatuses)
         ? new Set(value.enabledPlayerStatuses.filter(isPlayerStatus))
         : new Set(DEFAULT_ENABLED_PLAYER_STATUSES),
-      seenKinds: Array.isArray(value.seenKinds) ? new Set(value.seenKinds.filter(isItemKind)) : undefined,
+      seenKinds: Array.isArray(value.seenKinds) ? new Set(value.seenKinds.filter(isItemKind)) : defaultSeenKinds(),
       hiddenIds: Array.isArray(value.hiddenIds)
         ? new Set(value.hiddenIds.filter((id): id is string => typeof id === 'string').slice(0, 20_000))
         : undefined
@@ -92,7 +100,8 @@ export function loadFilterPreferences(): FilterPreferences {
   } catch {
     return {
       enabledKinds: new Set(DEFAULT_ENABLED_KINDS),
-      enabledPlayerStatuses: new Set(DEFAULT_ENABLED_PLAYER_STATUSES)
+      enabledPlayerStatuses: new Set(DEFAULT_ENABLED_PLAYER_STATUSES),
+      seenKinds: defaultSeenKinds()
     }
   }
 }
@@ -108,7 +117,7 @@ export function saveFilterPreferences(
         kindsVersion: FILTER_KINDS_VERSION,
         enabledKinds: [...preferences.enabledKinds].filter((kind) => !RETIRED_FILTER_KINDS.has(kind)),
         enabledPlayerStatuses: [...preferences.enabledPlayerStatuses],
-        seenKinds: [...(preferences.seenKinds ?? [])],
+        seenKinds: [...(preferences.seenKinds ?? defaultSeenKinds())],
         hiddenIds: [...preferences.hiddenIds].slice(0, 20_000)
       })
     )

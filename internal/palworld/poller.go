@@ -5,6 +5,7 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -99,10 +100,12 @@ type Poller struct {
 	logger         *slog.Logger
 	unsupportedLog bool
 
-	mu       sync.RWMutex
-	snapshot Snapshot
-	online   []Player
-	saved    []Player
+	mu             sync.RWMutex
+	snapshot       Snapshot
+	online         []Player
+	saved          []Player
+	playerRevision uint64
+	objectRevision uint64
 }
 
 func NewPoller(source Source, playerEvery, worldEvery time.Duration, worldEnabled bool, logger *slog.Logger) *Poller {
@@ -113,8 +116,11 @@ func NewPollerWithRoster(source Source, roster RosterSource, playerEvery, worldE
 	return &Poller{
 		source: source, roster: roster, playerEvery: playerEvery, worldEvery: worldEvery,
 		rosterEvery: rosterEvery, worldEnabled: worldEnabled, logger: logger,
-		snapshot: Snapshot{Players: []Player{}, Objects: []WorldObject{}, SaveEnabled: roster != nil},
-		online:   []Player{}, saved: []Player{},
+		snapshot:       Snapshot{Players: []Player{}, Objects: []WorldObject{}, SaveEnabled: roster != nil},
+		online:         []Player{},
+		saved:          []Player{},
+		playerRevision: 1,
+		objectRevision: 1,
 	}
 }
 
@@ -198,6 +204,21 @@ func (p *Poller) Snapshot() Snapshot {
 func (p *Poller) PlayerSnapshot() PlayerSnapshot {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
+	return p.playerSnapshotLocked()
+}
+
+// PlayerSnapshotSince avoids cloning player state when the caller already has
+// the current immutable semantic revision.
+func (p *Poller) PlayerSnapshotSince(revision uint64) (PlayerSnapshot, uint64, bool) {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+	if revision == p.playerRevision {
+		return PlayerSnapshot{}, revision, false
+	}
+	return p.playerSnapshotLocked(), p.playerRevision, true
+}
+
+func (p *Poller) playerSnapshotLocked() PlayerSnapshot {
 	return PlayerSnapshot{
 		Server: p.snapshot.Server, Connected: p.snapshot.Connected, Stale: p.snapshot.Stale,
 		LastSuccessAt: p.snapshot.LastSuccessAt, Players: clonePlayers(p.snapshot.Players),
@@ -213,6 +234,21 @@ func (p *Poller) PlayerSnapshot() PlayerSnapshot {
 func (p *Poller) ObjectSnapshot() ObjectSnapshot {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
+	return p.objectSnapshotLocked()
+}
+
+// ObjectSnapshotSince avoids cloning the potentially large world-object slice
+// when its semantic contents and status have not changed.
+func (p *Poller) ObjectSnapshotSince(revision uint64) (ObjectSnapshot, uint64, bool) {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+	if revision == p.objectRevision {
+		return ObjectSnapshot{}, revision, false
+	}
+	return p.objectSnapshotLocked(), p.objectRevision, true
+}
+
+func (p *Poller) objectSnapshotLocked() ObjectSnapshot {
 	return ObjectSnapshot{
 		Available: p.snapshot.ObjectsAvailable, Stale: p.snapshot.ObjectsStale,
 		Unsupported: p.snapshot.ObjectsUnsupported, Truncated: p.snapshot.ObjectsTruncated,
@@ -228,7 +264,10 @@ func (p *Poller) refreshInfo(ctx context.Context) {
 		return
 	}
 	p.mu.Lock()
-	p.snapshot.Server = info
+	if p.snapshot.Server != info {
+		p.snapshot.Server = info
+		p.playerRevision++
+	}
 	p.mu.Unlock()
 }
 
@@ -236,8 +275,12 @@ func (p *Poller) refreshPlayers(ctx context.Context) {
 	players, err := p.source.Players(ctx)
 	if err != nil {
 		p.mu.Lock()
+		previousConnected, previousStale := p.snapshot.Connected, p.snapshot.Stale
 		p.snapshot.Connected = false
 		p.snapshot.Stale = !p.snapshot.LastSuccessAt.IsZero()
+		if p.snapshot.Connected != previousConnected || p.snapshot.Stale != previousStale {
+			p.playerRevision++
+		}
 		p.mu.Unlock()
 		p.logger.Warn("Palworld player refresh failed", "error", err)
 		return
@@ -251,6 +294,7 @@ func (p *Poller) refreshPlayers(ctx context.Context) {
 		p.online[index].Online = true
 	}
 	p.snapshot.Players = mergePlayers(p.saved, p.online)
+	p.playerRevision++
 	p.mu.Unlock()
 }
 
@@ -258,8 +302,12 @@ func (p *Poller) refreshRoster(ctx context.Context) {
 	roster, err := p.roster.Roster(ctx)
 	if err != nil {
 		p.mu.Lock()
+		previousStale, previousError := p.snapshot.SaveStale, p.snapshot.SaveLastError
 		p.snapshot.SaveStale = p.snapshot.SaveAvailable
 		p.snapshot.SaveLastError = "refresh-failed"
+		if p.snapshot.SaveStale != previousStale || p.snapshot.SaveLastError != previousError {
+			p.playerRevision++
+		}
 		p.mu.Unlock()
 		p.logger.Warn("Palworld save-roster refresh failed", "error", err)
 		return
@@ -281,6 +329,7 @@ func (p *Poller) refreshRoster(ctx context.Context) {
 	p.snapshot.SaveSnapshotAt = roster.SnapshotAt.UTC()
 	p.snapshot.SaveLastError = lastError
 	p.snapshot.Players = mergePlayers(p.saved, p.online)
+	p.playerRevision++
 	p.mu.Unlock()
 	switch {
 	case lastError == saveResolveFailed && previousError != saveResolveFailed:
@@ -294,7 +343,11 @@ func (p *Poller) refreshMetrics(ctx context.Context) {
 	metrics, err := p.source.Metrics(ctx)
 	if err != nil {
 		p.mu.Lock()
+		previousStale := p.snapshot.MetricsStale
 		p.snapshot.MetricsStale = p.snapshot.MetricsAvailable
+		if p.snapshot.MetricsStale != previousStale {
+			p.playerRevision++
+		}
 		p.mu.Unlock()
 		p.logger.Warn("Palworld server-metrics refresh failed", "error", err)
 		return
@@ -304,25 +357,18 @@ func (p *Poller) refreshMetrics(ctx context.Context) {
 	p.snapshot.MetricsAvailable = true
 	p.snapshot.MetricsStale = false
 	p.snapshot.MetricsUpdatedAt = time.Now().UTC()
+	p.playerRevision++
 	p.mu.Unlock()
 }
 
 func (p *Poller) refreshWorld(ctx context.Context) {
 	objects, err := p.source.WorldObjects(ctx)
+	objects = retainPublishableWorldObjects(objects)
 	if err != nil {
 		var limitError *WorldObjectLimitError
 		if errors.As(err, &limitError) && len(objects) > 0 {
 			p.unsupportedLog = false
-			p.mu.Lock()
-			p.snapshot.ObjectsAvailable = true
-			p.snapshot.ObjectsStale = false
-			p.snapshot.ObjectsUnsupported = false
-			p.snapshot.ObjectsTruncated = true
-			p.snapshot.ObjectsTotal = limitError.Total
-			p.snapshot.ObjectsLastError = "object-limit"
-			p.snapshot.ObjectsUpdatedAt = time.Now().UTC()
-			p.snapshot.Objects = cloneWorldObjects(objects)
-			p.mu.Unlock()
+			p.publishWorld(objects, true, limitError.Total, "object-limit")
 			p.logger.Warn("Palworld world-object result was truncated", "objects", limitError.Total, "limit", limitError.Limit)
 			return
 		}
@@ -334,12 +380,18 @@ func (p *Poller) refreshWorld(ctx context.Context) {
 			lastError = "response-too-large"
 		}
 		p.mu.Lock()
+		previousStale := p.snapshot.ObjectsStale
+		previousUnsupported := p.snapshot.ObjectsUnsupported
+		previousError := p.snapshot.ObjectsLastError
 		p.snapshot.ObjectsStale = p.snapshot.ObjectsAvailable
 		p.snapshot.ObjectsUnsupported = unsupported
 		if unsupported {
 			lastError = "unsupported"
 		}
 		p.snapshot.ObjectsLastError = lastError
+		if p.snapshot.ObjectsStale != previousStale || p.snapshot.ObjectsUnsupported != previousUnsupported || p.snapshot.ObjectsLastError != previousError {
+			p.objectRevision++
+		}
 		p.mu.Unlock()
 		if unsupported {
 			if !p.unsupportedLog {
@@ -352,16 +404,43 @@ func (p *Poller) refreshWorld(ctx context.Context) {
 		return
 	}
 	p.unsupportedLog = false
+	p.publishWorld(objects, false, len(objects), "")
+}
+
+func (p *Poller) publishWorld(objects []WorldObject, truncated bool, total int, lastError string) {
 	p.mu.Lock()
+	defer p.mu.Unlock()
+	if p.snapshot.ObjectsAvailable && !p.snapshot.ObjectsStale && !p.snapshot.ObjectsUnsupported &&
+		p.snapshot.ObjectsTruncated == truncated && p.snapshot.ObjectsTotal == total &&
+		p.snapshot.ObjectsLastError == lastError && slices.Equal(p.snapshot.Objects, objects) {
+		return
+	}
 	p.snapshot.ObjectsAvailable = true
 	p.snapshot.ObjectsStale = false
 	p.snapshot.ObjectsUnsupported = false
-	p.snapshot.ObjectsTruncated = false
-	p.snapshot.ObjectsTotal = len(objects)
-	p.snapshot.ObjectsLastError = ""
+	p.snapshot.ObjectsTruncated = truncated
+	p.snapshot.ObjectsTotal = total
+	p.snapshot.ObjectsLastError = lastError
 	p.snapshot.ObjectsUpdatedAt = time.Now().UTC()
 	p.snapshot.Objects = cloneWorldObjects(objects)
-	p.mu.Unlock()
+	p.objectRevision++
+}
+
+func retainPublishableWorldObjects(objects []WorldObject) []WorldObject {
+	for index, object := range objects {
+		if publishableWorldObject(object.Kind) {
+			continue
+		}
+		result := make([]WorldObject, 0, len(objects)-1)
+		result = append(result, objects[:index]...)
+		for _, candidate := range objects[index+1:] {
+			if publishableWorldObject(candidate.Kind) {
+				result = append(result, candidate)
+			}
+		}
+		return result
+	}
+	return objects
 }
 
 func clonePlayers(players []Player) []Player {

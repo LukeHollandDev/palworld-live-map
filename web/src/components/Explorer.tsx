@@ -21,6 +21,10 @@ interface ExplorerProps {
   expandedGuilds: Set<string>
   expandedBases: Set<string>
   dataNotices: string[]
+  catalogueRetry?: {
+    message: string
+    onRetry: () => void
+  }
   onSearchChange: (value: string) => void
   onCheckAll: () => void
   onUncheckAll: () => void
@@ -108,6 +112,216 @@ const DEFAULT_COLLAPSED_GROUPS: CategoryGroup[] = [
 ]
 
 const INITIAL_CATEGORY_ITEMS = 250
+const GLOBAL_SEARCH_RESULT_BUDGET = 200
+const SEARCH_RESULTS_STATUS_ID = 'map-search-results-status'
+
+const SEARCH_SIMPLE_KINDS: ItemKind[] = [
+  'alpha-pals',
+  'bosses',
+  'bounties',
+  'oil-rigs',
+  'watchtowers',
+  'waypoints',
+  'dungeon-entrances',
+  'effigies',
+  'journals',
+  'ancient-shrine-pickups',
+  'npc-locations'
+]
+
+interface ExplorerIndex {
+  byKind: Record<ItemKind, MapItem[]>
+  baseById: Map<string, MapItem>
+  workersByBaseId: Map<string, MapItem[]>
+  companionsByOwnerId: Map<string, MapItem[]>
+  onlinePlayers: MapItem[]
+  offlinePlayers: MapItem[]
+  guildControlItems: MapItem[]
+  guildCount: number
+}
+
+interface GuildBucket {
+  id: string
+  name: string
+  displayName: string
+  bases: MapItem[]
+  outsideWorkers: MapItem[]
+}
+
+interface GuildData {
+  guilds: GuildBucket[]
+  fallbackWorkers: MapItem[]
+}
+
+interface SearchCandidate {
+  item: MapItem
+  rank: number
+}
+
+interface SearchPlan {
+  allowedKeys: ReadonlySet<string>
+  totalMatches: number
+}
+
+function searchResultKey(item: MapItem): string {
+  return `${item.kind}:${item.id}`
+}
+
+function itemMatchesSearch(item: MapItem, query: string, baseById: Map<string, MapItem>): boolean {
+  if (!query) return true
+  const baseName = item.kind === 'workers' && item.baseId ? baseById.get(item.baseId)?.name || '' : ''
+  return itemSearchText(item, baseName).includes(query)
+}
+
+function searchRank(item: MapItem, query: string, directMatch: boolean): number {
+  const name = item.name.trim().toLowerCase()
+  if (name === query) return 0
+  if (name.startsWith(query)) return 1
+  if (name.includes(query)) return 2
+  return directMatch ? 3 : 4
+}
+
+function buildGuildData(bases: MapItem[], workers: MapItem[], workersByBaseId: Map<string, MapItem[]>): GuildData {
+  const sortedBases = bases
+    .slice()
+    .sort((left, right) => left.name.localeCompare(right.name) || left.x - right.x || left.y - right.y)
+  const guildNames = new Map<string, string>()
+  for (const item of [...bases, ...workers]) {
+    if (item.guildKey && item.guildName) guildNames.set(item.guildKey, item.guildName)
+  }
+  const guildMap = new Map<string, Omit<GuildBucket, 'displayName'>>()
+  const newGuild = (id: string, name = guildNames.get(id) || 'Unnamed guild'): Omit<GuildBucket, 'displayName'> => ({
+    id,
+    name,
+    bases: [],
+    outsideWorkers: []
+  })
+  for (const base of sortedBases) {
+    const id = guildIdForBase(base)
+    const inferredGuildName =
+      guildNames.get(id) || (base.name.trim().toLowerCase() === 'palbox' ? 'Unnamed guild' : base.name)
+    const guild = guildMap.get(id) || newGuild(id, inferredGuildName)
+    if (guild.name === 'Unnamed guild' && inferredGuildName !== 'Unnamed guild') guild.name = inferredGuildName
+    guild.bases.push(base)
+    guildMap.set(id, guild)
+  }
+  const baseLinkedIds = new Set(
+    Array.from(workersByBaseId.values())
+      .flat()
+      .map((worker) => worker.id)
+  )
+  const fallbackWorkers: MapItem[] = []
+  for (const worker of workers) {
+    if (baseLinkedIds.has(worker.id)) continue
+    if (!worker.guildKey) {
+      fallbackWorkers.push(worker)
+      continue
+    }
+    const guild = guildMap.get(worker.guildKey) || newGuild(worker.guildKey)
+    guild.outsideWorkers.push(worker)
+    guildMap.set(guild.id, guild)
+  }
+  for (const guild of guildMap.values()) {
+    guild.outsideWorkers.sort((left, right) => left.name.localeCompare(right.name) || left.id.localeCompare(right.id))
+  }
+  fallbackWorkers.sort((left, right) => left.name.localeCompare(right.name) || left.id.localeCompare(right.id))
+  const sortedGuilds = Array.from(guildMap.values()).sort(
+    (left, right) => left.name.localeCompare(right.name) || left.id.localeCompare(right.id)
+  )
+  const nameCounts = new Map<string, number>()
+  for (const guild of sortedGuilds) nameCounts.set(guild.name, (nameCounts.get(guild.name) || 0) + 1)
+  const occurrences = new Map<string, number>()
+  const guilds = sortedGuilds.map((guild) => {
+    const occurrence = (occurrences.get(guild.name) || 0) + 1
+    occurrences.set(guild.name, occurrence)
+    return {
+      ...guild,
+      displayName: (nameCounts.get(guild.name) || 0) > 1 ? `${guild.name} #${occurrence}` : guild.name
+    }
+  })
+  return { guilds, fallbackWorkers }
+}
+
+function buildSearchPlan(query: string, index: ExplorerIndex, guildData: GuildData): SearchPlan {
+  const bucketMaps = Array.from({ length: 3 + SEARCH_SIMPLE_KINDS.length }, () => new Map<string, SearchCandidate>())
+  const addCandidate = (bucketIndex: number, item: MapItem, directMatch: boolean) => {
+    const key = searchResultKey(item)
+    const candidate = { item, rank: searchRank(item, query, directMatch) }
+    const existing = bucketMaps[bucketIndex].get(key)
+    if (!existing || candidate.rank < existing.rank) bucketMaps[bucketIndex].set(key, candidate)
+  }
+  const matches = (item: MapItem) => itemMatchesSearch(item, query, index.baseById)
+
+  for (const player of index.byKind.players) {
+    if (player.online === false) continue
+    const playerMatches = matches(player)
+    if (playerMatches) addCandidate(0, player, true)
+    for (const companion of index.companionsByOwnerId.get(player.id) || []) {
+      const companionMatches = matches(companion)
+      if (playerMatches || companionMatches) addCandidate(0, companion, companionMatches)
+    }
+  }
+  for (const player of index.byKind.players) {
+    if (player.online === false && matches(player)) addCandidate(1, player, true)
+  }
+
+  for (const guild of guildData.guilds) {
+    const guildMatches = guild.displayName.toLowerCase().includes(query)
+    for (const base of guild.bases) {
+      const baseMatches = matches(base)
+      if (guildMatches || baseMatches) addCandidate(2, base, baseMatches)
+      const baseWorkers = index.workersByBaseId.get(base.id) || index.workersByBaseId.get(base.baseId || '') || []
+      for (const worker of baseWorkers) {
+        const workerMatches = matches(worker)
+        if (guildMatches || workerMatches) addCandidate(2, worker, workerMatches)
+      }
+    }
+    for (const worker of guild.outsideWorkers) {
+      const workerMatches = matches(worker)
+      if (guildMatches || workerMatches) addCandidate(2, worker, workerMatches)
+    }
+  }
+  const fallbackMatches = 'no linked guild outside base perimeters'.includes(query)
+  for (const worker of guildData.fallbackWorkers) {
+    const workerMatches = matches(worker)
+    if (fallbackMatches || workerMatches) addCandidate(2, worker, workerMatches)
+  }
+
+  SEARCH_SIMPLE_KINDS.forEach((kind, offset) => {
+    for (const item of index.byKind[kind]) {
+      if (matches(item)) addCandidate(3 + offset, item, true)
+    }
+  })
+
+  const buckets = bucketMaps.map((bucket) =>
+    Array.from(bucket.values()).sort(
+      (left, right) =>
+        left.rank - right.rank ||
+        left.item.name.localeCompare(right.item.name) ||
+        left.item.kind.localeCompare(right.item.kind) ||
+        left.item.id.localeCompare(right.item.id)
+    )
+  )
+  const totalKeys = new Set(buckets.flatMap((bucket) => bucket.map(({ item }) => searchResultKey(item))))
+  const allowedKeys = new Set<string>()
+  for (let rank = 0; rank <= 4 && allowedKeys.size < GLOBAL_SEARCH_RESULT_BUDGET; rank++) {
+    const rankedBuckets = buckets.map((bucket) => bucket.filter((candidate) => candidate.rank === rank))
+    const cursors = rankedBuckets.map(() => 0)
+    let added = true
+    while (added && allowedKeys.size < GLOBAL_SEARCH_RESULT_BUDGET) {
+      added = false
+      rankedBuckets.forEach((bucket, bucketIndex) => {
+        if (allowedKeys.size >= GLOBAL_SEARCH_RESULT_BUDGET) return
+        const candidate = bucket[cursors[bucketIndex]]
+        if (!candidate) return
+        cursors[bucketIndex]++
+        allowedKeys.add(searchResultKey(candidate.item))
+        added = true
+      })
+    }
+  }
+  return { allowedKeys, totalMatches: totalKeys.size }
+}
 
 function playerStatusForGroup(group: CategoryGroup): PlayerStatus | undefined {
   if (group === 'online-players') return 'online'
@@ -262,6 +476,7 @@ export function Explorer(props: ExplorerProps) {
     const baseById = new Map<string, MapItem>()
     const workersByBaseId = new Map<string, MapItem[]>()
     const companionsByOwnerId = new Map<string, MapItem[]>()
+    const linkedWorkerIds = new Set<string>()
     for (const item of props.items) {
       if (item.kind === 'companions' && item.ownerId) {
         const ownerCompanions = companionsByOwnerId.get(item.ownerId) || []
@@ -280,6 +495,7 @@ export function Explorer(props: ExplorerProps) {
       const baseWorkers = workersByBaseId.get(worker.baseId) || []
       baseWorkers.push(worker)
       workersByBaseId.set(worker.baseId, baseWorkers)
+      linkedWorkerIds.add(worker.id)
     }
     for (const companions of companionsByOwnerId.values()) {
       companions.sort(
@@ -289,18 +505,35 @@ export function Explorer(props: ExplorerProps) {
           left.id.localeCompare(right.id)
       )
     }
-    return { byKind, baseById, workersByBaseId, companionsByOwnerId }
+    const guildIds = new Set(byKind.bases.map(guildIdForBase))
+    for (const worker of byKind.workers) {
+      if (!linkedWorkerIds.has(worker.id) && worker.guildKey) guildIds.add(worker.guildKey)
+    }
+    return {
+      byKind,
+      baseById,
+      workersByBaseId,
+      companionsByOwnerId,
+      onlinePlayers: byKind.players.filter((player) => player.online !== false),
+      offlinePlayers: byKind.players.filter((player) => player.online === false),
+      guildControlItems: [...byKind.bases, ...byKind.workers],
+      guildCount: guildIds.size
+    }
   }, [props.activeLayer.id, props.items])
 
-  const query = props.search.trim().toLowerCase()
+  const searchTerm = props.search.trim()
+  const query = searchTerm.toLowerCase()
   const searching = Boolean(query)
-  const matches = (item: MapItem) => {
-    if (!query) return true
-    const baseName = item.kind === 'workers' && item.baseId ? index.baseById.get(item.baseId)?.name || '' : ''
-    return itemSearchText(item, baseName).includes(query)
-  }
-  const onlinePlayers = index.byKind.players.filter((player) => player.online !== false)
-  const offlinePlayers = index.byKind.players.filter((player) => player.online === false)
+  const matches = (item: MapItem) => itemMatchesSearch(item, query, index.baseById)
+  const guildExpanded = searching || !collapsedGroups.has('bases')
+  const guildData = useMemo(
+    () => (guildExpanded ? buildGuildData(index.byKind.bases, index.byKind.workers, index.workersByBaseId) : undefined),
+    [guildExpanded, index]
+  )
+  const searchPlan = useMemo(
+    () => (query && guildData ? buildSearchPlan(query, index, guildData) : undefined),
+    [guildData, index, query]
+  )
   const allFiltersChecked =
     FILTERABLE_KINDS.every((kind) => props.enabledKinds.has(kind)) &&
     DEFAULT_ENABLED_PLAYER_STATUSES.every((status) => props.enabledPlayerStatuses.has(status)) &&
@@ -350,6 +583,7 @@ export function Explorer(props: ExplorerProps) {
                 ref={props.searchInputRef}
                 type="search"
                 aria-label="Search map locations and live objects"
+                aria-describedby={searching ? SEARCH_RESULTS_STATUS_ID : undefined}
                 aria-keyshortcuts="/"
                 placeholder="Filter map results…"
                 autoComplete="off"
@@ -419,20 +653,27 @@ export function Explorer(props: ExplorerProps) {
               </button>
             </div>
 
-            <div
-              className="min-h-0 flex-1 overflow-y-auto overscroll-contain border-t border-[#caeaef]/20 px-3.5 pt-1.5 pb-3.5"
-              aria-live="polite"
-            >
-              {props.search && (
-                <p className="mt-px mb-2 text-[11px] text-[#688088]">
-                  Results for <strong className="font-medium text-[#9ec1c7]">“{props.search}”</strong>
+            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain border-t border-[#caeaef]/20 px-3.5 pt-1.5 pb-3.5">
+              {searchPlan ? (
+                <p
+                  id={SEARCH_RESULTS_STATUS_ID}
+                  role="status"
+                  aria-label="Search results"
+                  aria-live="polite"
+                  aria-atomic="true"
+                  className="mt-px mb-2 text-[11px] text-[#688088]"
+                >
+                  {searchPlan.totalMatches > GLOBAL_SEARCH_RESULT_BUDGET
+                    ? `Showing ${GLOBAL_SEARCH_RESULT_BUDGET} of ${searchPlan.totalMatches} matches for “${searchTerm}”. Refine your search to inspect ${searchPlan.totalMatches - GLOBAL_SEARCH_RESULT_BUDGET} more.`
+                    : `${searchPlan.totalMatches} match${searchPlan.totalMatches === 1 ? '' : 'es'} for “${searchTerm}”.`}
                 </p>
-              )}
+              ) : null}
               <PlayerCategory
                 {...props}
-                players={onlinePlayers}
+                players={index.onlinePlayers}
                 companionsByOwnerId={index.companionsByOwnerId}
                 matches={matches}
+                searchResultKeys={searchPlan?.allowedKeys}
                 expanded={searching || !collapsedGroups.has('online-players')}
                 onToggleExpanded={() => toggleCategory('online-players')}
               />
@@ -440,19 +681,24 @@ export function Explorer(props: ExplorerProps) {
                 {...props}
                 group="offline-players"
                 title="Offline Players"
-                items={offlinePlayers}
+                items={index.offlinePlayers}
                 matches={matches}
+                searchResultKeys={searchPlan?.allowedKeys}
                 empty="No saved offline players are loaded for this region."
                 expanded={searching || !collapsedGroups.has('offline-players')}
                 onToggleExpanded={() => toggleCategory('offline-players')}
               />
               <GuildCategory
                 {...props}
+                guildData={guildData}
+                controlItems={index.guildControlItems}
+                guildCount={index.guildCount}
                 bases={index.byKind.bases}
                 workers={index.byKind.workers}
                 workersByBaseId={index.workersByBaseId}
                 matches={matches}
-                expanded={searching || !collapsedGroups.has('bases')}
+                searchResultKeys={searchPlan?.allowedKeys}
+                expanded={guildExpanded}
                 onToggleExpanded={() => toggleCategory('bases')}
               />
               <SimpleCategory
@@ -461,6 +707,7 @@ export function Explorer(props: ExplorerProps) {
                 title="Alpha Pals"
                 items={index.byKind['alpha-pals']}
                 matches={matches}
+                searchResultKeys={searchPlan?.allowedKeys}
                 empty="No Alpha Pal landmarks are loaded for this region."
                 expanded={searching || !collapsedGroups.has('alpha-pals')}
                 onToggleExpanded={() => toggleCategory('alpha-pals')}
@@ -471,6 +718,7 @@ export function Explorer(props: ExplorerProps) {
                 title="Tower Bosses"
                 items={index.byKind.bosses}
                 matches={matches}
+                searchResultKeys={searchPlan?.allowedKeys}
                 empty="No Tower Boss landmarks are loaded for this region."
                 expanded={searching || !collapsedGroups.has('bosses')}
                 onToggleExpanded={() => toggleCategory('bosses')}
@@ -481,6 +729,7 @@ export function Explorer(props: ExplorerProps) {
                 title="Bounties"
                 items={index.byKind.bounties}
                 matches={matches}
+                searchResultKeys={searchPlan?.allowedKeys}
                 empty="No Bounty locations are loaded for this region."
                 expanded={searching || !collapsedGroups.has('bounties')}
                 onToggleExpanded={() => toggleCategory('bounties')}
@@ -491,6 +740,7 @@ export function Explorer(props: ExplorerProps) {
                 title="Oil Rigs"
                 items={index.byKind['oil-rigs']}
                 matches={matches}
+                searchResultKeys={searchPlan?.allowedKeys}
                 empty="No Oil Rig locations are loaded for this region."
                 expanded={searching || !collapsedGroups.has('oil-rigs')}
                 onToggleExpanded={() => toggleCategory('oil-rigs')}
@@ -501,6 +751,7 @@ export function Explorer(props: ExplorerProps) {
                 title="Watchtowers"
                 items={index.byKind.watchtowers}
                 matches={matches}
+                searchResultKeys={searchPlan?.allowedKeys}
                 empty="No Watchtower locations are loaded for this region."
                 expanded={searching || !collapsedGroups.has('watchtowers')}
                 onToggleExpanded={() => toggleCategory('watchtowers')}
@@ -511,6 +762,7 @@ export function Explorer(props: ExplorerProps) {
                 title="Waypoints"
                 items={index.byKind.waypoints}
                 matches={matches}
+                searchResultKeys={searchPlan?.allowedKeys}
                 empty="No Waypoint locations are loaded for this region."
                 expanded={searching || !collapsedGroups.has('waypoints')}
                 onToggleExpanded={() => toggleCategory('waypoints')}
@@ -521,6 +773,7 @@ export function Explorer(props: ExplorerProps) {
                 title="Dungeon Entrances"
                 items={index.byKind['dungeon-entrances']}
                 matches={matches}
+                searchResultKeys={searchPlan?.allowedKeys}
                 empty="No Dungeon Entrance locations are loaded for this region."
                 expanded={searching || !collapsedGroups.has('dungeon-entrances')}
                 onToggleExpanded={() => toggleCategory('dungeon-entrances')}
@@ -531,6 +784,7 @@ export function Explorer(props: ExplorerProps) {
                 title="Pal Effigies"
                 items={index.byKind.effigies}
                 matches={matches}
+                searchResultKeys={searchPlan?.allowedKeys}
                 empty="No Pal Effigy locations are loaded for this region."
                 expanded={searching || !collapsedGroups.has('effigies')}
                 onToggleExpanded={() => toggleCategory('effigies')}
@@ -541,6 +795,7 @@ export function Explorer(props: ExplorerProps) {
                 title="Journals"
                 items={index.byKind.journals}
                 matches={matches}
+                searchResultKeys={searchPlan?.allowedKeys}
                 empty="No Journal locations are loaded for this region."
                 expanded={searching || !collapsedGroups.has('journals')}
                 onToggleExpanded={() => toggleCategory('journals')}
@@ -551,6 +806,7 @@ export function Explorer(props: ExplorerProps) {
                 title="Ancient Shrine Pickups"
                 items={index.byKind['ancient-shrine-pickups']}
                 matches={matches}
+                searchResultKeys={searchPlan?.allowedKeys}
                 empty="No Ancient Shrine pickups are loaded for this region."
                 expanded={searching || !collapsedGroups.has('ancient-shrine-pickups')}
                 onToggleExpanded={() => toggleCategory('ancient-shrine-pickups')}
@@ -561,6 +817,7 @@ export function Explorer(props: ExplorerProps) {
                 title="NPC Locations"
                 items={index.byKind['npc-locations']}
                 matches={matches}
+                searchResultKeys={searchPlan?.allowedKeys}
                 empty="No static NPC locations are loaded for this region."
                 expanded={searching || !collapsedGroups.has('npc-locations')}
                 onToggleExpanded={() => toggleCategory('npc-locations')}
@@ -576,6 +833,22 @@ export function Explorer(props: ExplorerProps) {
                 {notice}
               </p>
             ))}
+            {props.catalogueRetry ? (
+              <div
+                role="status"
+                aria-live="polite"
+                className="m-3 mt-1 flex items-center gap-2 rounded-md border border-[#554b37] bg-[#302b22] px-2.5 py-2 text-[11px] leading-4 text-[#d2b980]"
+              >
+                <span className="min-w-0 flex-1">{props.catalogueRetry.message}</span>
+                <button
+                  type="button"
+                  className="pal-interactive min-h-8 shrink-0 cursor-pointer border border-[#8f7b50]/50 bg-[#3b3428] px-2 text-[11px] text-[#ead5a2]"
+                  onClick={props.catalogueRetry.onRetry}
+                >
+                  Retry catalogue
+                </button>
+              </div>
+            ) : null}
           </div>
         </div>
       </MapPanelShell>
@@ -587,6 +860,7 @@ interface CategoryProps extends ExplorerProps {
   group: CategoryGroup
   title: string
   matches: (item: MapItem) => boolean
+  searchResultKeys?: ReadonlySet<string>
   empty: string
   expanded: boolean
   onToggleExpanded: () => void
@@ -654,28 +928,60 @@ function CategoryHeader({
   )
 }
 
-function PlayerCategory({
-  players,
-  companionsByOwnerId,
-  matches,
-  expanded,
-  onToggleExpanded,
-  ...props
-}: ExplorerProps & {
+interface PlayerCategoryProps extends ExplorerProps {
   players: MapItem[]
   companionsByOwnerId: Map<string, MapItem[]>
   matches: (item: MapItem) => boolean
+  searchResultKeys?: ReadonlySet<string>
   expanded: boolean
   onToggleExpanded: () => void
-}) {
+}
+
+function PlayerCategory({ players, expanded, onToggleExpanded, ...props }: PlayerCategoryProps) {
+  const contentId = useId()
+  return (
+    <section className="border-b border-white/7 py-0.5 last:border-b-0">
+      <CategoryHeader
+        {...props}
+        group="online-players"
+        title="Online Players"
+        items={players}
+        expanded={expanded}
+        onToggleExpanded={onToggleExpanded}
+        controls={contentId}
+      />
+      <div id={contentId} className="grid gap-px pl-1.5" hidden={!expanded}>
+        {expanded ? <PlayerCategoryBody {...props} players={players} /> : null}
+      </div>
+    </section>
+  )
+}
+
+function PlayerCategoryBody({
+  players,
+  companionsByOwnerId,
+  matches,
+  searchResultKeys,
+  ...props
+}: Omit<PlayerCategoryProps, 'expanded' | 'onToggleExpanded'>) {
+  const hasRawSearchMatches =
+    Boolean(searchResultKeys) &&
+    players.some((player) => matches(player) || (companionsByOwnerId.get(player.id) || []).some(matches))
   const rows = players
     .map((player) => {
       const companions = companionsByOwnerId.get(player.id) || []
       const playerMatches = matches(player)
+      const matchingCompanions = playerMatches ? companions : companions.filter(matches)
+      const renderedCompanions = searchResultKeys
+        ? matchingCompanions.filter((companion) => searchResultKeys.has(searchResultKey(companion)))
+        : matchingCompanions
+      const playerIsResult = !searchResultKeys || searchResultKeys.has(searchResultKey(player))
       return {
         player,
-        companions: playerMatches ? companions : companions.filter(matches),
-        visible: playerMatches || companions.some(matches)
+        companions: renderedCompanions,
+        visible: searchResultKeys
+          ? playerIsResult || renderedCompanions.length > 0
+          : playerMatches || companions.some(matches)
       }
     })
     .filter((row) => row.visible)
@@ -693,61 +999,51 @@ function PlayerCategory({
   const visibleCompanionCount = rows.reduce((total, row) => total + row.companions.length, 0)
   const renderedCompanionCount = renderedRows.reduce((total, row) => total + row.companions.length, 0)
   const omittedCompanions = visibleCompanionCount - renderedCompanionCount
-  const contentId = useId()
 
   return (
-    <section className="border-b border-white/7 py-0.5 last:border-b-0">
-      <CategoryHeader
-        {...props}
-        group="online-players"
-        title="Online Players"
-        items={players}
-        expanded={expanded}
-        onToggleExpanded={onToggleExpanded}
-        controls={contentId}
-      />
-      <div id={contentId} className="grid gap-px pl-1.5" hidden={!expanded}>
-        {rows.length === 0 ? (
-          <p className="my-1.5 pl-5 text-[11px] text-[#778187]">
-            {players.length > 0 && props.search.trim()
+    <>
+      {rows.length === 0 ? (
+        <p className="my-1.5 pl-5 text-[11px] text-[#778187]">
+          {hasRawSearchMatches
+            ? `Matching online players or companion Pals fall outside the first ${GLOBAL_SEARCH_RESULT_BUDGET} results.`
+            : players.length > 0 && props.search.trim()
               ? `No online players or companion Pals match “${props.search.trim()}”.`
               : 'No players are currently online in this region.'}
-          </p>
-        ) : (
-          renderedRows.map(({ player, companions }) => (
-            <div key={player.id}>
-              <ObjectRow
-                item={player}
-                meta={[player.level ? `Lv ${player.level}` : '', player.guildName || ''].filter(Boolean).join(' · ')}
-                {...props}
-              />
-              {companions.length > 0 ? (
-                <fieldset className="m-0 ml-8 grid min-w-0 gap-px border-0 border-l border-[#64d7e7]/25 p-0 pl-1.5">
-                  <legend className="sr-only">Companion Pals for {player.name}</legend>
-                  {companions.map((companion) => (
-                    <ItemButton
-                      key={companion.id}
-                      item={companion}
-                      meta={[companion.detail || '', companion.level ? `Lv ${companion.level}` : '']
-                        .filter(Boolean)
-                        .join(' · ')}
-                      onFocus={props.onFocusItem}
-                    />
-                  ))}
-                </fieldset>
-              ) : null}
-            </div>
-          ))
-        )}
-        {omittedCompanions > 0 ? (
-          <p className="my-1 ml-5 border-l-2 border-[#64d7e7]/40 px-2 py-1.5 text-[11px] text-[#9ec1c7]">
-            {props.search.trim()
-              ? `${omittedCompanions} more companion matches. Refine your search to inspect them.`
-              : `${omittedCompanions} more companion Pals are omitted. Use search to inspect them.`}
-          </p>
-        ) : null}
-      </div>
-    </section>
+        </p>
+      ) : (
+        renderedRows.map(({ player, companions }) => (
+          <div key={player.id}>
+            <ObjectRow
+              item={player}
+              meta={[player.level ? `Lv ${player.level}` : '', player.guildName || ''].filter(Boolean).join(' · ')}
+              {...props}
+            />
+            {companions.length > 0 ? (
+              <fieldset className="m-0 ml-8 grid min-w-0 gap-px border-0 border-l border-[#64d7e7]/25 p-0 pl-1.5">
+                <legend className="sr-only">Companion Pals for {player.name}</legend>
+                {companions.map((companion) => (
+                  <ItemButton
+                    key={companion.id}
+                    item={companion}
+                    meta={[companion.detail || '', companion.level ? `Lv ${companion.level}` : '']
+                      .filter(Boolean)
+                      .join(' · ')}
+                    onFocus={props.onFocusItem}
+                  />
+                ))}
+              </fieldset>
+            ) : null}
+          </div>
+        ))
+      )}
+      {!searchResultKeys && omittedCompanions > 0 ? (
+        <p className="my-1 ml-5 border-l-2 border-[#64d7e7]/40 px-2 py-1.5 text-[11px] text-[#9ec1c7]">
+          {props.search.trim()
+            ? `${omittedCompanions} more companion matches. Refine your search to inspect them.`
+            : `${omittedCompanions} more companion Pals are omitted. Use search to inspect them.`}
+        </p>
+      ) : null}
+    </>
   )
 }
 
@@ -758,21 +1054,29 @@ function SimpleCategory({
   controlItems = items,
   count,
   matches,
+  searchResultKeys,
   empty,
   ...props
 }: CategoryProps & { items: MapItem[]; controlItems?: MapItem[]; count?: number }) {
-  const visible = items.filter(matches).sort((left, right) => left.name.localeCompare(right.name))
+  const hasRawSearchMatches = Boolean(searchResultKeys) && items.some(matches)
+  const visible = props.expanded
+    ? items
+        .filter((item) => (searchResultKeys ? searchResultKeys.has(searchResultKey(item)) : matches(item)))
+        .sort((left, right) => left.name.localeCompare(right.name))
+    : []
   const rendered = visible.slice(0, INITIAL_CATEGORY_ITEMS)
   const contentId = useId()
   return (
     <section className="border-b border-white/7 py-0.5 last:border-b-0">
       <CategoryHeader {...props} group={group} title={title} items={controlItems} count={count} controls={contentId} />
       <div id={contentId} className="grid gap-px pl-1.5" hidden={!props.expanded}>
-        {visible.length === 0 ? (
+        {!props.expanded ? null : visible.length === 0 ? (
           <p className="my-1.5 pl-5 text-[11px] text-[#778187]">
-            {items.length > 0 && props.search.trim()
-              ? `No ${title.toLowerCase()} match “${props.search.trim()}”.`
-              : empty}
+            {hasRawSearchMatches
+              ? `Matches in ${title} fall outside the first ${GLOBAL_SEARCH_RESULT_BUDGET} results.`
+              : items.length > 0 && props.search.trim()
+                ? `No ${title.toLowerCase()} match “${props.search.trim()}”.`
+                : empty}
           </p>
         ) : (
           rendered.map((item) => (
@@ -792,7 +1096,7 @@ function SimpleCategory({
             />
           ))
         )}
-        {rendered.length < visible.length && (
+        {props.expanded && !searchResultKeys && rendered.length < visible.length && (
           <p className="my-1 ml-5 border-l-2 border-[#64d7e7]/40 px-2 py-1.5 text-[11px] text-[#9ec1c7]">
             {props.search.trim()
               ? `${visible.length - rendered.length} more matches. Refine your search to inspect them.`
@@ -805,326 +1109,338 @@ function SimpleCategory({
 }
 
 interface GuildCategoryProps extends ExplorerProps {
+  guildData?: GuildData
+  controlItems: MapItem[]
+  guildCount: number
   bases: MapItem[]
   workers: MapItem[]
   workersByBaseId: Map<string, MapItem[]>
   matches: (item: MapItem) => boolean
+  searchResultKeys?: ReadonlySet<string>
   expanded: boolean
   onToggleExpanded: () => void
 }
 
-function GuildCategory({ bases, workers, workersByBaseId, matches, ...props }: GuildCategoryProps) {
-  const sortedBases = bases
-    .slice()
-    .sort((left, right) => left.name.localeCompare(right.name) || left.x - right.x || left.y - right.y)
-  const guildNames = new Map<string, string>()
-  for (const item of [...bases, ...workers]) {
-    if (item.guildKey && item.guildName) guildNames.set(item.guildKey, item.guildName)
-  }
-  interface GuildBucket {
-    id: string
-    name: string
-    bases: MapItem[]
-    outsideWorkers: MapItem[]
-  }
-  const guildMap = new Map<string, GuildBucket>()
-  const newGuild = (id: string, name = guildNames.get(id) || 'Unnamed guild'): GuildBucket => ({
-    id,
-    name,
-    bases: [],
-    outsideWorkers: []
-  })
-  for (const base of sortedBases) {
-    const id = guildIdForBase(base)
-    const inferredGuildName =
-      guildNames.get(id) || (base.name.trim().toLowerCase() === 'palbox' ? 'Unnamed guild' : base.name)
-    const guild = guildMap.get(id) || newGuild(id, inferredGuildName)
-    if (guild.name === 'Unnamed guild' && inferredGuildName !== 'Unnamed guild') guild.name = inferredGuildName
-    guild.bases.push(base)
-    guildMap.set(id, guild)
-  }
-  const baseLinkedIds = new Set(
-    Array.from(workersByBaseId.values())
-      .flat()
-      .map((worker) => worker.id)
-  )
-  const fallbackWorkers: MapItem[] = []
-  for (const worker of workers) {
-    if (baseLinkedIds.has(worker.id)) continue
-    if (!worker.guildKey) {
-      fallbackWorkers.push(worker)
-      continue
-    }
-    const guild = guildMap.get(worker.guildKey) || newGuild(worker.guildKey)
-    guild.outsideWorkers.push(worker)
-    guildMap.set(guild.id, guild)
-  }
-  for (const guild of guildMap.values()) {
-    guild.outsideWorkers.sort((left, right) => left.name.localeCompare(right.name))
-  }
-  fallbackWorkers.sort((left, right) => left.name.localeCompare(right.name))
-  const guilds = Array.from(guildMap.values()).sort((left, right) => left.name.localeCompare(right.name))
-  const names = new Map<string, number>()
-  for (const guild of guilds) names.set(guild.name, (names.get(guild.name) || 0) + 1)
-  const occurrences = new Map<string, number>()
-  let rendered = 0
-  let eligibleBaseWorkers = 0
-  let renderedBaseWorkers = 0
-  let eligibleOutsideWorkers = 0
-  let renderedOutsideWorkers = 0
+function GuildCategory({
+  guildData,
+  controlItems,
+  guildCount,
+  expanded,
+  onToggleExpanded,
+  ...props
+}: GuildCategoryProps) {
   const contentId = useId()
-
   return (
     <section className="border-b border-white/7 py-0.5">
       <CategoryHeader
         {...props}
         group="bases"
         title="Guilds"
-        items={[...bases, ...workers]}
-        count={guilds.length}
+        items={controlItems}
+        count={guildCount}
+        expanded={expanded}
+        onToggleExpanded={onToggleExpanded}
         controls={contentId}
       />
-      <div id={contentId} className="grid gap-px pl-1" hidden={!props.expanded}>
-        {guilds.map((guild) => {
-          const occurrence = (occurrences.get(guild.name) || 0) + 1
-          occurrences.set(guild.name, occurrence)
-          const displayName = (names.get(guild.name) || 0) > 1 ? `${guild.name} #${occurrence}` : guild.name
-          const guildMatches = displayName.toLowerCase().includes(props.search.trim().toLowerCase())
-          const matchingOutsideWorkers = guildMatches ? guild.outsideWorkers : guild.outsideWorkers.filter(matches)
-          const entries = guild.bases
-            .map((base, index) => {
-              const baseWorkers = (workersByBaseId.get(base.id) || workersByBaseId.get(base.baseId || '') || [])
-                .slice()
-                .sort((left, right) => left.name.localeCompare(right.name))
-              return {
-                base,
-                baseWorkers,
-                index,
-                matchingWorkers: guildMatches ? baseWorkers : baseWorkers.filter(matches)
-              }
-            })
-            .filter(({ base, matchingWorkers }) => guildMatches || matches(base) || matchingWorkers.length > 0)
-          if (entries.length === 0 && matchingOutsideWorkers.length === 0) return null
-          rendered++
-          const guildItems = [
-            ...guild.bases.flatMap((base) => [
-              base,
-              ...(workersByBaseId.get(base.id) || workersByBaseId.get(base.baseId || '') || [])
-            ]),
-            ...guild.outsideWorkers
-          ]
-          const workerCount = guildItems.filter((item) => item.kind === 'workers').length
-          const expanded = props.expandedGuilds.has(guild.id) || Boolean(props.search.trim())
-          const guildContentId = `${contentId}-guild-${rendered}`
-          const requestedOutsideWorkers = props.search.trim() ? matchingOutsideWorkers : guild.outsideWorkers
-          let displayedOutsideWorkers: MapItem[] = []
-          if (expanded) {
-            eligibleOutsideWorkers += requestedOutsideWorkers.length
-            const remaining = Math.max(0, INITIAL_CATEGORY_ITEMS - renderedOutsideWorkers)
-            displayedOutsideWorkers = requestedOutsideWorkers.slice(0, remaining)
-            renderedOutsideWorkers += displayedOutsideWorkers.length
-          }
-          return (
-            <div key={guild.id}>
-              <div className="flex min-h-8 items-center gap-0.5">
-                <span className="grid size-8 shrink-0 place-items-center">
-                  <Checkbox
-                    state={visibilityState(
-                      guildItems,
-                      props.enabledKinds,
-                      props.enabledPlayerStatuses,
-                      props.hiddenIds
-                    )}
-                    label={`Show guild ${displayName}`}
-                    onChange={(visible) =>
-                      props.onToggleItems(
-                        guildItems.map((item) => item.id),
-                        visible
-                      )
-                    }
-                  />
-                </span>
-                <GuildButton
-                  guildId={guild.id}
-                  name={displayName}
-                  meta={`${guild.bases.length} base${guild.bases.length === 1 ? '' : 's'} · ${workerCount} Pal${workerCount === 1 ? '' : 's'}`}
-                  onFocus={props.onFocusGuild}
-                />
-                <DisclosureToggle
-                  expanded={expanded}
-                  label={displayName}
-                  controls={guildContentId}
-                  onClick={() => props.onToggleGuild(guild.id)}
-                />
-              </div>
-              <div id={guildContentId} className="ml-3 border-l border-white/10 pl-2" hidden={!expanded}>
-                {expanded &&
-                  entries.map(({ base, baseWorkers, index, matchingWorkers }) => {
-                    const baseExpanded = props.expandedBases.has(base.id) || Boolean(props.search.trim())
-                    const baseItems = [base, ...baseWorkers]
-                    const baseLabel = guild.bases.length === 1 ? 'Base' : `Base ${index + 1}`
-                    const baseContentId = `${guildContentId}-base-${index}`
-                    const requestedWorkers = props.search.trim() ? matchingWorkers : baseWorkers
-                    let displayedWorkers: MapItem[] = []
-                    if (baseExpanded) {
-                      eligibleBaseWorkers += requestedWorkers.length
-                      const remaining = Math.max(0, INITIAL_CATEGORY_ITEMS - renderedBaseWorkers)
-                      displayedWorkers = requestedWorkers.slice(0, remaining)
-                      renderedBaseWorkers += displayedWorkers.length
-                    }
-                    return (
-                      <div key={base.id}>
-                        <div className="flex min-h-8 min-w-0 items-center gap-0.5">
-                          <span className="grid size-8 shrink-0 place-items-center">
-                            <Checkbox
-                              state={visibilityState(
-                                baseItems,
-                                props.enabledKinds,
-                                props.enabledPlayerStatuses,
-                                props.hiddenIds
-                              )}
-                              label={`Show ${baseLabel} for ${displayName}`}
-                              onChange={(visible) =>
-                                props.onToggleItems(
-                                  baseItems.map((item) => item.id),
-                                  visible
-                                )
-                              }
-                            />
-                          </span>
-                          <ItemButton
-                            item={base}
-                            label={baseLabel}
-                            meta={`${baseWorkers.length} assigned Pal${baseWorkers.length === 1 ? '' : 's'}`}
-                            onFocus={props.onFocusItem}
-                          />
-                          <DisclosureToggle
-                            expanded={baseExpanded}
-                            label={`${displayName} ${baseLabel}`}
-                            controls={baseContentId}
-                            onClick={() => props.onToggleBase(base.id)}
-                          />
-                        </div>
-                        <div id={baseContentId} className="ml-3 border-l border-white/8 pl-2" hidden={!baseExpanded}>
-                          {baseExpanded &&
-                            displayedWorkers.map((worker) => (
-                              <ObjectRow
-                                key={worker.id}
-                                item={worker}
-                                meta={worker.level ? `Lv ${worker.level}` : undefined}
-                                {...props}
-                              />
-                            ))}
-                        </div>
-                      </div>
-                    )
-                  })}
-                {expanded && requestedOutsideWorkers.length > 0 ? (
-                  <fieldset className="m-0 mt-1 min-w-0 border-0 border-t border-white/10 p-0 pt-1">
-                    <legend className="sr-only">Outside base perimeters for {displayName}</legend>
-                    <h4 className="m-0 px-2 py-1 text-[10px] font-normal tracking-[.1em] text-[#8eb8bf] uppercase">
-                      Outside base perimeters
-                    </h4>
-                    <div className="grid gap-px">
-                      {displayedOutsideWorkers.map((worker) => (
-                        <ObjectRow
-                          key={worker.id}
-                          item={worker}
-                          meta={worker.level ? `Lv ${worker.level}` : undefined}
-                          className="pl-1"
-                          {...props}
-                        />
-                      ))}
-                    </div>
-                  </fieldset>
-                ) : null}
-              </div>
-            </div>
-          )
-        })}
-        {renderedBaseWorkers < eligibleBaseWorkers && (
-          <p className="my-1 ml-5 border-l-2 border-[#64d7e7]/40 px-2 py-1.5 text-[11px] text-[#9ec1c7]">
-            {eligibleBaseWorkers - renderedBaseWorkers} more assigned Pal
-            {eligibleBaseWorkers - renderedBaseWorkers === 1 ? '' : 's'} omitted. Refine your search or expand fewer
-            bases to inspect them.
-          </p>
-        )}
-        {(() => {
-          const fallbackMatches = 'no linked guild outside base perimeters'.includes(props.search.trim().toLowerCase())
-          const matchingWorkers = fallbackMatches ? fallbackWorkers : fallbackWorkers.filter(matches)
-          const requestedWorkers = props.search.trim() ? matchingWorkers : fallbackWorkers
-          if (requestedWorkers.length === 0) return null
-          rendered++
-          eligibleOutsideWorkers += requestedWorkers.length
-          const remaining = Math.max(0, INITIAL_CATEGORY_ITEMS - renderedOutsideWorkers)
-          const displayedWorkers = requestedWorkers.slice(0, remaining)
-          renderedOutsideWorkers += displayedWorkers.length
-          return (
-            <fieldset className="m-0 min-w-0 border-0 p-0">
-              <legend className="sr-only">Pals with no linked guild</legend>
-              <div className="flex min-h-8 items-center gap-0.5">
-                <span className="grid size-8 shrink-0 place-items-center">
-                  <Checkbox
-                    state={visibilityState(
-                      fallbackWorkers,
-                      props.enabledKinds,
-                      props.enabledPlayerStatuses,
-                      props.hiddenIds
-                    )}
-                    label="Show Pals with no linked guild"
-                    onChange={(visible) =>
-                      props.onToggleItems(
-                        fallbackWorkers.map((worker) => worker.id),
-                        visible
-                      )
-                    }
-                  />
-                </span>
-                <div className="grid min-h-7 min-w-0 flex-1 grid-cols-[20px_minmax(0,1fr)_auto] items-center gap-1.5 px-1.5 py-1 text-xs text-[#cbd7d9]">
-                  <MarkerGlyph kind="workers" />
-                  <strong className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap font-medium">
-                    No linked guild
-                  </strong>
-                  <span className="ml-auto shrink-0 text-[10px] text-[#7f898e]">
-                    {fallbackWorkers.length} Pal{fallbackWorkers.length === 1 ? '' : 's'}
-                  </span>
-                </div>
-              </div>
-              <div className="ml-3 border-l border-white/10 pl-2">
-                <h4 className="m-0 px-2 py-1 text-[10px] font-normal tracking-[.1em] text-[#8eb8bf] uppercase">
-                  Outside base perimeters
-                </h4>
-                <div className="grid gap-px">
-                  {displayedWorkers.map((worker) => (
-                    <ObjectRow
-                      key={worker.id}
-                      item={worker}
-                      meta={worker.level ? `Lv ${worker.level}` : undefined}
-                      className="pl-1"
-                      {...props}
-                    />
-                  ))}
-                </div>
-              </div>
-            </fieldset>
-          )
-        })()}
-        {renderedOutsideWorkers < eligibleOutsideWorkers && (
-          <p className="my-1 ml-5 border-l-2 border-[#64d7e7]/40 px-2 py-1.5 text-[11px] text-[#9ec1c7]">
-            {eligibleOutsideWorkers - renderedOutsideWorkers} more Pal
-            {eligibleOutsideWorkers - renderedOutsideWorkers === 1 ? '' : 's'} outside base perimeters omitted. Refine
-            your search or expand fewer guilds to inspect them.
-          </p>
-        )}
-        {rendered === 0 && (
-          <p className="my-1.5 pl-5 text-[11px] text-[#778187]">
-            {props.search.trim() && (bases.length > 0 || workers.length > 0)
-              ? `No guilds match “${props.search.trim()}”.`
-              : 'No guilds are currently available.'}
-          </p>
-        )}
+      <div id={contentId} className="grid gap-px pl-1" hidden={!expanded}>
+        {expanded && guildData ? (
+          <GuildCategoryBody
+            {...props}
+            guildData={guildData}
+            controlItems={controlItems}
+            guildCount={guildCount}
+            expanded={expanded}
+            onToggleExpanded={onToggleExpanded}
+            contentId={contentId}
+          />
+        ) : null}
       </div>
     </section>
+  )
+}
+
+function GuildCategoryBody({
+  guildData,
+  bases,
+  workers,
+  workersByBaseId,
+  matches,
+  searchResultKeys,
+  contentId,
+  ...props
+}: Omit<GuildCategoryProps, 'guildData'> & { guildData: GuildData; contentId: string }) {
+  const { guilds, fallbackWorkers } = guildData
+  const searchQuery = props.search.trim().toLowerCase()
+  const hasRawSearchMatches =
+    Boolean(searchResultKeys) &&
+    (guilds.some((guild) => {
+      if (guild.displayName.toLowerCase().includes(searchQuery)) return true
+      return (
+        guild.outsideWorkers.some(matches) ||
+        guild.bases.some((base) => {
+          const baseWorkers = workersByBaseId.get(base.id) || workersByBaseId.get(base.baseId || '') || []
+          return matches(base) || baseWorkers.some(matches)
+        })
+      )
+    }) ||
+      (fallbackWorkers.length > 0 &&
+        ('no linked guild outside base perimeters'.includes(searchQuery) || fallbackWorkers.some(matches))))
+  let rendered = 0
+  let eligibleBaseWorkers = 0
+  let renderedBaseWorkers = 0
+  let eligibleOutsideWorkers = 0
+  let renderedOutsideWorkers = 0
+
+  return (
+    <>
+      {guilds.map((guild) => {
+        const displayName = guild.displayName
+        const guildMatches = displayName.toLowerCase().includes(searchQuery)
+        const matchingOutsideWorkers = guildMatches ? guild.outsideWorkers : guild.outsideWorkers.filter(matches)
+        const requestedOutsideWorkers = props.search.trim() ? matchingOutsideWorkers : guild.outsideWorkers
+        const selectedOutsideWorkers = searchResultKeys
+          ? requestedOutsideWorkers.filter((worker) => searchResultKeys.has(searchResultKey(worker)))
+          : requestedOutsideWorkers
+        const entries = guild.bases
+          .map((base, index) => {
+            const baseWorkers = (workersByBaseId.get(base.id) || workersByBaseId.get(base.baseId || '') || [])
+              .slice()
+              .sort((left, right) => left.name.localeCompare(right.name))
+            const matchingWorkers = guildMatches ? baseWorkers : baseWorkers.filter(matches)
+            return {
+              base,
+              baseWorkers,
+              index,
+              matchingWorkers: searchResultKeys
+                ? matchingWorkers.filter((worker) => searchResultKeys.has(searchResultKey(worker)))
+                : matchingWorkers,
+              baseIsResult: !searchResultKeys || searchResultKeys.has(searchResultKey(base))
+            }
+          })
+          .filter(({ base, baseIsResult, matchingWorkers }) =>
+            searchResultKeys
+              ? baseIsResult || matchingWorkers.length > 0
+              : guildMatches || matches(base) || matchingWorkers.length > 0
+          )
+        if (entries.length === 0 && selectedOutsideWorkers.length === 0) return null
+        rendered++
+        const guildItems = [
+          ...guild.bases.flatMap((base) => [
+            base,
+            ...(workersByBaseId.get(base.id) || workersByBaseId.get(base.baseId || '') || [])
+          ]),
+          ...guild.outsideWorkers
+        ]
+        const workerCount = guildItems.filter((item) => item.kind === 'workers').length
+        const expanded = props.expandedGuilds.has(guild.id) || Boolean(props.search.trim())
+        const guildContentId = `${contentId}-guild-${rendered}`
+        let displayedOutsideWorkers: MapItem[] = []
+        if (expanded) {
+          eligibleOutsideWorkers += selectedOutsideWorkers.length
+          const remaining = Math.max(0, INITIAL_CATEGORY_ITEMS - renderedOutsideWorkers)
+          displayedOutsideWorkers = selectedOutsideWorkers.slice(0, remaining)
+          renderedOutsideWorkers += displayedOutsideWorkers.length
+        }
+        return (
+          <div key={guild.id}>
+            <div className="flex min-h-8 items-center gap-0.5">
+              <span className="grid size-8 shrink-0 place-items-center">
+                <Checkbox
+                  state={visibilityState(guildItems, props.enabledKinds, props.enabledPlayerStatuses, props.hiddenIds)}
+                  label={`Show guild ${displayName}`}
+                  onChange={(visible) =>
+                    props.onToggleItems(
+                      guildItems.map((item) => item.id),
+                      visible
+                    )
+                  }
+                />
+              </span>
+              <GuildButton
+                guildId={guild.id}
+                name={displayName}
+                meta={`${guild.bases.length} base${guild.bases.length === 1 ? '' : 's'} · ${workerCount} Pal${workerCount === 1 ? '' : 's'}`}
+                onFocus={props.onFocusGuild}
+              />
+              <DisclosureToggle
+                expanded={expanded}
+                label={displayName}
+                controls={guildContentId}
+                onClick={() => props.onToggleGuild(guild.id)}
+              />
+            </div>
+            <div id={guildContentId} className="ml-3 border-l border-white/10 pl-2" hidden={!expanded}>
+              {expanded &&
+                entries.map(({ base, baseWorkers, index, matchingWorkers }) => {
+                  const baseExpanded = props.expandedBases.has(base.id) || Boolean(props.search.trim())
+                  const baseItems = [base, ...baseWorkers]
+                  const baseLabel = guild.bases.length === 1 ? 'Base' : `Base ${index + 1}`
+                  const baseContentId = `${guildContentId}-base-${index}`
+                  const requestedWorkers = props.search.trim() ? matchingWorkers : baseWorkers
+                  let displayedWorkers: MapItem[] = []
+                  if (baseExpanded) {
+                    eligibleBaseWorkers += requestedWorkers.length
+                    const remaining = Math.max(0, INITIAL_CATEGORY_ITEMS - renderedBaseWorkers)
+                    displayedWorkers = requestedWorkers.slice(0, remaining)
+                    renderedBaseWorkers += displayedWorkers.length
+                  }
+                  return (
+                    <div key={base.id}>
+                      <div className="flex min-h-8 min-w-0 items-center gap-0.5">
+                        <span className="grid size-8 shrink-0 place-items-center">
+                          <Checkbox
+                            state={visibilityState(
+                              baseItems,
+                              props.enabledKinds,
+                              props.enabledPlayerStatuses,
+                              props.hiddenIds
+                            )}
+                            label={`Show ${baseLabel} for ${displayName}`}
+                            onChange={(visible) =>
+                              props.onToggleItems(
+                                baseItems.map((item) => item.id),
+                                visible
+                              )
+                            }
+                          />
+                        </span>
+                        <ItemButton
+                          item={base}
+                          label={baseLabel}
+                          meta={`${baseWorkers.length} assigned Pal${baseWorkers.length === 1 ? '' : 's'}`}
+                          onFocus={props.onFocusItem}
+                        />
+                        <DisclosureToggle
+                          expanded={baseExpanded}
+                          label={`${displayName} ${baseLabel}`}
+                          controls={baseContentId}
+                          onClick={() => props.onToggleBase(base.id)}
+                        />
+                      </div>
+                      <div id={baseContentId} className="ml-3 border-l border-white/8 pl-2" hidden={!baseExpanded}>
+                        {baseExpanded &&
+                          displayedWorkers.map((worker) => (
+                            <ObjectRow
+                              key={worker.id}
+                              item={worker}
+                              meta={worker.level ? `Lv ${worker.level}` : undefined}
+                              {...props}
+                            />
+                          ))}
+                      </div>
+                    </div>
+                  )
+                })}
+              {expanded && selectedOutsideWorkers.length > 0 ? (
+                <fieldset className="m-0 mt-1 min-w-0 border-0 border-t border-white/10 p-0 pt-1">
+                  <legend className="sr-only">Outside base perimeters for {displayName}</legend>
+                  <h4 className="m-0 px-2 py-1 text-[10px] font-normal tracking-[.1em] text-[#8eb8bf] uppercase">
+                    Outside base perimeters
+                  </h4>
+                  <div className="grid gap-px">
+                    {displayedOutsideWorkers.map((worker) => (
+                      <ObjectRow
+                        key={worker.id}
+                        item={worker}
+                        meta={worker.level ? `Lv ${worker.level}` : undefined}
+                        className="pl-1"
+                        {...props}
+                      />
+                    ))}
+                  </div>
+                </fieldset>
+              ) : null}
+            </div>
+          </div>
+        )
+      })}
+      {!searchResultKeys && renderedBaseWorkers < eligibleBaseWorkers && (
+        <p className="my-1 ml-5 border-l-2 border-[#64d7e7]/40 px-2 py-1.5 text-[11px] text-[#9ec1c7]">
+          {eligibleBaseWorkers - renderedBaseWorkers} more assigned Pal
+          {eligibleBaseWorkers - renderedBaseWorkers === 1 ? '' : 's'} omitted. Refine your search or expand fewer bases
+          to inspect them.
+        </p>
+      )}
+      {(() => {
+        const fallbackMatches = 'no linked guild outside base perimeters'.includes(searchQuery)
+        const matchingWorkers = fallbackMatches ? fallbackWorkers : fallbackWorkers.filter(matches)
+        const requestedWorkers = props.search.trim() ? matchingWorkers : fallbackWorkers
+        const selectedWorkers = searchResultKeys
+          ? requestedWorkers.filter((worker) => searchResultKeys.has(searchResultKey(worker)))
+          : requestedWorkers
+        if (selectedWorkers.length === 0) return null
+        rendered++
+        eligibleOutsideWorkers += selectedWorkers.length
+        const remaining = Math.max(0, INITIAL_CATEGORY_ITEMS - renderedOutsideWorkers)
+        const displayedWorkers = selectedWorkers.slice(0, remaining)
+        renderedOutsideWorkers += displayedWorkers.length
+        return (
+          <fieldset className="m-0 min-w-0 border-0 p-0">
+            <legend className="sr-only">Pals with no linked guild</legend>
+            <div className="flex min-h-8 items-center gap-0.5">
+              <span className="grid size-8 shrink-0 place-items-center">
+                <Checkbox
+                  state={visibilityState(
+                    fallbackWorkers,
+                    props.enabledKinds,
+                    props.enabledPlayerStatuses,
+                    props.hiddenIds
+                  )}
+                  label="Show Pals with no linked guild"
+                  onChange={(visible) =>
+                    props.onToggleItems(
+                      fallbackWorkers.map((worker) => worker.id),
+                      visible
+                    )
+                  }
+                />
+              </span>
+              <div className="grid min-h-7 min-w-0 flex-1 grid-cols-[20px_minmax(0,1fr)_auto] items-center gap-1.5 px-1.5 py-1 text-xs text-[#cbd7d9]">
+                <MarkerGlyph kind="workers" />
+                <strong className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap font-medium">
+                  No linked guild
+                </strong>
+                <span className="ml-auto shrink-0 text-[10px] text-[#7f898e]">
+                  {fallbackWorkers.length} Pal{fallbackWorkers.length === 1 ? '' : 's'}
+                </span>
+              </div>
+            </div>
+            <div className="ml-3 border-l border-white/10 pl-2">
+              <h4 className="m-0 px-2 py-1 text-[10px] font-normal tracking-[.1em] text-[#8eb8bf] uppercase">
+                Outside base perimeters
+              </h4>
+              <div className="grid gap-px">
+                {displayedWorkers.map((worker) => (
+                  <ObjectRow
+                    key={worker.id}
+                    item={worker}
+                    meta={worker.level ? `Lv ${worker.level}` : undefined}
+                    className="pl-1"
+                    {...props}
+                  />
+                ))}
+              </div>
+            </div>
+          </fieldset>
+        )
+      })()}
+      {!searchResultKeys && renderedOutsideWorkers < eligibleOutsideWorkers && (
+        <p className="my-1 ml-5 border-l-2 border-[#64d7e7]/40 px-2 py-1.5 text-[11px] text-[#9ec1c7]">
+          {eligibleOutsideWorkers - renderedOutsideWorkers} more Pal
+          {eligibleOutsideWorkers - renderedOutsideWorkers === 1 ? '' : 's'} outside base perimeters omitted. Refine
+          your search or expand fewer guilds to inspect them.
+        </p>
+      )}
+      {rendered === 0 && (
+        <p className="my-1.5 pl-5 text-[11px] text-[#778187]">
+          {hasRawSearchMatches
+            ? `Guild matches fall outside the first ${GLOBAL_SEARCH_RESULT_BUDGET} results.`
+            : props.search.trim() && (bases.length > 0 || workers.length > 0)
+              ? `No guilds match “${props.search.trim()}”.`
+              : 'No guilds are currently available.'}
+        </p>
+      )}
+    </>
   )
 }
 

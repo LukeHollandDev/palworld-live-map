@@ -10,7 +10,7 @@
     "dev": "vite",
     "demo:media": "node tools/capture-demo.mjs",
     "build": "npm run typecheck && npm run build:assets",
-    "build:assets": "vite build",
+    "build:assets": "vite build && node tools/precompress.mjs",
     "check": "npm run lint && npm run typecheck",
     "format": "biome format --write .",
     "lint": "biome check .",

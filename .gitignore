@@ -10,3 +10,4 @@ coverage/
 coverage.out
 *.coverprofile
 web/dist/
+/assets/palworld/maps/*-z*-x*-y*.webp

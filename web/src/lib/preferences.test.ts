@@ -1,6 +1,11 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import type { ItemKind } from '../types'
-import { DEFAULT_ENABLED_PLAYER_STATUSES, loadFilterPreferences, saveFilterPreferences } from './preferences'
+import {
+  DEFAULT_ENABLED_PLAYER_STATUSES,
+  FILTERABLE_KINDS,
+  loadFilterPreferences,
+  saveFilterPreferences
+} from './preferences'
 
 const WORLD_CATALOGUE_KINDS: ItemKind[] = [
   'bounties',
@@ -18,8 +23,21 @@ afterEach(() => window.localStorage.clear())
 
 describe('filter preferences', () => {
   it('enables only players and guild content by default', () => {
-    expect(loadFilterPreferences().enabledKinds).toEqual(new Set(['players', 'bases', 'workers']))
-    expect(loadFilterPreferences().enabledPlayerStatuses).toEqual(new Set(DEFAULT_ENABLED_PLAYER_STATUSES))
+    const preferences = loadFilterPreferences()
+    expect(preferences.enabledKinds).toEqual(new Set(['players', 'bases', 'workers']))
+    expect(preferences.enabledPlayerStatuses).toEqual(new Set(DEFAULT_ENABLED_PLAYER_STATUSES))
+    expect(preferences.seenKinds).toEqual(new Set(FILTERABLE_KINDS))
+  })
+
+  it('treats current categories as seen when migrating preferences that predate seen-kind tracking', () => {
+    window.localStorage.setItem(
+      'palworld-live-map.filters.v1',
+      JSON.stringify({ kindsVersion: 5, enabledKinds: ['players'], hiddenIds: [] })
+    )
+
+    const preferences = loadFilterPreferences()
+    expect(preferences.enabledKinds).toEqual(new Set(['players']))
+    expect(preferences.seenKinds).toEqual(new Set(FILTERABLE_KINDS))
   })
 
   it('enables newly introduced landmark and world-catalogue kinds in legacy preferences', () => {

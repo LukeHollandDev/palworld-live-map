@@ -47,6 +47,8 @@ export function App() {
   const [config, setConfig] = useState<PublicConfig | null>(null)
   const [configError, setConfigError] = useState(false)
   const [configAttempt, setConfigAttempt] = useState(0)
+  const [catalogueError, setCatalogueError] = useState(false)
+  const [catalogueAttempt, setCatalogueAttempt] = useState(0)
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: incrementing configAttempt deliberately retries the request
   useEffect(() => {
@@ -56,26 +58,7 @@ export function App() {
         const response = await fetch('/api/config', { cache: 'no-store', signal: controller.signal })
         if (!response.ok) throw new Error(`/api/config returned ${response.status}`)
         const nextConfig = (await response.json()) as PublicConfig
-        const catalogueResponse = await fetch(nextConfig.catalogueUrl, {
-          cache: 'force-cache',
-          signal: controller.signal
-        })
-        if (!catalogueResponse.ok) throw new Error(`${nextConfig.catalogueUrl} returned ${catalogueResponse.status}`)
-        const catalogue = (await catalogueResponse.json()) as WorldCatalogue
-        const locations = Array.from(
-          new Map(
-            [...(nextConfig.landmarks || []), ...(catalogue.locations || [])].map((location) => [location.id, location])
-          ).values()
-        )
-        setConfig({
-          ...nextConfig,
-          landmarks: locations,
-          landmarkCatalogue: {
-            gameVersion: catalogue.gameVersion,
-            generator: catalogue.generator,
-            decoder: catalogue.decoder
-          }
-        })
+        setConfig(nextConfig)
         setConfigError(false)
       } catch {
         if (!controller.signal.aborted) setConfigError(true)
@@ -84,6 +67,48 @@ export function App() {
     void load()
     return () => controller.abort()
   }, [configAttempt])
+
+  // The catalogue URL comes from the configuration, but the live map does not
+  // need to wait for the larger catalogue response before it can start polling
+  // and render the configured layers and legacy landmarks.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: incrementing catalogueAttempt deliberately retries the request
+  useEffect(() => {
+    if (!config) return
+    const controller = new AbortController()
+    const catalogueUrl = config.catalogueUrl
+    const load = async () => {
+      try {
+        const response = await fetch(catalogueUrl, {
+          cache: 'force-cache',
+          signal: controller.signal
+        })
+        if (!response.ok) throw new Error(`${catalogueUrl} returned ${response.status}`)
+        const catalogue = (await response.json()) as WorldCatalogue
+        setConfig((current) => {
+          if (!current || current.catalogueUrl !== catalogueUrl) return current
+          const locations = Array.from(
+            new Map(
+              [...(current.landmarks || []), ...(catalogue.locations || [])].map((location) => [location.id, location])
+            ).values()
+          )
+          return {
+            ...current,
+            landmarks: locations,
+            landmarkCatalogue: {
+              gameVersion: catalogue.gameVersion,
+              generator: catalogue.generator,
+              decoder: catalogue.decoder
+            }
+          }
+        })
+        setCatalogueError(false)
+      } catch {
+        if (!controller.signal.aborted) setCatalogueError(true)
+      }
+    }
+    void load()
+    return () => controller.abort()
+  }, [catalogueAttempt, config?.catalogueUrl])
 
   if (!config) {
     return (
@@ -112,10 +137,27 @@ export function App() {
     )
   }
 
-  return <LiveMap config={config} />
+  return (
+    <LiveMap
+      config={config}
+      catalogueError={catalogueError}
+      onRetryCatalogue={() => {
+        setCatalogueError(false)
+        setCatalogueAttempt((attempt) => attempt + 1)
+      }}
+    />
+  )
 }
 
-function LiveMap({ config }: { config: PublicConfig }) {
+function LiveMap({
+  config,
+  catalogueError,
+  onRetryCatalogue
+}: {
+  config: PublicConfig
+  catalogueError: boolean
+  onRetryCatalogue: () => void
+}) {
   const players = usePolling<PlayerState>('/api/players', config.pollIntervalMs)
   const objects = usePolling<ObjectState>('/api/objects', config.worldPollIntervalMs, config.worldDataEnabled)
   const playerState = players.data
@@ -514,6 +556,12 @@ function LiveMap({ config }: { config: PublicConfig }) {
     expandedGuilds,
     expandedBases,
     dataNotices,
+    catalogueRetry: catalogueError
+      ? {
+          message: 'Additional static map locations are temporarily unavailable.',
+          onRetry: onRetryCatalogue
+        }
+      : undefined,
     onSearchChange: setSearch,
     onCheckAll: checkAll,
     onUncheckAll: uncheckAll,

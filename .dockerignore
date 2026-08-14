@@ -14,6 +14,7 @@ web/dist/
 exporter/
 assets/images/
 assets/palworld/README.md
+assets/palworld/maps/*-z*-x*-y*.webp
 **/*_test.go
 web/src/**/*.test.ts
 web/src/**/*.test.tsx

@@ -1,16 +1,29 @@
 import { IconCrosshair, IconMinus, IconPlus } from '@tabler/icons-react'
-import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react'
 import {
+  forwardRef,
+  useCallback,
+  useEffect,
+  useImperativeHandle,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState
+} from 'react'
+import {
+  buildSpatialGrid,
   clampView,
   coverScale,
-  isScenePointVisible,
   itemSearchText,
   MAX_ZOOM_RATIO,
+  type MapTilePyramid,
+  type MapTileSelection,
   markerStackOrder,
   markerText,
   type Point,
+  querySpatialGrid,
   sceneSize,
   sceneViewportBounds,
+  selectVisibleMapTiles,
   toScene,
   toWorld,
   type View
@@ -57,20 +70,126 @@ interface RenderMarker {
   count?: number
 }
 
+interface ProjectedMarker {
+  item: MapItem
+  position: Point
+}
+
+interface MarkerBucket {
+  first: MapItem
+  count: number
+  x: number
+  y: number
+}
+
 interface ImageResult {
   url: string
   state: 'ready' | 'error'
   background?: string
 }
 
-const MAX_INDIVIDUAL_MARKERS = 900
+interface TileTransition {
+  layerId: string
+  current: MapTileSelection | null
+  previous: MapTileSelection | null
+}
+
+const MAX_RENDERED_MARKERS = 300
+const TARGET_CLUSTER_MARKERS = 250
 const CLUSTER_SIZE_PX = 52
+const MIN_CLUSTER_GROWTH = 1.15
 const CONTROL_ZOOM_DURATION_MS = 220
 const ITEM_FOCUS_DURATION_MS = 420
 const RESIZE_RENDER_SYNC_DELAY_MS = 120
 const MAP_FIT_PADDING_PX = 64
 const ZOOM_SAVE_DELAY_MS = 120
 const SELECTED_MARKER_STACK = 120
+
+function mapTilePyramid(layer: MapLayer): MapTilePyramid | null {
+  const candidate = (layer as MapLayer & { tilePyramid?: Partial<MapTilePyramid> }).tilePyramid
+  if (
+    !candidate ||
+    !Number.isFinite(candidate.tileSize) ||
+    !candidate.tileSize ||
+    !Array.isArray(candidate.levels) ||
+    !candidate.levels.length ||
+    typeof candidate.urlTemplate !== 'string' ||
+    !candidate.urlTemplate.includes('{size}') ||
+    !candidate.urlTemplate.includes('{x}') ||
+    !candidate.urlTemplate.includes('{y}')
+  )
+    return null
+  return candidate as MapTilePyramid
+}
+
+function TileArtwork({
+  selection,
+  onReady,
+  onError,
+  onSample
+}: {
+  selection: MapTileSelection
+  onReady: (signature: string) => void
+  onError: (signature: string) => void
+  onSample: (image: HTMLImageElement) => void
+}) {
+  const imagesRef = useRef(new Map<string, HTMLImageElement>())
+  const [loaded, setLoaded] = useState<Set<string>>(() => new Set())
+  const ready = selection.tiles.length > 0 && loaded.size === selection.tiles.length
+
+  const markLoaded = useCallback((key: string) => {
+    setLoaded((current) => {
+      if (current.has(key)) return current
+      const next = new Set(current)
+      next.add(key)
+      return next
+    })
+  }, [])
+
+  useLayoutEffect(() => {
+    const cached = new Set<string>()
+    for (const tile of selection.tiles) {
+      const image = imagesRef.current.get(tile.key)
+      if (image?.complete && image.naturalWidth > 0) cached.add(tile.key)
+    }
+    if (cached.size) setLoaded(cached)
+  }, [selection.tiles])
+
+  useEffect(() => {
+    if (ready) onReady(selection.signature)
+  }, [onReady, ready, selection.signature])
+
+  return (
+    <div
+      className={`map-tile-layer absolute inset-0 ${ready ? 'is-ready' : ''}`}
+      data-map-tile-level={selection.level}
+      aria-hidden="true"
+    >
+      {selection.tiles.map((tile, index) => (
+        <img
+          key={tile.key}
+          ref={(image) => {
+            if (image) imagesRef.current.set(tile.key, image)
+            else imagesRef.current.delete(tile.key)
+          }}
+          className="map-tile absolute select-none"
+          src={tile.url}
+          alt=""
+          width={tile.pixelSize}
+          height={tile.pixelSize}
+          decoding="async"
+          draggable={false}
+          style={{ left: tile.x, top: tile.y, width: tile.size, height: tile.size }}
+          onLoad={(event) => {
+            markLoaded(tile.key)
+            if (index === 0) onSample(event.currentTarget)
+          }}
+          onError={() => onError(selection.signature)}
+        />
+      ))}
+    </div>
+  )
+}
 
 function fitScale(width: number, height: number, size: number): number {
   const availableWidth = Math.max(1, width - MAP_FIT_PADDING_PX * 2)
@@ -81,6 +200,22 @@ function fitScale(width: number, height: number, size: number): number {
 function fitView(width: number, height: number, size: number): View {
   const scale = fitScale(width, height, size)
   return { scale, x: (width - size * scale) / 2, y: (height - size * scale) / 2 }
+}
+
+function bucketMarkers(markers: ProjectedMarker[], cellSize: number): Map<string, MarkerBucket> {
+  const buckets = new Map<string, MarkerBucket>()
+  for (const { item, position } of markers) {
+    const key = `${Math.floor(position.x / cellSize)}:${Math.floor(position.y / cellSize)}`
+    const bucket = buckets.get(key)
+    if (bucket) {
+      bucket.count++
+      bucket.x += position.x
+      bucket.y += position.y
+    } else {
+      buckets.set(key, { first: item, count: 1, x: position.x, y: position.y })
+    }
+  }
+  return buckets
 }
 
 function sampleImageBackground(
@@ -127,9 +262,62 @@ export const MapViewport = forwardRef<MapViewportHandle, MapViewportProps>(funct
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [renderViewport, setRenderViewport] = useState(initialViewport)
   const [imageResult, setImageResult] = useState<ImageResult | null>(null)
+  const [readyTileSignature, setReadyTileSignature] = useState<string | null>(null)
+  const readyTileSignatureRef = useRef<string | null>(null)
+  const [errorTileSignature, setErrorTileSignature] = useState<string | null>(null)
+  const [tileBackground, setTileBackground] = useState<{ layerId: string; value: string } | null>(null)
   const imageUrl = activeLayer.imageUrl
-  const imageState = !imageUrl ? 'error' : imageResult?.url === imageUrl ? imageResult.state : 'loading'
-  const imageBackground = imageUrl && imageResult?.url === imageUrl ? imageResult.background : undefined
+  const tilePyramid = useMemo(() => mapTilePyramid(activeLayer), [activeLayer])
+  const requestedTiles = useMemo(
+    () =>
+      tilePyramid
+        ? selectVisibleMapTiles(tilePyramid, renderViewport.view, renderViewport.width, renderViewport.height, size)
+        : null,
+    [renderViewport, size, tilePyramid]
+  )
+  const [tileTransition, setTileTransition] = useState<TileTransition>(() => ({
+    layerId: activeLayer.id,
+    current: requestedTiles,
+    previous: null
+  }))
+
+  useLayoutEffect(() => {
+    setTileTransition((current) => {
+      if (current.layerId === activeLayer.id && current.current?.signature === requestedTiles?.signature) return current
+      return {
+        layerId: activeLayer.id,
+        current: requestedTiles,
+        previous:
+          current.layerId === activeLayer.id
+            ? current.current?.signature === readyTileSignatureRef.current
+              ? current.current
+              : current.previous
+            : null
+      }
+    })
+  }, [activeLayer.id, requestedTiles])
+
+  const currentTileSignature = tileTransition.current?.signature
+  const currentTilesFailed = Boolean(tilePyramid && errorTileSignature === currentTileSignature)
+  const fallbackImageState = !imageUrl ? 'error' : imageResult?.url === imageUrl ? imageResult.state : 'loading'
+  const imageState = tilePyramid
+    ? currentTilesFailed
+      ? fallbackImageState
+      : readyTileSignature === currentTileSignature
+        ? 'ready'
+        : 'loading'
+    : !imageUrl
+      ? 'error'
+      : imageResult?.url === imageUrl
+        ? imageResult.state
+        : 'loading'
+  const imageBackground = tilePyramid
+    ? tileBackground?.layerId === activeLayer.id
+      ? tileBackground.value
+      : undefined
+    : imageUrl && imageResult?.url === imageUrl
+      ? imageResult.background
+      : undefined
 
   const current = useMemo(() => {
     const layerItems: MapItem[] = []
@@ -168,6 +356,17 @@ export const MapViewport = forwardRef<MapViewportHandle, MapViewportProps>(funct
     })
   }, [current, enabledKinds, enabledPlayerStatuses, hiddenIds, search])
 
+  const projectedItems = useMemo(() => {
+    const entries = visibleItems.flatMap((item) => {
+      const position = toScene(item, activeLayer, size)
+      return position ? [{ value: item, position }] : []
+    })
+    return {
+      grid: buildSpatialGrid(entries),
+      byId: new Map(entries.map((entry) => [entry.value.id, entry]))
+    }
+  }, [activeLayer, size, visibleItems])
+
   const renderMarkers = useMemo<RenderMarker[]>(() => {
     const bounds = sceneViewportBounds(
       renderViewport.view,
@@ -175,44 +374,50 @@ export const MapViewport = forwardRef<MapViewportHandle, MapViewportProps>(funct
       renderViewport.height,
       CLUSTER_SIZE_PX * 2
     )
-    const projected = visibleItems.flatMap((item) => {
-      const position = toScene(item, activeLayer, size)
-      return position && (item.id === selectedId || isScenePointVisible(position, bounds)) ? [{ item, position }] : []
-    })
+    const projected = querySpatialGrid(projectedItems.grid, bounds).map(({ value: item, position }) => ({
+      item,
+      position
+    }))
+    const selectedEntry = selectedId ? projectedItems.byId.get(selectedId) : undefined
+    if (selectedEntry && !projected.some(({ item }) => item.id === selectedId))
+      projected.push({ item: selectedEntry.value, position: selectedEntry.position })
 
-    if (projected.length <= MAX_INDIVIDUAL_MARKERS) {
+    if (projected.length <= MAX_RENDERED_MARKERS) {
       return projected.map(({ item, position }) => ({ key: item.id, item, position }))
     }
 
-    const cellSize = CLUSTER_SIZE_PX / renderViewport.view.scale
-    const buckets = new Map<string, { items: MapItem[]; x: number; y: number }>()
     const selected: RenderMarker[] = []
-    for (const { item, position } of projected) {
+    const clusterCandidates: ProjectedMarker[] = []
+    for (const marker of projected) {
+      const { item, position } = marker
       if (item.id === selectedId) {
         selected.push({ key: item.id, item, position })
         continue
       }
-      const key = `${Math.floor(position.x / cellSize)}:${Math.floor(position.y / cellSize)}`
-      const bucket = buckets.get(key) || { items: [], x: 0, y: 0 }
-      bucket.items.push(item)
-      bucket.x += position.x
-      bucket.y += position.y
-      buckets.set(key, bucket)
+      clusterCandidates.push(marker)
+    }
+
+    const target = Math.max(1, TARGET_CLUSTER_MARKERS - selected.length)
+    let cellSizePx = CLUSTER_SIZE_PX
+    let buckets = bucketMarkers(clusterCandidates, cellSizePx / renderViewport.view.scale)
+    while (buckets.size > target) {
+      const growth = Math.max(MIN_CLUSTER_GROWTH, Math.sqrt(buckets.size / target))
+      cellSizePx = Math.ceil(cellSizePx * growth)
+      buckets = bucketMarkers(clusterCandidates, cellSizePx / renderViewport.view.scale)
     }
 
     const clustered = Array.from(buckets, ([key, bucket]): RenderMarker => {
-      if (bucket.items.length === 1) {
-        const item = bucket.items[0]
-        return { key: item.id, item, position: { x: bucket.x, y: bucket.y } }
+      if (bucket.count === 1) {
+        return { key: bucket.first.id, item: bucket.first, position: { x: bucket.x, y: bucket.y } }
       }
       return {
         key: `cluster:${key}`,
-        count: bucket.items.length,
-        position: { x: bucket.x / bucket.items.length, y: bucket.y / bucket.items.length }
+        count: bucket.count,
+        position: { x: bucket.x / bucket.count, y: bucket.y / bucket.count }
       }
     })
     return [...selected, ...clustered]
-  }, [activeLayer, renderViewport, selectedId, size, visibleItems])
+  }, [projectedItems, renderViewport, selectedId])
 
   const syncRenderViewport = useCallback(() => {
     const viewport = viewportRef.current
@@ -475,7 +680,7 @@ export const MapViewport = forwardRef<MapViewportHandle, MapViewportProps>(funct
       ref={viewportRef}
       className={`map-viewport map-layer-${activeLayer.id} relative size-full touch-pinch-zoom overflow-hidden active:cursor-grabbing`}
       role="application"
-      aria-label="Interactive world map. Use arrow keys to pan and plus or minus to zoom."
+      aria-label={`${activeLayer.name} interactive world map. Use arrow keys to pan and plus or minus to zoom.`}
       // biome-ignore lint/a11y/noNoninteractiveTabindex: the map is an interactive pan and zoom canvas
       tabIndex={0}
       style={
@@ -589,10 +794,63 @@ export const MapViewport = forwardRef<MapViewportHandle, MapViewportProps>(funct
           } as React.CSSProperties
         }
       >
-        {imageUrl && (
+        {imageState !== 'ready' && <div className="fallback-grid absolute inset-0 size-full" aria-hidden="true" />}
+        {tilePyramid
+          ? [tileTransition.previous, tileTransition.current]
+              .filter((selection): selection is MapTileSelection => Boolean(selection))
+              .map((selection) => (
+                <TileArtwork
+                  key={selection.signature}
+                  selection={selection}
+                  onReady={(signature) => {
+                    readyTileSignatureRef.current = signature
+                    setReadyTileSignature(signature)
+                    setTileTransition((current) =>
+                      current.current?.signature === signature && current.previous
+                        ? { ...current, previous: null }
+                        : current
+                    )
+                  }}
+                  onError={(signature) => {
+                    setErrorTileSignature(signature)
+                    setTileTransition((current) =>
+                      current.current?.signature === signature ? { ...current, previous: null } : current
+                    )
+                  }}
+                  onSample={(image) => {
+                    const background = sampleImageBackground(
+                      image,
+                      activeLayer.id === 'palpagos' ? [-1, -1, 0] : undefined
+                    )
+                    if (background) setTileBackground({ layerId: activeLayer.id, value: background })
+                  }}
+                />
+              ))
+          : imageUrl && (
+              <img
+                className={`map-artwork absolute inset-0 size-full select-none object-fill ${
+                  imageState === 'ready' ? 'block' : 'hidden'
+                }`}
+                src={imageUrl}
+                alt=""
+                draggable={false}
+                onLoad={(event) =>
+                  setImageResult({
+                    url: imageUrl,
+                    state: 'ready',
+                    background: sampleImageBackground(
+                      event.currentTarget,
+                      activeLayer.id === 'palpagos' ? [-1, -1, 0] : undefined
+                    )
+                  })
+                }
+                onError={() => setImageResult({ url: imageUrl, state: 'error' })}
+              />
+            )}
+        {tilePyramid && currentTilesFailed && imageUrl && (
           <img
             className={`map-artwork absolute inset-0 size-full select-none object-fill ${
-              imageState === 'ready' ? 'block' : 'hidden'
+              fallbackImageState === 'ready' ? 'block' : 'hidden'
             }`}
             src={imageUrl}
             alt=""
@@ -610,7 +868,6 @@ export const MapViewport = forwardRef<MapViewportHandle, MapViewportProps>(funct
             onError={() => setImageResult({ url: imageUrl, state: 'error' })}
           />
         )}
-        {imageState !== 'ready' && <div className="fallback-grid absolute inset-0 size-full" aria-hidden="true" />}
         <div className="absolute inset-0">
           {renderMarkers.map(({ key, item, position, count }) => {
             if (!item) {

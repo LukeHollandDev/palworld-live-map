@@ -1,15 +1,18 @@
 package server
 
 import (
+	"bytes"
 	"compress/gzip"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"io"
 	"io/fs"
 	"net/http"
 	"net/http/httptest"
 	"regexp"
+	"strconv"
 	"strings"
 	"testing"
 	"testing/fstest"
@@ -20,6 +23,20 @@ import (
 )
 
 type fixedSnapshot struct{ value palworld.Snapshot }
+
+func (s fixedSnapshot) PlayerSnapshotSince(revision uint64) (palworld.PlayerSnapshot, uint64, bool) {
+	if revision == 1 {
+		return palworld.PlayerSnapshot{}, 1, false
+	}
+	return s.PlayerSnapshot(), 1, true
+}
+
+func (s fixedSnapshot) ObjectSnapshotSince(revision uint64) (palworld.ObjectSnapshot, uint64, bool) {
+	if revision == 1 {
+		return palworld.ObjectSnapshot{}, 1, false
+	}
+	return s.ObjectSnapshot(), 1, true
+}
 
 type deadlineRecorder struct {
 	*httptest.ResponseRecorder
@@ -32,6 +49,36 @@ type trackingSnapshotSource struct {
 	objectCalls int
 }
 
+type revisionSnapshotSource struct {
+	playerBuilds int
+	objectBuilds int
+	objects      []palworld.WorldObject
+}
+
+func (s *revisionSnapshotSource) Snapshot() palworld.Snapshot {
+	return palworld.Snapshot{Players: []palworld.Player{}, Objects: []palworld.WorldObject{}}
+}
+
+func (s *revisionSnapshotSource) PlayerSnapshotSince(revision uint64) (palworld.PlayerSnapshot, uint64, bool) {
+	if revision == 1 {
+		return palworld.PlayerSnapshot{}, 1, false
+	}
+	s.playerBuilds++
+	return palworld.PlayerSnapshot{Players: []palworld.Player{}}, 1, true
+}
+
+func (s *revisionSnapshotSource) ObjectSnapshotSince(revision uint64) (palworld.ObjectSnapshot, uint64, bool) {
+	if revision == 1 {
+		return palworld.ObjectSnapshot{}, 1, false
+	}
+	s.objectBuilds++
+	objects := s.objects
+	if objects == nil {
+		objects = []palworld.WorldObject{{ID: "base", Kind: "bases", Name: "Home"}}
+	}
+	return palworld.ObjectSnapshot{Available: true, Total: len(objects), Objects: objects}, 1, true
+}
+
 func (s *trackingSnapshotSource) Snapshot() palworld.Snapshot {
 	s.fullCalls++
 	return palworld.Snapshot{Players: []palworld.Player{}, Objects: []palworld.WorldObject{}}
@@ -42,9 +89,17 @@ func (s *trackingSnapshotSource) PlayerSnapshot() palworld.PlayerSnapshot {
 	return palworld.PlayerSnapshot{Players: []palworld.Player{}}
 }
 
+func (s *trackingSnapshotSource) PlayerSnapshotSince(uint64) (palworld.PlayerSnapshot, uint64, bool) {
+	return s.PlayerSnapshot(), uint64(s.playerCalls), true
+}
+
 func (s *trackingSnapshotSource) ObjectSnapshot() palworld.ObjectSnapshot {
 	s.objectCalls++
 	return palworld.ObjectSnapshot{Objects: []palworld.WorldObject{}}
+}
+
+func (s *trackingSnapshotSource) ObjectSnapshotSince(uint64) (palworld.ObjectSnapshot, uint64, bool) {
+	return s.ObjectSnapshot(), uint64(s.objectCalls), true
 }
 
 func (r *deadlineRecorder) SetWriteDeadline(deadline time.Time) error {
@@ -238,6 +293,82 @@ func TestJSONEndpointsSupportGzip(t *testing.T) {
 	}
 }
 
+func TestDynamicEndpointsReuseCachedRepresentationsAndReturn304(t *testing.T) {
+	source := &revisionSnapshotSource{}
+	service, err := New(testConfig(), source)
+	if err != nil {
+		t.Fatal(err)
+	}
+	request := httptest.NewRequest(http.MethodGet, "/api/objects", nil)
+	request.Header.Set("Accept-Encoding", "gzip")
+	first := httptest.NewRecorder()
+	service.Handler().ServeHTTP(first, request)
+	if first.Code != http.StatusOK || first.Header().Get("ETag") == "" || first.Header().Get("Content-Encoding") != "gzip" {
+		t.Fatalf("first response = status %d, etag %q, encoding %q", first.Code, first.Header().Get("ETag"), first.Header().Get("Content-Encoding"))
+	}
+	reader, err := gzip.NewReader(first.Body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	decompressed, err := io.ReadAll(reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = reader.Close()
+	identity := httptest.NewRecorder()
+	service.Handler().ServeHTTP(identity, httptest.NewRequest(http.MethodGet, "/api/objects", nil))
+	if !bytes.Equal(decompressed, identity.Body.Bytes()) {
+		t.Fatalf("gzip and identity representations differ: %q != %q", decompressed, identity.Body.Bytes())
+	}
+	conditional := httptest.NewRequest(http.MethodGet, "/api/objects", nil)
+	conditional.Header.Set("If-None-Match", first.Header().Get("ETag"))
+	second := httptest.NewRecorder()
+	service.Handler().ServeHTTP(second, conditional)
+	if second.Code != http.StatusNotModified || second.Body.Len() != 0 {
+		t.Fatalf("conditional response = status %d, body %q", second.Code, second.Body.String())
+	}
+	if source.objectBuilds != 1 {
+		t.Fatalf("object snapshots built %d times, want once", source.objectBuilds)
+	}
+}
+
+func BenchmarkCachedObjectResponses(b *testing.B) {
+	objects := make([]palworld.WorldObject, 8_000)
+	for index := range objects {
+		objects[index] = palworld.WorldObject{
+			ID: fmt.Sprintf("object:%d", index), Kind: "workers", Name: "Assigned Pal",
+			BaseID: fmt.Sprintf("base:%d", index/20), X: float64(index), Y: -float64(index), Map: "palpagos",
+		}
+	}
+	source := &revisionSnapshotSource{objects: objects}
+	service := &Server{settings: serverSettings{worldDataEnabled: true}, source: source}
+	service.handler = service.securityHeaders(service.routes())
+	warm := httptest.NewRecorder()
+	service.Handler().ServeHTTP(warm, httptest.NewRequest(http.MethodGet, "/api/objects", nil))
+	etag := warm.Header().Get("ETag")
+
+	for _, benchmark := range []struct {
+		name     string
+		encoding string
+		etag     string
+	}{
+		{name: "identity"},
+		{name: "gzip", encoding: "gzip"},
+		{name: "not-modified", etag: etag},
+	} {
+		b.Run(benchmark.name, func(b *testing.B) {
+			b.ReportAllocs()
+			for range b.N {
+				request := httptest.NewRequest(http.MethodGet, "/api/objects", nil)
+				request.Header.Set("Accept-Encoding", benchmark.encoding)
+				request.Header.Set("If-None-Match", benchmark.etag)
+				response := httptest.NewRecorder()
+				service.Handler().ServeHTTP(response, request)
+			}
+		})
+	}
+}
+
 func TestPublicConfigAndObjectsExposeDisabledWorldData(t *testing.T) {
 	cfg := testConfig()
 	cfg.WorldDataEnabled = false
@@ -302,6 +433,14 @@ func TestServerServesOnlyKnownEmbeddedMapArtwork(t *testing.T) {
 	service.Handler().ServeHTTP(versioned, httptest.NewRequest(http.MethodGet, service.layers[0].ImageURL, nil))
 	if versioned.Code != http.StatusOK || !strings.Contains(versioned.Header().Get("Cache-Control"), "immutable") {
 		t.Fatalf("versioned map response = status %d, cache %q", versioned.Code, versioned.Header().Get("Cache-Control"))
+	}
+
+	tileTemplate := service.layers[0].TilePyramid.URLTemplate
+	tileURL := strings.NewReplacer("{size}", strconv.Itoa(service.layers[0].TilePyramid.Levels[0]), "{x}", "0", "{y}", "0").Replace(tileTemplate)
+	tile := httptest.NewRecorder()
+	service.Handler().ServeHTTP(tile, httptest.NewRequest(http.MethodGet, tileURL, nil))
+	if tile.Code != http.StatusOK || tile.Header().Get("Content-Type") != "image/webp" || !strings.Contains(tile.Header().Get("Cache-Control"), "immutable") || tile.Header().Get("ETag") == "" {
+		t.Fatalf("tile response = status %d, type %q, cache %q, etag %q", tile.Code, tile.Header().Get("Content-Type"), tile.Header().Get("Cache-Control"), tile.Header().Get("ETag"))
 	}
 
 	wrongVersion := httptest.NewRecorder()
@@ -459,6 +598,30 @@ func TestServerServesViteFrontendAssets(t *testing.T) {
 	}
 }
 
+func TestServerSelectsPrecompressedHashedAssets(t *testing.T) {
+	service := &Server{assets: fstest.MapFS{
+		"assets/app-deadbeef.js":    &fstest.MapFile{Data: []byte("identity")},
+		"assets/app-deadbeef.js.br": &fstest.MapFile{Data: []byte("brotli")},
+		"assets/app-deadbeef.js.gz": &fstest.MapFile{Data: []byte("gzip")},
+	}}
+	service.handler = service.securityHeaders(service.routes())
+	for _, test := range []struct {
+		accept, encoding, body string
+	}{
+		{accept: "br, gzip", encoding: "br", body: "brotli"},
+		{accept: "br;q=0.1, gzip;q=1", encoding: "gzip", body: "gzip"},
+		{accept: "identity", encoding: "", body: "identity"},
+	} {
+		request := httptest.NewRequest(http.MethodGet, "/assets/app-deadbeef.js", nil)
+		request.Header.Set("Accept-Encoding", test.accept)
+		response := httptest.NewRecorder()
+		service.Handler().ServeHTTP(response, request)
+		if response.Code != http.StatusOK || response.Header().Get("Content-Encoding") != test.encoding || response.Header().Get("Vary") != "Accept-Encoding" || response.Body.String() != test.body {
+			t.Fatalf("accept %q = status %d, encoding %q, vary %q, body %q", test.accept, response.Code, response.Header().Get("Content-Encoding"), response.Header().Get("Vary"), response.Body.String())
+		}
+	}
+}
+
 func TestEmptySnapshotOmitsZeroTimestamps(t *testing.T) {
 	service, err := New(testConfig(), fixedSnapshot{})
 	if err != nil {
@@ -549,13 +712,52 @@ func TestLoadMapLayersRejectsInvalidMetadataAndArtwork(t *testing.T) {
 	}
 }
 
+func TestLoadMapTilePyramidRejectsIntegrityAndRoutingDrift(t *testing.T) {
+	tileData := []byte("tile")
+	tileDigest := sha256.Sum256(tileData)
+	tileHash := hex.EncodeToString(tileDigest[:])
+	aggregate := sha256.Sum256([]byte("512/0/0 " + tileHash + "\n"))
+	pyramid := &mapManifestTilePyramid{
+		TileSize: 512,
+		Format:   "webp",
+		SHA256:   hex.EncodeToString(aggregate[:]),
+		Levels: []mapManifestTileLevel{{Size: 512, Columns: 1, Rows: 1, Tiles: []mapManifestTile{{
+			X: 0, Y: 0, File: "palpagos-z512-x0-y0.webp", Bytes: int64(len(tileData)), SHA256: tileHash,
+		}}}},
+	}
+	maps := fstest.MapFS{"palpagos-z512-x0-y0.webp": &fstest.MapFile{Data: tileData}}
+	if _, _, err := loadMapTilePyramid(maps, "palpagos", pyramid); err != nil {
+		t.Fatalf("valid pyramid = %v", err)
+	}
+
+	wrongAggregate := *pyramid
+	wrongAggregate.SHA256 = strings.Repeat("0", 64)
+	if _, _, err := loadMapTilePyramid(maps, "palpagos", &wrongAggregate); err == nil || !strings.Contains(err.Error(), "aggregate") {
+		t.Fatalf("wrong aggregate error = %v", err)
+	}
+
+	wrongFilename := *pyramid
+	wrongFilename.Levels = append([]mapManifestTileLevel(nil), pyramid.Levels...)
+	wrongFilename.Levels[0].Tiles = append([]mapManifestTile(nil), pyramid.Levels[0].Tiles...)
+	wrongFilename.Levels[0].Tiles[0].File = "other-z512-x0-y0.webp"
+	if _, _, err := loadMapTilePyramid(maps, "palpagos", &wrongFilename); err == nil || !strings.Contains(err.Error(), "invalid tile") {
+		t.Fatalf("wrong filename error = %v", err)
+	}
+
+	unsorted := *pyramid
+	unsorted.Levels = append(append([]mapManifestTileLevel(nil), pyramid.Levels...), pyramid.Levels[0])
+	if _, _, err := loadMapTilePyramid(maps, "palpagos", &unsorted); err == nil || !strings.Contains(err.Error(), "invalid tile level") {
+		t.Fatalf("unsorted level error = %v", err)
+	}
+}
+
 func validTestMapFS(t *testing.T) fstest.MapFS {
 	t.Helper()
 	palpagosArtwork := []byte("test map artwork")
 	worldTreeArtwork := []byte("test world tree artwork")
 	palpagosDigest := sha256.Sum256(palpagosArtwork)
 	worldTreeDigest := sha256.Sum256(worldTreeArtwork)
-	manifest := mapManifest{SchemaVersion: 1, Layers: []mapManifestLayer{
+	manifest := mapManifest{SchemaVersion: 2, Layers: []mapManifestLayer{
 		{
 			ID: "palpagos", Name: "Palpagos", File: "palpagos-test.jpg",
 			Bounds: [4]float64{349400, 724400, -1099400, -724400}, SHA256: hex.EncodeToString(palpagosDigest[:]),
@@ -565,15 +767,29 @@ func validTestMapFS(t *testing.T) fstest.MapFS {
 			Bounds: [4]float64{689148.5, -476400, 347351.5, -818197}, SHA256: hex.EncodeToString(worldTreeDigest[:]),
 		},
 	}}
+	files := fstest.MapFS{
+		"palpagos-test.jpg":   &fstest.MapFile{Data: palpagosArtwork},
+		"world-tree-test.jpg": &fstest.MapFile{Data: worldTreeArtwork},
+	}
+	for index := range manifest.Layers {
+		layer := &manifest.Layers[index]
+		tileName := fmt.Sprintf("%s-z512-x0-y0.webp", layer.ID)
+		tileData := []byte("tile for " + layer.ID)
+		tileDigest := sha256.Sum256(tileData)
+		tileHash := hex.EncodeToString(tileDigest[:])
+		aggregate := sha256.Sum256([]byte("512/0/0 " + tileHash + "\n"))
+		layer.TilePyramid = &mapManifestTilePyramid{
+			TileSize: 512, Format: "webp", SHA256: hex.EncodeToString(aggregate[:]),
+			Levels: []mapManifestTileLevel{{Size: 512, Columns: 1, Rows: 1, Tiles: []mapManifestTile{{X: 0, Y: 0, File: tileName, Bytes: int64(len(tileData)), SHA256: tileHash}}}},
+		}
+		files[tileName] = &fstest.MapFile{Data: tileData}
+	}
 	encoded, err := json.Marshal(manifest)
 	if err != nil {
 		t.Fatal(err)
 	}
-	return fstest.MapFS{
-		"manifest.json":       &fstest.MapFile{Data: encoded},
-		"palpagos-test.jpg":   &fstest.MapFile{Data: palpagosArtwork},
-		"world-tree-test.jpg": &fstest.MapFile{Data: worldTreeArtwork},
-	}
+	files["manifest.json"] = &fstest.MapFile{Data: encoded}
+	return files
 }
 
 func cloneMapFS(source fstest.MapFS) fstest.MapFS {

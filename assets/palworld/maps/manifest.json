@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "gameVersion": "1.0.3.101283",
   "generator": "palworld-asset-exporter/4",
   "decoder": "CUE4Parse/1.2.2.202608",
@@ -31,7 +31,2428 @@
       "sourceHeight": 8192,
       "width": 8192,
       "height": 8192,
-      "sha256": "9961632d5c38a0a67fd18713fa63af0ac6f192e71fadeb5ba53ae696b8914dd1"
+      "sha256": "9961632d5c38a0a67fd18713fa63af0ac6f192e71fadeb5ba53ae696b8914dd1",
+      "tilePyramid": {
+        "tileSize": 512,
+        "format": "webp",
+        "quality": 82,
+        "method": 6,
+        "exact": true,
+        "resampling": "lanczos",
+        "encoder": "Pillow/11.3.0 libwebp/1.5.0",
+        "generatorSha256": "70cf076bdb943f00f132afa0157f6e2e5a6cb7f5de8c23c37312940167097a14",
+        "sha256": "285f5c5ee96d11375ecee388c92653ae439bdcc6961ab45f9a3deef476630c7f",
+        "levels": [
+          {
+            "size": 1024,
+            "columns": 2,
+            "rows": 2,
+            "tiles": [
+              {
+                "x": 0,
+                "y": 0,
+                "file": "palpagos-z1024-x0-y0.webp",
+                "bytes": 15386,
+                "sha256": "0ccb031265d07a5e9b5cbc92e0b2df66876ab2ca7004182de74d1b9ae173713e"
+              },
+              {
+                "x": 1,
+                "y": 0,
+                "file": "palpagos-z1024-x1-y0.webp",
+                "bytes": 37560,
+                "sha256": "f4ad327ac980bd556912ba13929fd0db3268eda54202380000514c1e9d0d9cb0"
+              },
+              {
+                "x": 0,
+                "y": 1,
+                "file": "palpagos-z1024-x0-y1.webp",
+                "bytes": 27754,
+                "sha256": "f2d2241ad857f53636e17f2107d12b0c7d82a3088f5573aaab47a406d81b9a45"
+              },
+              {
+                "x": 1,
+                "y": 1,
+                "file": "palpagos-z1024-x1-y1.webp",
+                "bytes": 7808,
+                "sha256": "afed69f58844a9d0eb8662a07d8d51a342b57cfd6c1ee77b9cca730aeeba6b8b"
+              }
+            ]
+          },
+          {
+            "size": 2048,
+            "columns": 4,
+            "rows": 4,
+            "tiles": [
+              {
+                "x": 0,
+                "y": 0,
+                "file": "palpagos-z2048-x0-y0.webp",
+                "bytes": 536,
+                "sha256": "6471e42515917f521cc5c8cd0e54c62061077817433b830efde601593fd1a162"
+              },
+              {
+                "x": 1,
+                "y": 0,
+                "file": "palpagos-z2048-x1-y0.webp",
+                "bytes": 10834,
+                "sha256": "7aab60129e49dab50fafa0dcd4007589d031a90c1d8877da884d9533755c9083"
+              },
+              {
+                "x": 2,
+                "y": 0,
+                "file": "palpagos-z2048-x2-y0.webp",
+                "bytes": 34842,
+                "sha256": "312a75104501602d4cee8d80676328b48fc880140c1bbceb2ccdac62abac8905"
+              },
+              {
+                "x": 3,
+                "y": 0,
+                "file": "palpagos-z2048-x3-y0.webp",
+                "bytes": 10672,
+                "sha256": "99fcc46c0532c1d211c512c174c5fff4a8fd3e672c26afcd4a6f602c414f53d4"
+              },
+              {
+                "x": 0,
+                "y": 1,
+                "file": "palpagos-z2048-x0-y1.webp",
+                "bytes": 2030,
+                "sha256": "c4269180f1578ae8e0886428bd78b8377419ed5b9dcb453565008a416d452280"
+              },
+              {
+                "x": 1,
+                "y": 1,
+                "file": "palpagos-z2048-x1-y1.webp",
+                "bytes": 37150,
+                "sha256": "bc7b8bb248cafc8f9119c034fe01f871abeb6e678744dbc9ea99ac2ffa36ccc2"
+              },
+              {
+                "x": 2,
+                "y": 1,
+                "file": "palpagos-z2048-x2-y1.webp",
+                "bytes": 69512,
+                "sha256": "3c0d89a4eca401d05303f8b123ca430d390a77f4a67ed715aacdb03209ba78b6"
+              },
+              {
+                "x": 3,
+                "y": 1,
+                "file": "palpagos-z2048-x3-y1.webp",
+                "bytes": 14096,
+                "sha256": "e22f03b8abd1a46a3b6c6e1e0a961a98c768811eff07ce4eec31d0026eeb41d2"
+              },
+              {
+                "x": 0,
+                "y": 2,
+                "file": "palpagos-z2048-x0-y2.webp",
+                "bytes": 15988,
+                "sha256": "7ca928e06bcfdf365d48c5f454fc93c65b07dcbda37600f4e7217b94ab017092"
+              },
+              {
+                "x": 1,
+                "y": 2,
+                "file": "palpagos-z2048-x1-y2.webp",
+                "bytes": 42532,
+                "sha256": "6438971e860595716b4c84cdd069a7c234573abfa7662e8c05f6c5cc87f24b3b"
+              },
+              {
+                "x": 2,
+                "y": 2,
+                "file": "palpagos-z2048-x2-y2.webp",
+                "bytes": 11654,
+                "sha256": "a3bd55680fba5d23ed15b6586407df91dd0043e2c8a7b783b9b7dc27cedd3e43"
+              },
+              {
+                "x": 3,
+                "y": 2,
+                "file": "palpagos-z2048-x3-y2.webp",
+                "bytes": 3286,
+                "sha256": "217fa99a7f3d6a5e04f444bea5ed971fcaefb407ec2e37a72ebb3d5be6b093bc"
+              },
+              {
+                "x": 0,
+                "y": 3,
+                "file": "palpagos-z2048-x0-y3.webp",
+                "bytes": 16238,
+                "sha256": "f7aea110369cfe2ce80ef575b7da4b691aae07e830d2959b7b1e29106ade0117"
+              },
+              {
+                "x": 1,
+                "y": 3,
+                "file": "palpagos-z2048-x1-y3.webp",
+                "bytes": 15046,
+                "sha256": "8ca194cb44183339c713a5d8ceb999d478df22bb673609570e906b1b5664100d"
+              },
+              {
+                "x": 2,
+                "y": 3,
+                "file": "palpagos-z2048-x2-y3.webp",
+                "bytes": 6810,
+                "sha256": "854f3f9f1a0be14903b3d4735bec96dea1e51e548f125af014190ad0bf21639e"
+              },
+              {
+                "x": 3,
+                "y": 3,
+                "file": "palpagos-z2048-x3-y3.webp",
+                "bytes": 936,
+                "sha256": "8f2d1f90767cb4baf9298a1718e07a8c5d5f021e819dcc5bf5bf534a1201402c"
+              }
+            ]
+          },
+          {
+            "size": 4096,
+            "columns": 8,
+            "rows": 8,
+            "tiles": [
+              {
+                "x": 0,
+                "y": 0,
+                "file": "palpagos-z4096-x0-y0.webp",
+                "bytes": 536,
+                "sha256": "6471e42515917f521cc5c8cd0e54c62061077817433b830efde601593fd1a162"
+              },
+              {
+                "x": 1,
+                "y": 0,
+                "file": "palpagos-z4096-x1-y0.webp",
+                "bytes": 536,
+                "sha256": "6471e42515917f521cc5c8cd0e54c62061077817433b830efde601593fd1a162"
+              },
+              {
+                "x": 2,
+                "y": 0,
+                "file": "palpagos-z4096-x2-y0.webp",
+                "bytes": 3266,
+                "sha256": "75b393698851c5646380f6925eb848540a5a8a493d0d1b3e2a7dd27949eb8249"
+              },
+              {
+                "x": 3,
+                "y": 0,
+                "file": "palpagos-z4096-x3-y0.webp",
+                "bytes": 4392,
+                "sha256": "83e923bcc354c0c8045386c9f0d6ba998ab38ec349a81ee337f9fcccf615a778"
+              },
+              {
+                "x": 4,
+                "y": 0,
+                "file": "palpagos-z4096-x4-y0.webp",
+                "bytes": 7114,
+                "sha256": "5fbc47c58416cd54807071819a3b26040f72ebdcb54715c4fdc4c3748b455e9f"
+              },
+              {
+                "x": 5,
+                "y": 0,
+                "file": "palpagos-z4096-x5-y0.webp",
+                "bytes": 7626,
+                "sha256": "e2ee315e42a09f3a25fdf95ff02c1193ccf8ef75d6a461ee430458ef642917f5"
+              },
+              {
+                "x": 6,
+                "y": 0,
+                "file": "palpagos-z4096-x6-y0.webp",
+                "bytes": 6566,
+                "sha256": "3f86ea0d16a2cdcd7a272c05ee54abc5c938396ab21a8c604f36d40a3306437b"
+              },
+              {
+                "x": 7,
+                "y": 0,
+                "file": "palpagos-z4096-x7-y0.webp",
+                "bytes": 2068,
+                "sha256": "01bd8bbea1a120020edb625738b5872051fea9322559e65a66714e02e12f93d6"
+              },
+              {
+                "x": 0,
+                "y": 1,
+                "file": "palpagos-z4096-x0-y1.webp",
+                "bytes": 536,
+                "sha256": "6471e42515917f521cc5c8cd0e54c62061077817433b830efde601593fd1a162"
+              },
+              {
+                "x": 1,
+                "y": 1,
+                "file": "palpagos-z4096-x1-y1.webp",
+                "bytes": 536,
+                "sha256": "6471e42515917f521cc5c8cd0e54c62061077817433b830efde601593fd1a162"
+              },
+              {
+                "x": 2,
+                "y": 1,
+                "file": "palpagos-z4096-x2-y1.webp",
+                "bytes": 3946,
+                "sha256": "2acf408e731fbb356ff951e953343e5d6f0f49fd4b766a27190c35730331381e"
+              },
+              {
+                "x": 3,
+                "y": 1,
+                "file": "palpagos-z4096-x3-y1.webp",
+                "bytes": 23048,
+                "sha256": "6dbe250bf8fc6073c04f9237bbb5cb3427a412a3063796b3eff70f633b0fb874"
+              },
+              {
+                "x": 4,
+                "y": 1,
+                "file": "palpagos-z4096-x4-y1.webp",
+                "bytes": 75246,
+                "sha256": "bad70b2fc88e2b5d90a8905f85c20af6ee1f229334d7fea5dc26bd1d3250b339"
+              },
+              {
+                "x": 5,
+                "y": 1,
+                "file": "palpagos-z4096-x5-y1.webp",
+                "bytes": 33318,
+                "sha256": "af01cf3eeb9f28d9ff2d472b8e5e41cf1bff5bcaa28ccb8bab07b4bba2bb184e"
+              },
+              {
+                "x": 6,
+                "y": 1,
+                "file": "palpagos-z4096-x6-y1.webp",
+                "bytes": 24342,
+                "sha256": "389cfedce49ec252038fd55e6347c95f82a47ff5abdc6a57aeac4ed2aff39b6a"
+              },
+              {
+                "x": 7,
+                "y": 1,
+                "file": "palpagos-z4096-x7-y1.webp",
+                "bytes": 1940,
+                "sha256": "0de761ff0dd9e0bf1a8ca827fc0ceaf6b10ca1c8beb1e4c70ee5eb0815dbcca6"
+              },
+              {
+                "x": 0,
+                "y": 2,
+                "file": "palpagos-z4096-x0-y2.webp",
+                "bytes": 536,
+                "sha256": "6471e42515917f521cc5c8cd0e54c62061077817433b830efde601593fd1a162"
+              },
+              {
+                "x": 1,
+                "y": 2,
+                "file": "palpagos-z4096-x1-y2.webp",
+                "bytes": 1338,
+                "sha256": "652f98858077afaf1c6be9ed7a9e671aa0ef0201fb7f2b8203a9ab98f5d11525"
+              },
+              {
+                "x": 2,
+                "y": 2,
+                "file": "palpagos-z4096-x2-y2.webp",
+                "bytes": 5582,
+                "sha256": "159e51373701ee293f0e3abe22cb57a160f34a57f25662ac7582fcbdc39342d3"
+              },
+              {
+                "x": 3,
+                "y": 2,
+                "file": "palpagos-z4096-x3-y2.webp",
+                "bytes": 36280,
+                "sha256": "eb2700d67ec7145da328c2a18848d2b0ea5f03f8376ee317e3ba81eb7a072501"
+              },
+              {
+                "x": 4,
+                "y": 2,
+                "file": "palpagos-z4096-x4-y2.webp",
+                "bytes": 49308,
+                "sha256": "7de8d6b34a4379f5dcc6995483440764bfcdd1a407cf90b912be1349653c0c70"
+              },
+              {
+                "x": 5,
+                "y": 2,
+                "file": "palpagos-z4096-x5-y2.webp",
+                "bytes": 56734,
+                "sha256": "a0470366b160a6aff331d9f92adb865d1fc87f6ff20dada9d3f7134cbe576910"
+              },
+              {
+                "x": 6,
+                "y": 2,
+                "file": "palpagos-z4096-x6-y2.webp",
+                "bytes": 25314,
+                "sha256": "0c23317df7e32a1d02cb48b3c244d6c8a36b38461a28550e1ae0046897af2c59"
+              },
+              {
+                "x": 7,
+                "y": 2,
+                "file": "palpagos-z4096-x7-y2.webp",
+                "bytes": 7644,
+                "sha256": "182a93e138bb88c4fcdfcdb742fca002e32e261c6dbf4fa023b4732afd5469b7"
+              },
+              {
+                "x": 0,
+                "y": 3,
+                "file": "palpagos-z4096-x0-y3.webp",
+                "bytes": 758,
+                "sha256": "cc213aeef66670ceb35f5bd4103609f6c2b0f8638d2907c85282a0b5c2ad6272"
+              },
+              {
+                "x": 1,
+                "y": 3,
+                "file": "palpagos-z4096-x1-y3.webp",
+                "bytes": 3822,
+                "sha256": "429d5fe1ec96885c009b7d886bc896b37921cd15bd19312c89ebbfb70f89934f"
+              },
+              {
+                "x": 2,
+                "y": 3,
+                "file": "palpagos-z4096-x2-y3.webp",
+                "bytes": 19062,
+                "sha256": "2dc00ed22c534bad717d5c3e45a55f31e90bbd618b4eae21c20521995da5e644"
+              },
+              {
+                "x": 3,
+                "y": 3,
+                "file": "palpagos-z4096-x3-y3.webp",
+                "bytes": 67784,
+                "sha256": "a53484b07bbae34b22263e540d884cc01ea5ad806e23a5b3899282fd6c68ecb9"
+              },
+              {
+                "x": 4,
+                "y": 3,
+                "file": "palpagos-z4096-x4-y3.webp",
+                "bytes": 72054,
+                "sha256": "8569fbc5692a7aebd60cd245bc67ffaa0cf1d7238b3dd7ecdb5e0a0dd6e18cb7"
+              },
+              {
+                "x": 5,
+                "y": 3,
+                "file": "palpagos-z4096-x5-y3.webp",
+                "bytes": 55860,
+                "sha256": "e76d5e2458065d221b843482bca4c741c971938cc54bbb23a853d85a82adbcf4"
+              },
+              {
+                "x": 6,
+                "y": 3,
+                "file": "palpagos-z4096-x6-y3.webp",
+                "bytes": 9308,
+                "sha256": "ff8f88b651a751c613783b52e959921760fafe49d91bf8457de7c68ef819f14e"
+              },
+              {
+                "x": 7,
+                "y": 3,
+                "file": "palpagos-z4096-x7-y3.webp",
+                "bytes": 1974,
+                "sha256": "7c5d82ef5ed5e57b0ce5621cd5a34f33afc009c318e24714de5c666dde6186cc"
+              },
+              {
+                "x": 0,
+                "y": 4,
+                "file": "palpagos-z4096-x0-y4.webp",
+                "bytes": 5946,
+                "sha256": "0317a5ec85bdcd10dc62957af47ee840a9b349a63d9439f3f710da06266a75c6"
+              },
+              {
+                "x": 1,
+                "y": 4,
+                "file": "palpagos-z4096-x1-y4.webp",
+                "bytes": 10182,
+                "sha256": "558b185a71b3f1d8301814a558ebecd67d2990e30f1a68b9f3184cb1be563938"
+              },
+              {
+                "x": 2,
+                "y": 4,
+                "file": "palpagos-z4096-x2-y4.webp",
+                "bytes": 22000,
+                "sha256": "e600d697ba8ba93bb7bf0ec1b3be88aaa7c58ac21bdd1dcc57ee85aaac5aca5b"
+              },
+              {
+                "x": 3,
+                "y": 4,
+                "file": "palpagos-z4096-x3-y4.webp",
+                "bytes": 35930,
+                "sha256": "4b5556711652debba8ad47676c5c3db0a18f7ab57a1c1ce57405f7d6186eac08"
+              },
+              {
+                "x": 4,
+                "y": 4,
+                "file": "palpagos-z4096-x4-y4.webp",
+                "bytes": 22866,
+                "sha256": "7190802d12301c3bf7fdd54b4d33e5e7ad05cb634540a493d0ec80f221306d70"
+              },
+              {
+                "x": 5,
+                "y": 4,
+                "file": "palpagos-z4096-x5-y4.webp",
+                "bytes": 8404,
+                "sha256": "0adfc5d917a33757165f65fdf3fbebc05cdc44a7a37465f7f3c5461b7cbe394d"
+              },
+              {
+                "x": 6,
+                "y": 4,
+                "file": "palpagos-z4096-x6-y4.webp",
+                "bytes": 2310,
+                "sha256": "f2cb063f7d73dd8eab30d38464001d03c49aa22dca4f23065360ae531acac0c2"
+              },
+              {
+                "x": 7,
+                "y": 4,
+                "file": "palpagos-z4096-x7-y4.webp",
+                "bytes": 3250,
+                "sha256": "0b457bbbf46b5e5ef930b0ba97916c357b82b253a692c903bd3c4f3e6b415dbb"
+              },
+              {
+                "x": 0,
+                "y": 5,
+                "file": "palpagos-z4096-x0-y5.webp",
+                "bytes": 4440,
+                "sha256": "f8d7a48383cd409ede41831c9aa9b8dc9869c3d388aa6e2869fce4d5e844158f"
+              },
+              {
+                "x": 1,
+                "y": 5,
+                "file": "palpagos-z4096-x1-y5.webp",
+                "bytes": 32356,
+                "sha256": "57c28fa93ec7b1f9d4d1521f74b09992a490a5ad27a1cf612d70c774a82db051"
+              },
+              {
+                "x": 2,
+                "y": 5,
+                "file": "palpagos-z4096-x2-y5.webp",
+                "bytes": 73144,
+                "sha256": "84354013d83127db975f8e83e3f2dc868bc1fb8c80efa2a8c6710dc52bd13fd3"
+              },
+              {
+                "x": 3,
+                "y": 5,
+                "file": "palpagos-z4096-x3-y5.webp",
+                "bytes": 12512,
+                "sha256": "cb0eef854204d9da20a6fdac10a35cdb73104a111fb000c891730c9dcc073380"
+              },
+              {
+                "x": 4,
+                "y": 5,
+                "file": "palpagos-z4096-x4-y5.webp",
+                "bytes": 3462,
+                "sha256": "5f83f23bb4c1f78650618677a709233b8d2673093ed8bdc36cdc6c9ce94e8719"
+              },
+              {
+                "x": 5,
+                "y": 5,
+                "file": "palpagos-z4096-x5-y5.webp",
+                "bytes": 1240,
+                "sha256": "804da249cd579ad7b203b96dea360ecbe536d0ddc32ac3ebc3a7684118826f84"
+              },
+              {
+                "x": 6,
+                "y": 5,
+                "file": "palpagos-z4096-x6-y5.webp",
+                "bytes": 3602,
+                "sha256": "bd1b59646abc72a398afa0718bc84eb5c5f618abcb7d4f83666174c0363290b1"
+              },
+              {
+                "x": 7,
+                "y": 5,
+                "file": "palpagos-z4096-x7-y5.webp",
+                "bytes": 536,
+                "sha256": "6471e42515917f521cc5c8cd0e54c62061077817433b830efde601593fd1a162"
+              },
+              {
+                "x": 0,
+                "y": 6,
+                "file": "palpagos-z4096-x0-y6.webp",
+                "bytes": 3928,
+                "sha256": "782cb168dbd074dd11002b09d6ce37605e0d28368d35b5d9cb3d647f084a85fa"
+              },
+              {
+                "x": 1,
+                "y": 6,
+                "file": "palpagos-z4096-x1-y6.webp",
+                "bytes": 41396,
+                "sha256": "0ee3414eabcf1f486885951b8cbce3982b01a8675e098cce69c8a59c448b2818"
+              },
+              {
+                "x": 2,
+                "y": 6,
+                "file": "palpagos-z4096-x2-y6.webp",
+                "bytes": 22410,
+                "sha256": "4d5122c10e063c31e201992f42fb1a325507d26675b875aa7306830bfb69ab6f"
+              },
+              {
+                "x": 3,
+                "y": 6,
+                "file": "palpagos-z4096-x3-y6.webp",
+                "bytes": 20008,
+                "sha256": "3f3a542987c5f5a532b0e919704b593ae74aec474d0a9690fb6588a55ba352dd"
+              },
+              {
+                "x": 4,
+                "y": 6,
+                "file": "palpagos-z4096-x4-y6.webp",
+                "bytes": 12764,
+                "sha256": "1b2b9257ffd9cafb1566a8d7a7211c84e4054da503ecbc50399729ba1bdcc98b"
+              },
+              {
+                "x": 5,
+                "y": 6,
+                "file": "palpagos-z4096-x5-y6.webp",
+                "bytes": 3184,
+                "sha256": "f3d428bac4d229f06763018c50b947198bab8c94ead6b0340118b9559ac1a94a"
+              },
+              {
+                "x": 6,
+                "y": 6,
+                "file": "palpagos-z4096-x6-y6.webp",
+                "bytes": 1556,
+                "sha256": "375527dedfc5f5287fd8ebe22d4ee9c346236c38ec5a9e28fa99688c3e9af8e5"
+              },
+              {
+                "x": 7,
+                "y": 6,
+                "file": "palpagos-z4096-x7-y6.webp",
+                "bytes": 536,
+                "sha256": "6471e42515917f521cc5c8cd0e54c62061077817433b830efde601593fd1a162"
+              },
+              {
+                "x": 0,
+                "y": 7,
+                "file": "palpagos-z4096-x0-y7.webp",
+                "bytes": 1736,
+                "sha256": "fc1eadda4a14c57c4aa456cee3be894e4e08c80924e069bc41d24dce91cb27ad"
+              },
+              {
+                "x": 1,
+                "y": 7,
+                "file": "palpagos-z4096-x1-y7.webp",
+                "bytes": 10328,
+                "sha256": "c7f7dba6766c628ee2b6949653f684d5c75f0f277ba25d5dae248fd87b1ef2c9"
+              },
+              {
+                "x": 2,
+                "y": 7,
+                "file": "palpagos-z4096-x2-y7.webp",
+                "bytes": 5524,
+                "sha256": "480dcc491da9a3267fe32b3a8b084f7139232c117765913f0879ed56a028f7a1"
+              },
+              {
+                "x": 3,
+                "y": 7,
+                "file": "palpagos-z4096-x3-y7.webp",
+                "bytes": 2044,
+                "sha256": "18afb0780ff58eabba4fab2a5d994397771c7189ae3ccf3ee27da5a9c7b01b41"
+              },
+              {
+                "x": 4,
+                "y": 7,
+                "file": "palpagos-z4096-x4-y7.webp",
+                "bytes": 3626,
+                "sha256": "9d1f274146af89810e09e0ed1ab4e0d763cba7d9422fc274ef924e184d4e922f"
+              },
+              {
+                "x": 5,
+                "y": 7,
+                "file": "palpagos-z4096-x5-y7.webp",
+                "bytes": 1522,
+                "sha256": "0515f26d292e0386a29d3ce778eaaecd028036f431a45a3817c7df9b99c3a7bd"
+              },
+              {
+                "x": 6,
+                "y": 7,
+                "file": "palpagos-z4096-x6-y7.webp",
+                "bytes": 536,
+                "sha256": "6471e42515917f521cc5c8cd0e54c62061077817433b830efde601593fd1a162"
+              },
+              {
+                "x": 7,
+                "y": 7,
+                "file": "palpagos-z4096-x7-y7.webp",
+                "bytes": 536,
+                "sha256": "6471e42515917f521cc5c8cd0e54c62061077817433b830efde601593fd1a162"
+              }
+            ]
+          },
+          {
+            "size": 8192,
+            "columns": 16,
+            "rows": 16,
+            "tiles": [
+              {
+                "x": 0,
+                "y": 0,
+                "file": "palpagos-z8192-x0-y0.webp",
+                "bytes": 536,
+                "sha256": "6471e42515917f521cc5c8cd0e54c62061077817433b830efde601593fd1a162"
+              },
+              {
+                "x": 1,
+                "y": 0,
+                "file": "palpagos-z8192-x1-y0.webp",
+                "bytes": 536,
+                "sha256": "6471e42515917f521cc5c8cd0e54c62061077817433b830efde601593fd1a162"
+              },
+              {
+                "x": 2,
+                "y": 0,
+                "file": "palpagos-z8192-x2-y0.webp",
+                "bytes": 536,
+                "sha256": "6471e42515917f521cc5c8cd0e54c62061077817433b830efde601593fd1a162"
+              },
+              {
+                "x": 3,
+                "y": 0,
+                "file": "palpagos-z8192-x3-y0.webp",
+                "bytes": 536,
+                "sha256": "6471e42515917f521cc5c8cd0e54c62061077817433b830efde601593fd1a162"
+              },
+              {
+                "x": 4,
+                "y": 0,
+                "file": "palpagos-z8192-x4-y0.webp",
+                "bytes": 536,
+                "sha256": "6471e42515917f521cc5c8cd0e54c62061077817433b830efde601593fd1a162"
+              },
+              {
+                "x": 5,
+                "y": 0,
+                "file": "palpagos-z8192-x5-y0.webp",
+                "bytes": 536,
+                "sha256": "6471e42515917f521cc5c8cd0e54c62061077817433b830efde601593fd1a162"
+              },
+              {
+                "x": 6,
+                "y": 0,
+                "file": "palpagos-z8192-x6-y0.webp",
+                "bytes": 1222,
+                "sha256": "cf6a79f4c497e00739827aa1b1cfc234e73587c03a12aee4be073617bd1b783d"
+              },
+              {
+                "x": 7,
+                "y": 0,
+                "file": "palpagos-z8192-x7-y0.webp",
+                "bytes": 4390,
+                "sha256": "6c0dc42fa9c066600b5e1f524d741ebfdfeb7bdea0ed288ee26e75a0b97b6442"
+              },
+              {
+                "x": 8,
+                "y": 0,
+                "file": "palpagos-z8192-x8-y0.webp",
+                "bytes": 4056,
+                "sha256": "ce207642e0cd683a819c941b1e8cc69d00fcb35bc1f6b6a3df4dbc9fa0146689"
+              },
+              {
+                "x": 9,
+                "y": 0,
+                "file": "palpagos-z8192-x9-y0.webp",
+                "bytes": 2792,
+                "sha256": "285faecd6ec8ee3a7fb50a97370ac6e922380453a4c9129c7ce53ba2ac96d49e"
+              },
+              {
+                "x": 10,
+                "y": 0,
+                "file": "palpagos-z8192-x10-y0.webp",
+                "bytes": 2700,
+                "sha256": "51936663d53473b9a94918c59a6decf20c2b3c5abe095e2ca4887cd7bf6a44cf"
+              },
+              {
+                "x": 11,
+                "y": 0,
+                "file": "palpagos-z8192-x11-y0.webp",
+                "bytes": 2920,
+                "sha256": "b475e162f305f3e3fad64b7d6d8fda13e7096dea7fe3fdd8f79bfd35a66b2b20"
+              },
+              {
+                "x": 12,
+                "y": 0,
+                "file": "palpagos-z8192-x12-y0.webp",
+                "bytes": 2564,
+                "sha256": "039d16d2b93a8f8b96ec846957695c1e1ca0dd5fd06bf826b8a2c26aaf1ad23d"
+              },
+              {
+                "x": 13,
+                "y": 0,
+                "file": "palpagos-z8192-x13-y0.webp",
+                "bytes": 2470,
+                "sha256": "3dc5ba44b13aebef18df82ab8b79ee08a29e4f671843e74fc3907c2bc55aeca5"
+              },
+              {
+                "x": 14,
+                "y": 0,
+                "file": "palpagos-z8192-x14-y0.webp",
+                "bytes": 2286,
+                "sha256": "896567299f17e6ab7e89b93b54520c2919e8e6ab3c254a962f3619bc5d8f4f01"
+              },
+              {
+                "x": 15,
+                "y": 0,
+                "file": "palpagos-z8192-x15-y0.webp",
+                "bytes": 1006,
+                "sha256": "2c338a80cd20a04217ebce28452d8eff296aca314bcb7107e7c71d5171c097c7"
+              },
+              {
+                "x": 0,
+                "y": 1,
+                "file": "palpagos-z8192-x0-y1.webp",
+                "bytes": 536,
+                "sha256": "6471e42515917f521cc5c8cd0e54c62061077817433b830efde601593fd1a162"
+              },
+              {
+                "x": 1,
+                "y": 1,
+                "file": "palpagos-z8192-x1-y1.webp",
+                "bytes": 536,
+                "sha256": "6471e42515917f521cc5c8cd0e54c62061077817433b830efde601593fd1a162"
+              },
+              {
+                "x": 2,
+                "y": 1,
+                "file": "palpagos-z8192-x2-y1.webp",
+                "bytes": 536,
+                "sha256": "6471e42515917f521cc5c8cd0e54c62061077817433b830efde601593fd1a162"
+              },
+              {
+                "x": 3,
+                "y": 1,
+                "file": "palpagos-z8192-x3-y1.webp",
+                "bytes": 536,
+                "sha256": "6471e42515917f521cc5c8cd0e54c62061077817433b830efde601593fd1a162"
+              },
+              {
+                "x": 4,
+                "y": 1,
+                "file": "palpagos-z8192-x4-y1.webp",
+                "bytes": 536,
+                "sha256": "6471e42515917f521cc5c8cd0e54c62061077817433b830efde601593fd1a162"
+              },
+              {
+                "x": 5,
+                "y": 1,
+                "file": "palpagos-z8192-x5-y1.webp",
+                "bytes": 9424,
+                "sha256": "dd314bda36ee881b635fb9bd39235b7d3f63bbd2cd3efe21c6bc283cc1d2a88b"
+              },
+              {
+                "x": 6,
+                "y": 1,
+                "file": "palpagos-z8192-x6-y1.webp",
+                "bytes": 4552,
+                "sha256": "3eacd9716412e3754a37d33851f262e934955c3ecdada15ccd8d92a32cc692c0"
+              },
+              {
+                "x": 7,
+                "y": 1,
+                "file": "palpagos-z8192-x7-y1.webp",
+                "bytes": 1828,
+                "sha256": "02d0fac58380d004e8f2a5f61e73b32dacce8eeaee1d80ff9dfc5e1bd861932a"
+              },
+              {
+                "x": 8,
+                "y": 1,
+                "file": "palpagos-z8192-x8-y1.webp",
+                "bytes": 13442,
+                "sha256": "18986b848f59f616e9060d93056b5e7d108c0d41891ce18d84bae02693f7354c"
+              },
+              {
+                "x": 9,
+                "y": 1,
+                "file": "palpagos-z8192-x9-y1.webp",
+                "bytes": 2380,
+                "sha256": "75874f368040cbe072f5198bfd7ede5b2c1b21816af6274ae343e3e8ab87d4f6"
+              },
+              {
+                "x": 10,
+                "y": 1,
+                "file": "palpagos-z8192-x10-y1.webp",
+                "bytes": 8124,
+                "sha256": "f66f2ac73e4b9cb5c5315fac19c72a96c9502c9582cbceb0b4188bc490e1366a"
+              },
+              {
+                "x": 11,
+                "y": 1,
+                "file": "palpagos-z8192-x11-y1.webp",
+                "bytes": 9022,
+                "sha256": "78147a02ed75dccdde364bfdb4bb2f68939790c93ff9580b8f758f2531d26776"
+              },
+              {
+                "x": 12,
+                "y": 1,
+                "file": "palpagos-z8192-x12-y1.webp",
+                "bytes": 7670,
+                "sha256": "d3dbe541b36142bf086a4b0759a8ee531b212bbcf9ff1fbdd7f739293af0fd36"
+              },
+              {
+                "x": 13,
+                "y": 1,
+                "file": "palpagos-z8192-x13-y1.webp",
+                "bytes": 6502,
+                "sha256": "f8c21cba86cfd05e81cbf229ad1ec93e97ade3cc1f7b544040722e1c46062053"
+              },
+              {
+                "x": 14,
+                "y": 1,
+                "file": "palpagos-z8192-x14-y1.webp",
+                "bytes": 1306,
+                "sha256": "4f14565dde562238bcffb5636c8755ebd24065551aee36a541176f54b2f6ed07"
+              },
+              {
+                "x": 15,
+                "y": 1,
+                "file": "palpagos-z8192-x15-y1.webp",
+                "bytes": 1826,
+                "sha256": "e8a1b334a7b5a288889ebbc016ec819f39e28f73598eabc1e98555aa476e9e9c"
+              },
+              {
+                "x": 0,
+                "y": 2,
+                "file": "palpagos-z8192-x0-y2.webp",
+                "bytes": 536,
+                "sha256": "6471e42515917f521cc5c8cd0e54c62061077817433b830efde601593fd1a162"
+              },
+              {
+                "x": 1,
+                "y": 2,
+                "file": "palpagos-z8192-x1-y2.webp",
+                "bytes": 536,
+                "sha256": "6471e42515917f521cc5c8cd0e54c62061077817433b830efde601593fd1a162"
+              },
+              {
+                "x": 2,
+                "y": 2,
+                "file": "palpagos-z8192-x2-y2.webp",
+                "bytes": 536,
+                "sha256": "6471e42515917f521cc5c8cd0e54c62061077817433b830efde601593fd1a162"
+              },
+              {
+                "x": 3,
+                "y": 2,
+                "file": "palpagos-z8192-x3-y2.webp",
+                "bytes": 536,
+                "sha256": "6471e42515917f521cc5c8cd0e54c62061077817433b830efde601593fd1a162"
+              },
+              {
+                "x": 4,
+                "y": 2,
+                "file": "palpagos-z8192-x4-y2.webp",
+                "bytes": 536,
+                "sha256": "6471e42515917f521cc5c8cd0e54c62061077817433b830efde601593fd1a162"
+              },
+              {
+                "x": 5,
+                "y": 2,
+                "file": "palpagos-z8192-x5-y2.webp",
+                "bytes": 6984,
+                "sha256": "350293840f74505b1bccf0a8beffb933251a3ca335520cf8f29adc5d2bb56022"
+              },
+              {
+                "x": 6,
+                "y": 2,
+                "file": "palpagos-z8192-x6-y2.webp",
+                "bytes": 1746,
+                "sha256": "be792acec5bf288c53b4a7dc5b800d5c5b0bff3eb0ec521871d7ded4528a0327"
+              },
+              {
+                "x": 7,
+                "y": 2,
+                "file": "palpagos-z8192-x7-y2.webp",
+                "bytes": 26828,
+                "sha256": "6955d6b324d7051e68a26b05224cf034b9952f2d8331f99041ea59b191a76659"
+              },
+              {
+                "x": 8,
+                "y": 2,
+                "file": "palpagos-z8192-x8-y2.webp",
+                "bytes": 66910,
+                "sha256": "f2bb83d0a7536b6e8140a1c7b77c4085e6fcf648c0c5ab410e069f03d7c0b532"
+              },
+              {
+                "x": 9,
+                "y": 2,
+                "file": "palpagos-z8192-x9-y2.webp",
+                "bytes": 45808,
+                "sha256": "e976d22897bc52374e1bd325de556ca586e1cee2e6db588881a1d2d49c763cac"
+              },
+              {
+                "x": 10,
+                "y": 2,
+                "file": "palpagos-z8192-x10-y2.webp",
+                "bytes": 10264,
+                "sha256": "e3217534ea92dae0cdc1f97d19892036965c4f9c13ac418b38166cddc84eec3f"
+              },
+              {
+                "x": 11,
+                "y": 2,
+                "file": "palpagos-z8192-x11-y2.webp",
+                "bytes": 38298,
+                "sha256": "7cfe0a785109efbc5157427d3465c234baef30820c62b6b118df1f77c41f5351"
+              },
+              {
+                "x": 12,
+                "y": 2,
+                "file": "palpagos-z8192-x12-y2.webp",
+                "bytes": 15988,
+                "sha256": "e83c6811e0b061c5026c6657f42f8a2cca53fce880ba86a01cda38c7f2c5a9b2"
+              },
+              {
+                "x": 13,
+                "y": 2,
+                "file": "palpagos-z8192-x13-y2.webp",
+                "bytes": 14968,
+                "sha256": "70d5cf266e9216e9c49791d5e70e5d59d0745c6d4049adb0e4c83f4219adb1fe"
+              },
+              {
+                "x": 14,
+                "y": 2,
+                "file": "palpagos-z8192-x14-y2.webp",
+                "bytes": 1650,
+                "sha256": "830fdb64d35cfc77295fba15dfe31abf9bbfe0857d6cbe85ebc0931123f4468a"
+              },
+              {
+                "x": 15,
+                "y": 2,
+                "file": "palpagos-z8192-x15-y2.webp",
+                "bytes": 1276,
+                "sha256": "37580772e6e6aab08993ba6dd82ccebb350a29d3621dfffb6fe375b4ca1a1649"
+              },
+              {
+                "x": 0,
+                "y": 3,
+                "file": "palpagos-z8192-x0-y3.webp",
+                "bytes": 536,
+                "sha256": "6471e42515917f521cc5c8cd0e54c62061077817433b830efde601593fd1a162"
+              },
+              {
+                "x": 1,
+                "y": 3,
+                "file": "palpagos-z8192-x1-y3.webp",
+                "bytes": 536,
+                "sha256": "6471e42515917f521cc5c8cd0e54c62061077817433b830efde601593fd1a162"
+              },
+              {
+                "x": 2,
+                "y": 3,
+                "file": "palpagos-z8192-x2-y3.webp",
+                "bytes": 536,
+                "sha256": "6471e42515917f521cc5c8cd0e54c62061077817433b830efde601593fd1a162"
+              },
+              {
+                "x": 3,
+                "y": 3,
+                "file": "palpagos-z8192-x3-y3.webp",
+                "bytes": 536,
+                "sha256": "6471e42515917f521cc5c8cd0e54c62061077817433b830efde601593fd1a162"
+              },
+              {
+                "x": 4,
+                "y": 3,
+                "file": "palpagos-z8192-x4-y3.webp",
+                "bytes": 536,
+                "sha256": "6471e42515917f521cc5c8cd0e54c62061077817433b830efde601593fd1a162"
+              },
+              {
+                "x": 5,
+                "y": 3,
+                "file": "palpagos-z8192-x5-y3.webp",
+                "bytes": 3428,
+                "sha256": "457308dbf86891b52599ceda12fe36f9b837284ccc911ef5c0bc5690922b2f2c"
+              },
+              {
+                "x": 6,
+                "y": 3,
+                "file": "palpagos-z8192-x6-y3.webp",
+                "bytes": 23982,
+                "sha256": "49fb70c8e9b880626811cf618bbfed7f57c8a09e9eb09232658f527cd598ed8e"
+              },
+              {
+                "x": 7,
+                "y": 3,
+                "file": "palpagos-z8192-x7-y3.webp",
+                "bytes": 24276,
+                "sha256": "59f3ee84db403498c657369264b4c005a9b2586575c1117f54f8b6f0e024140a"
+              },
+              {
+                "x": 8,
+                "y": 3,
+                "file": "palpagos-z8192-x8-y3.webp",
+                "bytes": 70908,
+                "sha256": "4f9813a0d7a0d3a09c7b80d72e75adc1c283c5f19c37719ecad55ba08ee776bf"
+              },
+              {
+                "x": 9,
+                "y": 3,
+                "file": "palpagos-z8192-x9-y3.webp",
+                "bytes": 66718,
+                "sha256": "498ca6e1f929ad0f54b8c0983033f7ea79f7584bef314dd28a2e881764b2f581"
+              },
+              {
+                "x": 10,
+                "y": 3,
+                "file": "palpagos-z8192-x10-y3.webp",
+                "bytes": 30060,
+                "sha256": "aba01cba9a5462eda33828b613274f1dde6accc84901bd09e6acfed4f7ef2e7d"
+              },
+              {
+                "x": 11,
+                "y": 3,
+                "file": "palpagos-z8192-x11-y3.webp",
+                "bytes": 34920,
+                "sha256": "3d5c2f3de1110ba9397285ee712eb943d485c7bef407643b83f69f4d49b18c0a"
+              },
+              {
+                "x": 12,
+                "y": 3,
+                "file": "palpagos-z8192-x12-y3.webp",
+                "bytes": 36992,
+                "sha256": "1d92c55e6a202d9e7a4c3379b676ce5f81b08c85fe28701803733afa51b12412"
+              },
+              {
+                "x": 13,
+                "y": 3,
+                "file": "palpagos-z8192-x13-y3.webp",
+                "bytes": 14546,
+                "sha256": "3db8ce2368b7aa862a9d800fc71ebe369154b2af18ad02337b0f850baef686ac"
+              },
+              {
+                "x": 14,
+                "y": 3,
+                "file": "palpagos-z8192-x14-y3.webp",
+                "bytes": 1724,
+                "sha256": "297004beb35d08613dcf421a8f65954ec34323e2f8385aba69e3f1018f3bb7fa"
+              },
+              {
+                "x": 15,
+                "y": 3,
+                "file": "palpagos-z8192-x15-y3.webp",
+                "bytes": 1484,
+                "sha256": "f595a884a590675bd78d1961aeef3502b29fcdb8166a5bf3f3d6f0ab63208971"
+              },
+              {
+                "x": 0,
+                "y": 4,
+                "file": "palpagos-z8192-x0-y4.webp",
+                "bytes": 536,
+                "sha256": "6471e42515917f521cc5c8cd0e54c62061077817433b830efde601593fd1a162"
+              },
+              {
+                "x": 1,
+                "y": 4,
+                "file": "palpagos-z8192-x1-y4.webp",
+                "bytes": 536,
+                "sha256": "6471e42515917f521cc5c8cd0e54c62061077817433b830efde601593fd1a162"
+              },
+              {
+                "x": 2,
+                "y": 4,
+                "file": "palpagos-z8192-x2-y4.webp",
+                "bytes": 536,
+                "sha256": "6471e42515917f521cc5c8cd0e54c62061077817433b830efde601593fd1a162"
+              },
+              {
+                "x": 3,
+                "y": 4,
+                "file": "palpagos-z8192-x3-y4.webp",
+                "bytes": 536,
+                "sha256": "6471e42515917f521cc5c8cd0e54c62061077817433b830efde601593fd1a162"
+              },
+              {
+                "x": 4,
+                "y": 4,
+                "file": "palpagos-z8192-x4-y4.webp",
+                "bytes": 3326,
+                "sha256": "2ecccef4221bcc38f5f75bfc42009c145bd1bfff93861a82c0d923dcfac42577"
+              },
+              {
+                "x": 5,
+                "y": 4,
+                "file": "palpagos-z8192-x5-y4.webp",
+                "bytes": 7424,
+                "sha256": "efada0e1c9847bed0fa43ae4eedcfda386f6a3eee40409192df48b0449160cdc"
+              },
+              {
+                "x": 6,
+                "y": 4,
+                "file": "palpagos-z8192-x6-y4.webp",
+                "bytes": 39458,
+                "sha256": "b617af2e965d4ae5707551aebb3f4c78815b0e0ffd0314b71e3963700519c973"
+              },
+              {
+                "x": 7,
+                "y": 4,
+                "file": "palpagos-z8192-x7-y4.webp",
+                "bytes": 20986,
+                "sha256": "d49e9efdb22e844cf26bfd729f0844a0faa2b08cb61bbb626872ce417861da28"
+              },
+              {
+                "x": 8,
+                "y": 4,
+                "file": "palpagos-z8192-x8-y4.webp",
+                "bytes": 22448,
+                "sha256": "24a5a3f11afd5f0471bd734d8fafa80240be4ffeaf9ccb51facd428d38def9d6"
+              },
+              {
+                "x": 9,
+                "y": 4,
+                "file": "palpagos-z8192-x9-y4.webp",
+                "bytes": 65696,
+                "sha256": "3a36f99b776f7faf8f37e542eced11961b7cd885703c94b993c9361c05c90483"
+              },
+              {
+                "x": 10,
+                "y": 4,
+                "file": "palpagos-z8192-x10-y4.webp",
+                "bytes": 39660,
+                "sha256": "ccfaedeb2ac1448b5ce633dc7a918d5591d3bbc38be47742956671c7fef2496f"
+              },
+              {
+                "x": 11,
+                "y": 4,
+                "file": "palpagos-z8192-x11-y4.webp",
+                "bytes": 33164,
+                "sha256": "b52ffbcbbc3566c585c8c3cdba69030ed6e8afb81135ad3bd1c580e0c8df67ff"
+              },
+              {
+                "x": 12,
+                "y": 4,
+                "file": "palpagos-z8192-x12-y4.webp",
+                "bytes": 43794,
+                "sha256": "35a87cf702afce242701f935d0fd02f84133380c15fbd5341497a662a8942f89"
+              },
+              {
+                "x": 13,
+                "y": 4,
+                "file": "palpagos-z8192-x13-y4.webp",
+                "bytes": 15938,
+                "sha256": "2039333287e3d196d98e4cdad15fb52b58e627d12e59041852d9e7b5107647a7"
+              },
+              {
+                "x": 14,
+                "y": 4,
+                "file": "palpagos-z8192-x14-y4.webp",
+                "bytes": 6378,
+                "sha256": "65ead57b183a87eab99eacadd55d79d996759e6cb9858aedb8a4019420575f35"
+              },
+              {
+                "x": 15,
+                "y": 4,
+                "file": "palpagos-z8192-x15-y4.webp",
+                "bytes": 1466,
+                "sha256": "5ca324c945c7558c27c3dd98e6fb14d1dba40bcf569d19ec687ffcc8a5d7f5c9"
+              },
+              {
+                "x": 0,
+                "y": 5,
+                "file": "palpagos-z8192-x0-y5.webp",
+                "bytes": 536,
+                "sha256": "6471e42515917f521cc5c8cd0e54c62061077817433b830efde601593fd1a162"
+              },
+              {
+                "x": 1,
+                "y": 5,
+                "file": "palpagos-z8192-x1-y5.webp",
+                "bytes": 536,
+                "sha256": "6471e42515917f521cc5c8cd0e54c62061077817433b830efde601593fd1a162"
+              },
+              {
+                "x": 2,
+                "y": 5,
+                "file": "palpagos-z8192-x2-y5.webp",
+                "bytes": 536,
+                "sha256": "6471e42515917f521cc5c8cd0e54c62061077817433b830efde601593fd1a162"
+              },
+              {
+                "x": 3,
+                "y": 5,
+                "file": "palpagos-z8192-x3-y5.webp",
+                "bytes": 2560,
+                "sha256": "08d66cad6e53eebaf081b83816c9054a222ba684614bda1ccf069dd3fccf191a"
+              },
+              {
+                "x": 4,
+                "y": 5,
+                "file": "palpagos-z8192-x4-y5.webp",
+                "bytes": 2900,
+                "sha256": "1f51855d1713460ffe0e0670663f94c0e11c91c3caa724e6234a56a1f08b3fd1"
+              },
+              {
+                "x": 5,
+                "y": 5,
+                "file": "palpagos-z8192-x5-y5.webp",
+                "bytes": 2034,
+                "sha256": "78605cb5092a298aab5b225a05110b298ef6cbefa9a280481f77e1de1e33df76"
+              },
+              {
+                "x": 6,
+                "y": 5,
+                "file": "palpagos-z8192-x6-y5.webp",
+                "bytes": 17760,
+                "sha256": "7ed2e8f9cd66e35420133c300f7ec3bf3dd64745613cfb104adfb7b40ea4b0b4"
+              },
+              {
+                "x": 7,
+                "y": 5,
+                "file": "palpagos-z8192-x7-y5.webp",
+                "bytes": 35182,
+                "sha256": "540c33dd805b10473632d0f0a988ac9ec3aabdac9a79545a4a7779b02e0e7407"
+              },
+              {
+                "x": 8,
+                "y": 5,
+                "file": "palpagos-z8192-x8-y5.webp",
+                "bytes": 46444,
+                "sha256": "6fc65101fca9da623d840b2ff05b52f3f5ae9cc2467fa9a4a1624db863c27031"
+              },
+              {
+                "x": 9,
+                "y": 5,
+                "file": "palpagos-z8192-x9-y5.webp",
+                "bytes": 30772,
+                "sha256": "ee6b4955f101d26969bd1e062ca677a958403ad3c6491bed6f25e7f4700d235f"
+              },
+              {
+                "x": 10,
+                "y": 5,
+                "file": "palpagos-z8192-x10-y5.webp",
+                "bytes": 72494,
+                "sha256": "bdd6bb8182d810acefc533da7dbe7fb4ab505dcf4cf5d714749f3b01ee4dbac1"
+              },
+              {
+                "x": 11,
+                "y": 5,
+                "file": "palpagos-z8192-x11-y5.webp",
+                "bytes": 47678,
+                "sha256": "50fe8d97260043a483a2f3cfb6313b88cfa9a1524d3b93ccd4424d2d28f3f1e4"
+              },
+              {
+                "x": 12,
+                "y": 5,
+                "file": "palpagos-z8192-x12-y5.webp",
+                "bytes": 23508,
+                "sha256": "400ecb6ebdd9ec6530a4fa869705e374236290fb57ccbcc2d7f371682033bdd3"
+              },
+              {
+                "x": 13,
+                "y": 5,
+                "file": "palpagos-z8192-x13-y5.webp",
+                "bytes": 2688,
+                "sha256": "d6b571f4ac5ebda861a35bb2bbc90ad681198693b62d6bdc6cbbecf6deabaadb"
+              },
+              {
+                "x": 14,
+                "y": 5,
+                "file": "palpagos-z8192-x14-y5.webp",
+                "bytes": 14644,
+                "sha256": "a7ef5a9e61842d37a47ab67f0deb60477c24984458d8f57b41012cb96ba87cf9"
+              },
+              {
+                "x": 15,
+                "y": 5,
+                "file": "palpagos-z8192-x15-y5.webp",
+                "bytes": 1348,
+                "sha256": "4d416771c3b6196c338756465fb06bab93a62a90c42c1a7f8e1f547461419ad1"
+              },
+              {
+                "x": 0,
+                "y": 6,
+                "file": "palpagos-z8192-x0-y6.webp",
+                "bytes": 536,
+                "sha256": "6471e42515917f521cc5c8cd0e54c62061077817433b830efde601593fd1a162"
+              },
+              {
+                "x": 1,
+                "y": 6,
+                "file": "palpagos-z8192-x1-y6.webp",
+                "bytes": 536,
+                "sha256": "6471e42515917f521cc5c8cd0e54c62061077817433b830efde601593fd1a162"
+              },
+              {
+                "x": 2,
+                "y": 6,
+                "file": "palpagos-z8192-x2-y6.webp",
+                "bytes": 1854,
+                "sha256": "0e1b12f23327ca14d894135a784ab9195eebdc175ce864e7053928fc22f93530"
+              },
+              {
+                "x": 3,
+                "y": 6,
+                "file": "palpagos-z8192-x3-y6.webp",
+                "bytes": 3386,
+                "sha256": "d509d46329ce8e86360e684acca56f8036418be71847f7a74f9dfd2f04222f40"
+              },
+              {
+                "x": 4,
+                "y": 6,
+                "file": "palpagos-z8192-x4-y6.webp",
+                "bytes": 1374,
+                "sha256": "0dfacd580c089fb0a315eddb59b8bb567481fc2387a6823c89e57185f2763261"
+              },
+              {
+                "x": 5,
+                "y": 6,
+                "file": "palpagos-z8192-x5-y6.webp",
+                "bytes": 25050,
+                "sha256": "fb69e73c2ce708110f86f40c2c754a8f4afd5310e9571f19526764e0a5510b3b"
+              },
+              {
+                "x": 6,
+                "y": 6,
+                "file": "palpagos-z8192-x6-y6.webp",
+                "bytes": 45852,
+                "sha256": "f122c9d1eee8b75d87f7bf1671d31a4d99870baeafa13ac4edfd6707a365a625"
+              },
+              {
+                "x": 7,
+                "y": 6,
+                "file": "palpagos-z8192-x7-y6.webp",
+                "bytes": 44004,
+                "sha256": "f98878a73d289e67335c593b7865a98832385e5773bc0c8bd1dce59896fd7e8f"
+              },
+              {
+                "x": 8,
+                "y": 6,
+                "file": "palpagos-z8192-x8-y6.webp",
+                "bytes": 64208,
+                "sha256": "52043bde667ef95cf9c556a5c35a843812a9b4bead968235bb56cf98ac9dcb65"
+              },
+              {
+                "x": 9,
+                "y": 6,
+                "file": "palpagos-z8192-x9-y6.webp",
+                "bytes": 54378,
+                "sha256": "8f4a36d923ab9574082ddd908f45d6117c0e2726029779a6aca56cf6c4294d60"
+              },
+              {
+                "x": 10,
+                "y": 6,
+                "file": "palpagos-z8192-x10-y6.webp",
+                "bytes": 51570,
+                "sha256": "e7a865f66097d2e60188f551e27ab473c0afd6b7eb78527865837b0bcda88966"
+              },
+              {
+                "x": 11,
+                "y": 6,
+                "file": "palpagos-z8192-x11-y6.webp",
+                "bytes": 48774,
+                "sha256": "7b1fd8f20855170f81c89e5f56194b07657c0968d36a7865813221af7e7899db"
+              },
+              {
+                "x": 12,
+                "y": 6,
+                "file": "palpagos-z8192-x12-y6.webp",
+                "bytes": 19528,
+                "sha256": "057c85e029d4ad465510cf8d493070f795fb162eba7aeed35c883c84618732ce"
+              },
+              {
+                "x": 13,
+                "y": 6,
+                "file": "palpagos-z8192-x13-y6.webp",
+                "bytes": 2232,
+                "sha256": "adda71a956f45892c67db712a68eea982c5c9b80a6914a4ea4f901f0d1de73c5"
+              },
+              {
+                "x": 14,
+                "y": 6,
+                "file": "palpagos-z8192-x14-y6.webp",
+                "bytes": 1522,
+                "sha256": "f786f802ed5033a2572db2c38712efcefd560d87e3baf3a2c28d456e4c925fff"
+              },
+              {
+                "x": 15,
+                "y": 6,
+                "file": "palpagos-z8192-x15-y6.webp",
+                "bytes": 1292,
+                "sha256": "c060bce3c0b1c8fd169867b2842bbe47559628a529e1a5b9707504a0a0983f53"
+              },
+              {
+                "x": 0,
+                "y": 7,
+                "file": "palpagos-z8192-x0-y7.webp",
+                "bytes": 536,
+                "sha256": "6471e42515917f521cc5c8cd0e54c62061077817433b830efde601593fd1a162"
+              },
+              {
+                "x": 1,
+                "y": 7,
+                "file": "palpagos-z8192-x1-y7.webp",
+                "bytes": 1140,
+                "sha256": "ab854d9ad258996af1cac56d1acbf1b83115b07dac94ea71cf21360b3aa5eba6"
+              },
+              {
+                "x": 2,
+                "y": 7,
+                "file": "palpagos-z8192-x2-y7.webp",
+                "bytes": 4194,
+                "sha256": "d6fbb6a7ce222e00df5f0f813bfdfaa820469c6f559c2ad026e58aa9002d95fb"
+              },
+              {
+                "x": 3,
+                "y": 7,
+                "file": "palpagos-z8192-x3-y7.webp",
+                "bytes": 1362,
+                "sha256": "c164e73f6dbf5951a054890ce4b540e0c3b59b5631e880ef0785a865d5db3f94"
+              },
+              {
+                "x": 4,
+                "y": 7,
+                "file": "palpagos-z8192-x4-y7.webp",
+                "bytes": 1794,
+                "sha256": "2950e4a30ea1c638ca2e32c0d66998c7087996782a4fc614569dab5f6db4b30b"
+              },
+              {
+                "x": 5,
+                "y": 7,
+                "file": "palpagos-z8192-x5-y7.webp",
+                "bytes": 38960,
+                "sha256": "4ec0bcb1e95a041549cb8b7090f41cf3e62876c5af6d84ac6b5025232a34ba9e"
+              },
+              {
+                "x": 6,
+                "y": 7,
+                "file": "palpagos-z8192-x6-y7.webp",
+                "bytes": 62662,
+                "sha256": "e79c8f00118f7419dcf0ad3549d4b2e6d3e8260e2c887afadd8193b7b9c6b125"
+              },
+              {
+                "x": 7,
+                "y": 7,
+                "file": "palpagos-z8192-x7-y7.webp",
+                "bytes": 79962,
+                "sha256": "c03d78c3292d1de4c4af23cbb904994882b3bda549d3a5277f43b248c69a1e7a"
+              },
+              {
+                "x": 8,
+                "y": 7,
+                "file": "palpagos-z8192-x8-y7.webp",
+                "bytes": 59364,
+                "sha256": "804645f8ace6d0a4aadfef7dd64c80ea6aa55cdf171a2ff60db2b1552d24ff31"
+              },
+              {
+                "x": 9,
+                "y": 7,
+                "file": "palpagos-z8192-x9-y7.webp",
+                "bytes": 62470,
+                "sha256": "a679f88f6293c5795cee1a3424774ad7c18141862b68b35c981eb3230dcf8f8a"
+              },
+              {
+                "x": 10,
+                "y": 7,
+                "file": "palpagos-z8192-x10-y7.webp",
+                "bytes": 59892,
+                "sha256": "08e830940529cd9fb8251de189590af30ab3e1a39ffe54ba8a391f358efea9bc"
+              },
+              {
+                "x": 11,
+                "y": 7,
+                "file": "palpagos-z8192-x11-y7.webp",
+                "bytes": 18362,
+                "sha256": "214272e860a799a61549dcda812739afdc1c30c2dc051205987c0686010fdc96"
+              },
+              {
+                "x": 12,
+                "y": 7,
+                "file": "palpagos-z8192-x12-y7.webp",
+                "bytes": 5598,
+                "sha256": "9df7fb4a5758cd154be7c62ad41fb601027afa83fc62a62c21ff33dfa6e91695"
+              },
+              {
+                "x": 13,
+                "y": 7,
+                "file": "palpagos-z8192-x13-y7.webp",
+                "bytes": 1494,
+                "sha256": "5a5e2b52a217ea93a8fe22f0f26d3f48cfa77937d6805f856acfb95d5a9277ca"
+              },
+              {
+                "x": 14,
+                "y": 7,
+                "file": "palpagos-z8192-x14-y7.webp",
+                "bytes": 1070,
+                "sha256": "8563ee6a9fd285a37726d0ec9ecbdde907f40b97f96fce54ae7c21297c4c5860"
+              },
+              {
+                "x": 15,
+                "y": 7,
+                "file": "palpagos-z8192-x15-y7.webp",
+                "bytes": 2190,
+                "sha256": "edefa20fb62be004a31f14a84ca32f7ff173fc6a7055e8fcff3361821dc3a1b3"
+              },
+              {
+                "x": 0,
+                "y": 8,
+                "file": "palpagos-z8192-x0-y8.webp",
+                "bytes": 568,
+                "sha256": "6f1525304f333f02ea653168089d52bc1918b61a7df782aaad3ef3dafeb98f79"
+              },
+              {
+                "x": 1,
+                "y": 8,
+                "file": "palpagos-z8192-x1-y8.webp",
+                "bytes": 4396,
+                "sha256": "26d853b409025fbc9db34acf71c50645ae0102329834054d16b151e3c149261b"
+              },
+              {
+                "x": 2,
+                "y": 8,
+                "file": "palpagos-z8192-x2-y8.webp",
+                "bytes": 1538,
+                "sha256": "b4c6a5f02a56ac740273ac6726c02c84d6eab5345b9e2166bf7c63174c223dc1"
+              },
+              {
+                "x": 3,
+                "y": 8,
+                "file": "palpagos-z8192-x3-y8.webp",
+                "bytes": 14474,
+                "sha256": "623bb4621337fdf2e7b1a2f2d22f66d291cb72f7f38a4fcaa76b047eb4f4b0a0"
+              },
+              {
+                "x": 4,
+                "y": 8,
+                "file": "palpagos-z8192-x4-y8.webp",
+                "bytes": 1758,
+                "sha256": "fd98dde5c8676c27e6566c8230626e876256055f5eefc2c36a3f541251e00583"
+              },
+              {
+                "x": 5,
+                "y": 8,
+                "file": "palpagos-z8192-x5-y8.webp",
+                "bytes": 18010,
+                "sha256": "639e6d9620867ec8ea3216b6664153ba28e00e817d66900988738fb1c7fe5792"
+              },
+              {
+                "x": 6,
+                "y": 8,
+                "file": "palpagos-z8192-x6-y8.webp",
+                "bytes": 52242,
+                "sha256": "3f9733e2d7f6149f99438d4d702dbc2b8dc5fb6a35333ad86d4dcd940dece216"
+              },
+              {
+                "x": 7,
+                "y": 8,
+                "file": "palpagos-z8192-x7-y8.webp",
+                "bytes": 51528,
+                "sha256": "ce47f1a71c13e7ef36dbfa24b9b361af74aa3f4be89e647b488143f7048df199"
+              },
+              {
+                "x": 8,
+                "y": 8,
+                "file": "palpagos-z8192-x8-y8.webp",
+                "bytes": 47248,
+                "sha256": "7563b8c9c3106fed49e925ef6ed6a9d91e041ad91eb9c2212af5363e50bed5fe"
+              },
+              {
+                "x": 9,
+                "y": 8,
+                "file": "palpagos-z8192-x9-y8.webp",
+                "bytes": 26624,
+                "sha256": "d130b36d630de0d971d0f26b30ce65df71a767a4170664989dd6f39623d43a72"
+              },
+              {
+                "x": 10,
+                "y": 8,
+                "file": "palpagos-z8192-x10-y8.webp",
+                "bytes": 15244,
+                "sha256": "573241a101854f34d84ad0dd59a9e359780a2670d469c957c4e258f72cb08943"
+              },
+              {
+                "x": 11,
+                "y": 8,
+                "file": "palpagos-z8192-x11-y8.webp",
+                "bytes": 6702,
+                "sha256": "ac5b8aefc22cdec3926082964e2b92b7ec197b59c83f66ed90da8c95b3fc9754"
+              },
+              {
+                "x": 12,
+                "y": 8,
+                "file": "palpagos-z8192-x12-y8.webp",
+                "bytes": 2976,
+                "sha256": "0bf5a3e2f6d53ee03dbc44eb5248791c3decfa0b792792a708e0d6c2f59dae3f"
+              },
+              {
+                "x": 13,
+                "y": 8,
+                "file": "palpagos-z8192-x13-y8.webp",
+                "bytes": 1194,
+                "sha256": "fb5a0b345a66486cc74f33e23d3831df618cbc790e2edc9550371221642764ca"
+              },
+              {
+                "x": 14,
+                "y": 8,
+                "file": "palpagos-z8192-x14-y8.webp",
+                "bytes": 2922,
+                "sha256": "688b001b8ea3abcfd54e47260dc716a4378a7ae3c2a28254da1623fdcfc223c3"
+              },
+              {
+                "x": 15,
+                "y": 8,
+                "file": "palpagos-z8192-x15-y8.webp",
+                "bytes": 2114,
+                "sha256": "bb10e9f10840104ace89c0f661519fd943559dcf2f00226480eb761fe209eb3f"
+              },
+              {
+                "x": 0,
+                "y": 9,
+                "file": "palpagos-z8192-x0-y9.webp",
+                "bytes": 5320,
+                "sha256": "792386a0e6e53cfc1600139fcbcb4797c2a34a03a03eb71acf911520ff8cdb92"
+              },
+              {
+                "x": 1,
+                "y": 9,
+                "file": "palpagos-z8192-x1-y9.webp",
+                "bytes": 7064,
+                "sha256": "568a163c9131b47af100d51b70a9a76d9da786d72f25a30ad438fc1bd9a860c6"
+              },
+              {
+                "x": 2,
+                "y": 9,
+                "file": "palpagos-z8192-x2-y9.webp",
+                "bytes": 1678,
+                "sha256": "56e56540a3555ee9b8f37287448159369c9eb57aec1238d61742d242489ef54a"
+              },
+              {
+                "x": 3,
+                "y": 9,
+                "file": "palpagos-z8192-x3-y9.webp",
+                "bytes": 14826,
+                "sha256": "9241ddf5b32f6b1e52e3bd8c86c7e3447def25e7c115914b42d0e3b22923fc34"
+              },
+              {
+                "x": 4,
+                "y": 9,
+                "file": "palpagos-z8192-x4-y9.webp",
+                "bytes": 28356,
+                "sha256": "9017454100beed7512daa76e923414fff3f450854c3dedb1ee01705b9cf362d3"
+              },
+              {
+                "x": 5,
+                "y": 9,
+                "file": "palpagos-z8192-x5-y9.webp",
+                "bytes": 23464,
+                "sha256": "dcf3c3c0d51d94dc5540165daed1f5a7e9f3823a539f332510e29ac474c95937"
+              },
+              {
+                "x": 6,
+                "y": 9,
+                "file": "palpagos-z8192-x6-y9.webp",
+                "bytes": 8870,
+                "sha256": "3f96a8de9fcbe0fa3657020f577adfb6dd6c55fb26e2fa167e018194def9fb78"
+              },
+              {
+                "x": 7,
+                "y": 9,
+                "file": "palpagos-z8192-x7-y9.webp",
+                "bytes": 7750,
+                "sha256": "bf60a5dd83ba3918d71993acbb1062ae5ed3dbc9ff6bc038359587e8a61b9a5b"
+              },
+              {
+                "x": 8,
+                "y": 9,
+                "file": "palpagos-z8192-x8-y9.webp",
+                "bytes": 1706,
+                "sha256": "5cd95c2e0f32a50d60b3ca1a223ed4190e2acbe31255e2ed4c564285f0d5ad18"
+              },
+              {
+                "x": 9,
+                "y": 9,
+                "file": "palpagos-z8192-x9-y9.webp",
+                "bytes": 2050,
+                "sha256": "8ba067d3c86034ccf5686c0a90c3e52c38ea95a75c7a2380040f18932bffe747"
+              },
+              {
+                "x": 10,
+                "y": 9,
+                "file": "palpagos-z8192-x10-y9.webp",
+                "bytes": 1630,
+                "sha256": "0d1b2aa3e946f9e3c700cf3a5e74e1dac30f3bdd9b3ba66da3b20b613b0e3904"
+              },
+              {
+                "x": 11,
+                "y": 9,
+                "file": "palpagos-z8192-x11-y9.webp",
+                "bytes": 2032,
+                "sha256": "732006653f879a6b3c325f0f363f88a49ba193135e083cbf816f9ae271231c4f"
+              },
+              {
+                "x": 12,
+                "y": 9,
+                "file": "palpagos-z8192-x12-y9.webp",
+                "bytes": 1496,
+                "sha256": "e9fbfeb70b75fa15c6334cfa2033f5a7d7059221f37ad83f92daad88815d3586"
+              },
+              {
+                "x": 13,
+                "y": 9,
+                "file": "palpagos-z8192-x13-y9.webp",
+                "bytes": 1526,
+                "sha256": "7957589f4c8a8d6dde3282e9cc627579f76a37e8b24acfb82df8d44ec533e144"
+              },
+              {
+                "x": 14,
+                "y": 9,
+                "file": "palpagos-z8192-x14-y9.webp",
+                "bytes": 3636,
+                "sha256": "596f1ec8390d7fd30ac68325d030afb42605add44949937076a61d561fc94f3d"
+              },
+              {
+                "x": 15,
+                "y": 9,
+                "file": "palpagos-z8192-x15-y9.webp",
+                "bytes": 536,
+                "sha256": "6471e42515917f521cc5c8cd0e54c62061077817433b830efde601593fd1a162"
+              },
+              {
+                "x": 0,
+                "y": 10,
+                "file": "palpagos-z8192-x0-y10.webp",
+                "bytes": 2640,
+                "sha256": "6e3844053cddab8e10a064aeba1b2f6093efcb175cd22e822e2697693a7cdfa7"
+              },
+              {
+                "x": 1,
+                "y": 10,
+                "file": "palpagos-z8192-x1-y10.webp",
+                "bytes": 9170,
+                "sha256": "1fb1525570b031cd7c40dd53d0b97072768ee46230e91ff8e219eb84cff142b6"
+              },
+              {
+                "x": 2,
+                "y": 10,
+                "file": "palpagos-z8192-x2-y10.webp",
+                "bytes": 15792,
+                "sha256": "39e12f72cf68bf4761e8a579f4b4cf92e1da2ee82789c9c347daf737acadaffa"
+              },
+              {
+                "x": 3,
+                "y": 10,
+                "file": "palpagos-z8192-x3-y10.webp",
+                "bytes": 37370,
+                "sha256": "8bd622e2385cf526a63daaf79f5d692866ded9e72f81d6f454606eaeec4ab455"
+              },
+              {
+                "x": 4,
+                "y": 10,
+                "file": "palpagos-z8192-x4-y10.webp",
+                "bytes": 51248,
+                "sha256": "a0524179810cd84e16bc670c859e09067ecf50179f6e944e21a350e939e1e571"
+              },
+              {
+                "x": 5,
+                "y": 10,
+                "file": "palpagos-z8192-x5-y10.webp",
+                "bytes": 63098,
+                "sha256": "37fab4604cad697b59e610f7e19b33ac218c21a36c300fd580a1c96789f5ef0a"
+              },
+              {
+                "x": 6,
+                "y": 10,
+                "file": "palpagos-z8192-x6-y10.webp",
+                "bytes": 21240,
+                "sha256": "5d8bcb3a73b0259616dbf186ebf8ab0886c7560a24eb287af26a3c0d7e03e335"
+              },
+              {
+                "x": 7,
+                "y": 10,
+                "file": "palpagos-z8192-x7-y10.webp",
+                "bytes": 1030,
+                "sha256": "31401bb7f8274ef4ca330047976472a4bae823ac2f1d945f794551581647371f"
+              },
+              {
+                "x": 8,
+                "y": 10,
+                "file": "palpagos-z8192-x8-y10.webp",
+                "bytes": 1060,
+                "sha256": "72a29e91fc0dfb0d3630ba1d1ae608b2745acae796f0d23dd9b76fe073e43f36"
+              },
+              {
+                "x": 9,
+                "y": 10,
+                "file": "palpagos-z8192-x9-y10.webp",
+                "bytes": 7538,
+                "sha256": "31f79ab3efd329583ae4f1bbf7dda48f6dc4b3a85f244f2adba104e46d8056ca"
+              },
+              {
+                "x": 10,
+                "y": 10,
+                "file": "palpagos-z8192-x10-y10.webp",
+                "bytes": 954,
+                "sha256": "faca8d7dc9e8737eeaa87f784363afc7d153b3e8cc9ad3a8a74d5327c5a942ff"
+              },
+              {
+                "x": 11,
+                "y": 10,
+                "file": "palpagos-z8192-x11-y10.webp",
+                "bytes": 1006,
+                "sha256": "dcff6b6de56fcf606f7bd739603a66a704a63cb5f695cf9d2f7ae5a2057edeb0"
+              },
+              {
+                "x": 12,
+                "y": 10,
+                "file": "palpagos-z8192-x12-y10.webp",
+                "bytes": 1034,
+                "sha256": "7c2108b290bffb194db04d1906a818dd5648adc602175b201dbe294895f850e5"
+              },
+              {
+                "x": 13,
+                "y": 10,
+                "file": "palpagos-z8192-x13-y10.webp",
+                "bytes": 4134,
+                "sha256": "0e91eb9a81ed99803f9f5ccbb851fec9e2423966058e32bb2268e7deb3322264"
+              },
+              {
+                "x": 14,
+                "y": 10,
+                "file": "palpagos-z8192-x14-y10.webp",
+                "bytes": 536,
+                "sha256": "6471e42515917f521cc5c8cd0e54c62061077817433b830efde601593fd1a162"
+              },
+              {
+                "x": 15,
+                "y": 10,
+                "file": "palpagos-z8192-x15-y10.webp",
+                "bytes": 536,
+                "sha256": "6471e42515917f521cc5c8cd0e54c62061077817433b830efde601593fd1a162"
+              },
+              {
+                "x": 0,
+                "y": 11,
+                "file": "palpagos-z8192-x0-y11.webp",
+                "bytes": 1462,
+                "sha256": "6993129c3072fc319b59494890123d42ccd5fdbbe815ef58823ffa241b4e80da"
+              },
+              {
+                "x": 1,
+                "y": 11,
+                "file": "palpagos-z8192-x1-y11.webp",
+                "bytes": 1150,
+                "sha256": "769413d30972eb3a8ece4cbd67c30e39c348cba6080301fd6d0ae4dee20728e6"
+              },
+              {
+                "x": 2,
+                "y": 11,
+                "file": "palpagos-z8192-x2-y11.webp",
+                "bytes": 7688,
+                "sha256": "5c1828b2f2a00515ec22592a951756ddb5b6f888a6eae5838831025699cc4ec0"
+              },
+              {
+                "x": 3,
+                "y": 11,
+                "file": "palpagos-z8192-x3-y11.webp",
+                "bytes": 49182,
+                "sha256": "7ba47c430462886baa5cd01ee14851bc2dbefc35fc6a407e127eaa00448b2d52"
+              },
+              {
+                "x": 4,
+                "y": 11,
+                "file": "palpagos-z8192-x4-y11.webp",
+                "bytes": 60904,
+                "sha256": "874190253a4590515bf52eef78bd097122ebd1d60d9fc6d111eb4e94615c2093"
+              },
+              {
+                "x": 5,
+                "y": 11,
+                "file": "palpagos-z8192-x5-y11.webp",
+                "bytes": 62518,
+                "sha256": "2deda08ab76b291a19c149e0251ec9cbc473f5cfb87d251b796c0b894692a3f2"
+              },
+              {
+                "x": 6,
+                "y": 11,
+                "file": "palpagos-z8192-x6-y11.webp",
+                "bytes": 11842,
+                "sha256": "bde6f3e346c531a00295e9b40a3b1609b4dd05f2c1ad6180baaaa955851e0a6b"
+              },
+              {
+                "x": 7,
+                "y": 11,
+                "file": "palpagos-z8192-x7-y11.webp",
+                "bytes": 4432,
+                "sha256": "807e51f7a0fdcac734ab658e00f0860482aee3229fe3642c3f769679ffe603a7"
+              },
+              {
+                "x": 8,
+                "y": 11,
+                "file": "palpagos-z8192-x8-y11.webp",
+                "bytes": 1150,
+                "sha256": "8ec9369a81a345fcd3e2ccb64de52a00df42471e8aa01482842a9f1ee3613900"
+              },
+              {
+                "x": 9,
+                "y": 11,
+                "file": "palpagos-z8192-x9-y11.webp",
+                "bytes": 1068,
+                "sha256": "b974e66cfd8ab02b200118e1520cbd046fe7571d75f358b2439b09c42196d99f"
+              },
+              {
+                "x": 10,
+                "y": 11,
+                "file": "palpagos-z8192-x10-y11.webp",
+                "bytes": 996,
+                "sha256": "3d3338e3d0e90d149ecef9b0ce819f30f4df42c71961e182b0b646411eb290aa"
+              },
+              {
+                "x": 11,
+                "y": 11,
+                "file": "palpagos-z8192-x11-y11.webp",
+                "bytes": 1088,
+                "sha256": "8a2ecc93aa5cdc150a885023ec0db1278f89f3661d65a4792112d526956d6c52"
+              },
+              {
+                "x": 12,
+                "y": 11,
+                "file": "palpagos-z8192-x12-y11.webp",
+                "bytes": 3344,
+                "sha256": "65c08cb69ed1f34a3e9c3598517cf0cda5c0b5175d5f1d582108fcbbf3c26c0e"
+              },
+              {
+                "x": 13,
+                "y": 11,
+                "file": "palpagos-z8192-x13-y11.webp",
+                "bytes": 1602,
+                "sha256": "73f8879d7702f0b4b3978376a14855416af70bc08799ba028c61ddfea6afdca4"
+              },
+              {
+                "x": 14,
+                "y": 11,
+                "file": "palpagos-z8192-x14-y11.webp",
+                "bytes": 536,
+                "sha256": "6471e42515917f521cc5c8cd0e54c62061077817433b830efde601593fd1a162"
+              },
+              {
+                "x": 15,
+                "y": 11,
+                "file": "palpagos-z8192-x15-y11.webp",
+                "bytes": 536,
+                "sha256": "6471e42515917f521cc5c8cd0e54c62061077817433b830efde601593fd1a162"
+              },
+              {
+                "x": 0,
+                "y": 12,
+                "file": "palpagos-z8192-x0-y12.webp",
+                "bytes": 4694,
+                "sha256": "96c479dce028a394230028e05a9b263dd0496ebb9aed8860fe5c462cfdfe763f"
+              },
+              {
+                "x": 1,
+                "y": 12,
+                "file": "palpagos-z8192-x1-y12.webp",
+                "bytes": 3958,
+                "sha256": "0a2ddbe2cb02e17e02f9956d88114bb3b9776ac64f3016c6158ad159949592fb"
+              },
+              {
+                "x": 2,
+                "y": 12,
+                "file": "palpagos-z8192-x2-y12.webp",
+                "bytes": 14368,
+                "sha256": "ee1293cf2481038742bf973f84adec5fc97222fe578d7ef727b610c016824349"
+              },
+              {
+                "x": 3,
+                "y": 12,
+                "file": "palpagos-z8192-x3-y12.webp",
+                "bytes": 56120,
+                "sha256": "03cca6895df07cfad68f21f8d68ae796faeb79192cbe1bf2215faa82c48747be"
+              },
+              {
+                "x": 4,
+                "y": 12,
+                "file": "palpagos-z8192-x4-y12.webp",
+                "bytes": 44748,
+                "sha256": "4718c61201315585c7764357b441983ffa1f5323d2949c42d28a9e47e38e2215"
+              },
+              {
+                "x": 5,
+                "y": 12,
+                "file": "palpagos-z8192-x5-y12.webp",
+                "bytes": 20590,
+                "sha256": "90ca38568bfb9a1fb99ba55b8b14ded58527855b61932a358a333834e50aab21"
+              },
+              {
+                "x": 6,
+                "y": 12,
+                "file": "palpagos-z8192-x6-y12.webp",
+                "bytes": 19732,
+                "sha256": "9595e1d38b12acb725ffd4e2828dc6a708a36042ecf354269f50da9b541e8372"
+              },
+              {
+                "x": 7,
+                "y": 12,
+                "file": "palpagos-z8192-x7-y12.webp",
+                "bytes": 40760,
+                "sha256": "ac2d316575a9db785e91053d963e905e592299a20b518e55d18a206afe42391a"
+              },
+              {
+                "x": 8,
+                "y": 12,
+                "file": "palpagos-z8192-x8-y12.webp",
+                "bytes": 34894,
+                "sha256": "c5adefd8174223bb5a0db3d7dd685db3f81da455265fdb1929c6af1bbc173f45"
+              },
+              {
+                "x": 9,
+                "y": 12,
+                "file": "palpagos-z8192-x9-y12.webp",
+                "bytes": 1028,
+                "sha256": "85ba5df261e79a0a1530ca5a80e844a9727393abf4684cd6626926747a251d64"
+              },
+              {
+                "x": 10,
+                "y": 12,
+                "file": "palpagos-z8192-x10-y12.webp",
+                "bytes": 1024,
+                "sha256": "907813b9b39c5d1a979c4f8bff907002361a13afd50896539f28aa283f81fad6"
+              },
+              {
+                "x": 11,
+                "y": 12,
+                "file": "palpagos-z8192-x11-y12.webp",
+                "bytes": 1940,
+                "sha256": "57fac0d74b7ad057c910363eb36646ef06bf25fa466988cdc44548f14b7cb686"
+              },
+              {
+                "x": 12,
+                "y": 12,
+                "file": "palpagos-z8192-x12-y12.webp",
+                "bytes": 3108,
+                "sha256": "3afc7ae6d95d7e7f32b8a54f2f9265eea41be5ea5b502775299fa510f4595c38"
+              },
+              {
+                "x": 13,
+                "y": 12,
+                "file": "palpagos-z8192-x13-y12.webp",
+                "bytes": 536,
+                "sha256": "6471e42515917f521cc5c8cd0e54c62061077817433b830efde601593fd1a162"
+              },
+              {
+                "x": 14,
+                "y": 12,
+                "file": "palpagos-z8192-x14-y12.webp",
+                "bytes": 536,
+                "sha256": "6471e42515917f521cc5c8cd0e54c62061077817433b830efde601593fd1a162"
+              },
+              {
+                "x": 15,
+                "y": 12,
+                "file": "palpagos-z8192-x15-y12.webp",
+                "bytes": 536,
+                "sha256": "6471e42515917f521cc5c8cd0e54c62061077817433b830efde601593fd1a162"
+              },
+              {
+                "x": 0,
+                "y": 13,
+                "file": "palpagos-z8192-x0-y13.webp",
+                "bytes": 1556,
+                "sha256": "62cde5a2e83a7086aa8c9c3bcaa1d8b9ba167cc3c1bf4c994c9a0ea516ae311c"
+              },
+              {
+                "x": 1,
+                "y": 13,
+                "file": "palpagos-z8192-x1-y13.webp",
+                "bytes": 1322,
+                "sha256": "a4d447b55ca80afd942b56ff43208ac2c6a8add6848bc2c1479c133ea481483c"
+              },
+              {
+                "x": 2,
+                "y": 13,
+                "file": "palpagos-z8192-x2-y13.webp",
+                "bytes": 10688,
+                "sha256": "80d84bb21f5db76f71505d97c0c51af81e78c5bfed6ae7400bfba1c618499a47"
+              },
+              {
+                "x": 3,
+                "y": 13,
+                "file": "palpagos-z8192-x3-y13.webp",
+                "bytes": 61992,
+                "sha256": "e3b32c85d774a1a980248fd93231071d8e2322c0fb84b99ee6f887d2e8d9a7b2"
+              },
+              {
+                "x": 4,
+                "y": 13,
+                "file": "palpagos-z8192-x4-y13.webp",
+                "bytes": 7284,
+                "sha256": "377bb45c6c83b0f4dec382b708f173261b18d0a5fc5700febd2aced8c2fbf669"
+              },
+              {
+                "x": 5,
+                "y": 13,
+                "file": "palpagos-z8192-x5-y13.webp",
+                "bytes": 1624,
+                "sha256": "0e5ec7b5185a17f71aa6df867efe1142426fd5d456f340ff3e4320959a5ca093"
+              },
+              {
+                "x": 6,
+                "y": 13,
+                "file": "palpagos-z8192-x6-y13.webp",
+                "bytes": 3894,
+                "sha256": "65c7e05f3428ca3442104b0c80b3cd5d85e348a139b52ac360fd78e830c66c41"
+              },
+              {
+                "x": 7,
+                "y": 13,
+                "file": "palpagos-z8192-x7-y13.webp",
+                "bytes": 9522,
+                "sha256": "6bebb91bf3b95708919acf118a5f10191b6c393f52bbd769e3ec6f669e3ee84a"
+              },
+              {
+                "x": 8,
+                "y": 13,
+                "file": "palpagos-z8192-x8-y13.webp",
+                "bytes": 7924,
+                "sha256": "283472a8bdd1096bfd67415030bdcdaf193ec202cfcc59578e2a5c13c5a5aa71"
+              },
+              {
+                "x": 9,
+                "y": 13,
+                "file": "palpagos-z8192-x9-y13.webp",
+                "bytes": 1062,
+                "sha256": "114f6a37343e8d2d7f7cb83a0dafe31069fc8cae4528c87bee2f76e4da1902a9"
+              },
+              {
+                "x": 10,
+                "y": 13,
+                "file": "palpagos-z8192-x10-y13.webp",
+                "bytes": 2102,
+                "sha256": "fb3281669cef9dbc10d966711399259f076ef51b29a39fa94c41b93f5844e822"
+              },
+              {
+                "x": 11,
+                "y": 13,
+                "file": "palpagos-z8192-x11-y13.webp",
+                "bytes": 4030,
+                "sha256": "20cc7fd76ac456b2f3ceda316d447db4acc27495257a28edbd1ff977657b3b9f"
+              },
+              {
+                "x": 12,
+                "y": 13,
+                "file": "palpagos-z8192-x12-y13.webp",
+                "bytes": 536,
+                "sha256": "6471e42515917f521cc5c8cd0e54c62061077817433b830efde601593fd1a162"
+              },
+              {
+                "x": 13,
+                "y": 13,
+                "file": "palpagos-z8192-x13-y13.webp",
+                "bytes": 536,
+                "sha256": "6471e42515917f521cc5c8cd0e54c62061077817433b830efde601593fd1a162"
+              },
+              {
+                "x": 14,
+                "y": 13,
+                "file": "palpagos-z8192-x14-y13.webp",
+                "bytes": 536,
+                "sha256": "6471e42515917f521cc5c8cd0e54c62061077817433b830efde601593fd1a162"
+              },
+              {
+                "x": 15,
+                "y": 13,
+                "file": "palpagos-z8192-x15-y13.webp",
+                "bytes": 536,
+                "sha256": "6471e42515917f521cc5c8cd0e54c62061077817433b830efde601593fd1a162"
+              },
+              {
+                "x": 0,
+                "y": 14,
+                "file": "palpagos-z8192-x0-y14.webp",
+                "bytes": 1442,
+                "sha256": "5eef437dbd4dcd57d2065ba63272c5823cc5f89b0db5de37bff9ee886aec53a8"
+              },
+              {
+                "x": 1,
+                "y": 14,
+                "file": "palpagos-z8192-x1-y14.webp",
+                "bytes": 1104,
+                "sha256": "1b3f3bc16c13900645c8b256edd3cb466f755ccaf4077abde5e37e7aa9c3483e"
+              },
+              {
+                "x": 2,
+                "y": 14,
+                "file": "palpagos-z8192-x2-y14.webp",
+                "bytes": 1452,
+                "sha256": "bc32a25d034fcd5ad182b5664f233ebcec7ae4ce21f6f8b5cb90edbf387cd407"
+              },
+              {
+                "x": 3,
+                "y": 14,
+                "file": "palpagos-z8192-x3-y14.webp",
+                "bytes": 20282,
+                "sha256": "94bcf5a4c9f4f9b321fda187f11d19e7df4a704d72f21bc63133108eae5270bc"
+              },
+              {
+                "x": 4,
+                "y": 14,
+                "file": "palpagos-z8192-x4-y14.webp",
+                "bytes": 6166,
+                "sha256": "95547c1e88d0783447c6ec19be4ac0be2063e3992f6a2f676b85939af413cb48"
+              },
+              {
+                "x": 5,
+                "y": 14,
+                "file": "palpagos-z8192-x5-y14.webp",
+                "bytes": 1074,
+                "sha256": "7c17ce3331f18450c0ea24815816d7e4a5656591631bbe367296a3a9b379bc18"
+              },
+              {
+                "x": 6,
+                "y": 14,
+                "file": "palpagos-z8192-x6-y14.webp",
+                "bytes": 1058,
+                "sha256": "387c877067f737552183e0f9532e83252822fa027e16a280ad70eae360c9b280"
+              },
+              {
+                "x": 7,
+                "y": 14,
+                "file": "palpagos-z8192-x7-y14.webp",
+                "bytes": 1084,
+                "sha256": "048decc5fa31ece04729428bf1456625b61519a879f7a977678f3eace2e0d201"
+              },
+              {
+                "x": 8,
+                "y": 14,
+                "file": "palpagos-z8192-x8-y14.webp",
+                "bytes": 1340,
+                "sha256": "c6ffe8efdd55b1e6eac1593daa85882c799da914589a20cfe35b5b75dd4b29d1"
+              },
+              {
+                "x": 9,
+                "y": 14,
+                "file": "palpagos-z8192-x9-y14.webp",
+                "bytes": 4276,
+                "sha256": "1bdea4a7b8d0eff6aa77e4d37e9410d6f8da35b9863f3ffe31c89ceec1baa098"
+              },
+              {
+                "x": 10,
+                "y": 14,
+                "file": "palpagos-z8192-x10-y14.webp",
+                "bytes": 2876,
+                "sha256": "abf8ffcaa18615f9dfd99a802ff0cc78558c5787e23bfef7714c08010784d550"
+              },
+              {
+                "x": 11,
+                "y": 14,
+                "file": "palpagos-z8192-x11-y14.webp",
+                "bytes": 536,
+                "sha256": "6471e42515917f521cc5c8cd0e54c62061077817433b830efde601593fd1a162"
+              },
+              {
+                "x": 12,
+                "y": 14,
+                "file": "palpagos-z8192-x12-y14.webp",
+                "bytes": 536,
+                "sha256": "6471e42515917f521cc5c8cd0e54c62061077817433b830efde601593fd1a162"
+              },
+              {
+                "x": 13,
+                "y": 14,
+                "file": "palpagos-z8192-x13-y14.webp",
+                "bytes": 536,
+                "sha256": "6471e42515917f521cc5c8cd0e54c62061077817433b830efde601593fd1a162"
+              },
+              {
+                "x": 14,
+                "y": 14,
+                "file": "palpagos-z8192-x14-y14.webp",
+                "bytes": 536,
+                "sha256": "6471e42515917f521cc5c8cd0e54c62061077817433b830efde601593fd1a162"
+              },
+              {
+                "x": 15,
+                "y": 14,
+                "file": "palpagos-z8192-x15-y14.webp",
+                "bytes": 536,
+                "sha256": "6471e42515917f521cc5c8cd0e54c62061077817433b830efde601593fd1a162"
+              },
+              {
+                "x": 0,
+                "y": 15,
+                "file": "palpagos-z8192-x0-y15.webp",
+                "bytes": 1714,
+                "sha256": "cfc4c1f1d477cf698f563491503e8c81027a674ecb227439084dec538a27cbda"
+              },
+              {
+                "x": 1,
+                "y": 15,
+                "file": "palpagos-z8192-x1-y15.webp",
+                "bytes": 1478,
+                "sha256": "0006ec883e61c55702467c1af01dfabc25415e669d6bb36ff1707cd119fd4af7"
+              },
+              {
+                "x": 2,
+                "y": 15,
+                "file": "palpagos-z8192-x2-y15.webp",
+                "bytes": 1430,
+                "sha256": "5a5f63b372ab9369280176d37d35b88876f86d12b5169890a174f47379aa94b6"
+              },
+              {
+                "x": 3,
+                "y": 15,
+                "file": "palpagos-z8192-x3-y15.webp",
+                "bytes": 15836,
+                "sha256": "a6e8fa8422831c8fce4f9bc9bc1e0e71f0b54e7205fb4f6ebec46b73eab6cad6"
+              },
+              {
+                "x": 4,
+                "y": 15,
+                "file": "palpagos-z8192-x4-y15.webp",
+                "bytes": 12994,
+                "sha256": "413066ac9afac047878d49bd74c2ad4a72761c98739b3f4565e44bf610f17ea0"
+              },
+              {
+                "x": 5,
+                "y": 15,
+                "file": "palpagos-z8192-x5-y15.webp",
+                "bytes": 1406,
+                "sha256": "e56f1e66622d6489e89c90de7c6f847b16533855536421a8033dba087c8dd44f"
+              },
+              {
+                "x": 6,
+                "y": 15,
+                "file": "palpagos-z8192-x6-y15.webp",
+                "bytes": 1424,
+                "sha256": "65c3fb082b96ecd8ee3bf3c9e1b04699e8ccc61083285c5a903607a76ee4de2d"
+              },
+              {
+                "x": 7,
+                "y": 15,
+                "file": "palpagos-z8192-x7-y15.webp",
+                "bytes": 2716,
+                "sha256": "21110751d92749daebc1974bfbd85c8dddeb83efeb810b9d66779ae5a99d6dcb"
+              },
+              {
+                "x": 8,
+                "y": 15,
+                "file": "palpagos-z8192-x8-y15.webp",
+                "bytes": 3760,
+                "sha256": "3320ac0c69d9ce21af52355be16200d4157da216600583ec8ef68f00a8a67027"
+              },
+              {
+                "x": 9,
+                "y": 15,
+                "file": "palpagos-z8192-x9-y15.webp",
+                "bytes": 554,
+                "sha256": "325eac687e2316e62dd0a2b6dbcccb371bfdf399ca2bcb687dd7b00a81bce62b"
+              },
+              {
+                "x": 10,
+                "y": 15,
+                "file": "palpagos-z8192-x10-y15.webp",
+                "bytes": 536,
+                "sha256": "6471e42515917f521cc5c8cd0e54c62061077817433b830efde601593fd1a162"
+              },
+              {
+                "x": 11,
+                "y": 15,
+                "file": "palpagos-z8192-x11-y15.webp",
+                "bytes": 536,
+                "sha256": "6471e42515917f521cc5c8cd0e54c62061077817433b830efde601593fd1a162"
+              },
+              {
+                "x": 12,
+                "y": 15,
+                "file": "palpagos-z8192-x12-y15.webp",
+                "bytes": 536,
+                "sha256": "6471e42515917f521cc5c8cd0e54c62061077817433b830efde601593fd1a162"
+              },
+              {
+                "x": 13,
+                "y": 15,
+                "file": "palpagos-z8192-x13-y15.webp",
+                "bytes": 536,
+                "sha256": "6471e42515917f521cc5c8cd0e54c62061077817433b830efde601593fd1a162"
+              },
+              {
+                "x": 14,
+                "y": 15,
+                "file": "palpagos-z8192-x14-y15.webp",
+                "bytes": 536,
+                "sha256": "6471e42515917f521cc5c8cd0e54c62061077817433b830efde601593fd1a162"
+              },
+              {
+                "x": 15,
+                "y": 15,
+                "file": "palpagos-z8192-x15-y15.webp",
+                "bytes": 536,
+                "sha256": "6471e42515917f521cc5c8cd0e54c62061077817433b830efde601593fd1a162"
+              }
+            ]
+          }
+        ]
+      }
     },
     {
       "id": "world-tree",
@@ -48,7 +2469,2428 @@
       "sourceHeight": 8192,
       "width": 8192,
       "height": 8192,
-      "sha256": "77fee7b2bb90fa62f26eeb862396d54dbc8c7d2f0f5b12339c12585474f7c521"
+      "sha256": "77fee7b2bb90fa62f26eeb862396d54dbc8c7d2f0f5b12339c12585474f7c521",
+      "tilePyramid": {
+        "tileSize": 512,
+        "format": "webp",
+        "quality": 82,
+        "method": 6,
+        "exact": true,
+        "resampling": "lanczos",
+        "encoder": "Pillow/11.3.0 libwebp/1.5.0",
+        "generatorSha256": "70cf076bdb943f00f132afa0157f6e2e5a6cb7f5de8c23c37312940167097a14",
+        "sha256": "0e3639685f37200f54b30e235a05a2dd13889ddacc7de719fcf5f05e165b001f",
+        "levels": [
+          {
+            "size": 1024,
+            "columns": 2,
+            "rows": 2,
+            "tiles": [
+              {
+                "x": 0,
+                "y": 0,
+                "file": "world-tree-z1024-x0-y0.webp",
+                "bytes": 34902,
+                "sha256": "89929efd092edba38469b3007798b1485ce1d22abc7b3b5640270d8393770b6c"
+              },
+              {
+                "x": 1,
+                "y": 0,
+                "file": "world-tree-z1024-x1-y0.webp",
+                "bytes": 28978,
+                "sha256": "f04b0ad9ff2f2e64dc4c6ee05a010f340e150675de9afa046be12da2d01f7e2c"
+              },
+              {
+                "x": 0,
+                "y": 1,
+                "file": "world-tree-z1024-x0-y1.webp",
+                "bytes": 27510,
+                "sha256": "ad7483a7415b10af1cc3d872faad4bb5435d5211e7b3d3a4970ee9ce95656941"
+              },
+              {
+                "x": 1,
+                "y": 1,
+                "file": "world-tree-z1024-x1-y1.webp",
+                "bytes": 12064,
+                "sha256": "847a4ee2ae5409636aa82c1a6eac4f6ffb856f7dade5bec547dceaf64ae15896"
+              }
+            ]
+          },
+          {
+            "size": 2048,
+            "columns": 4,
+            "rows": 4,
+            "tiles": [
+              {
+                "x": 0,
+                "y": 0,
+                "file": "world-tree-z2048-x0-y0.webp",
+                "bytes": 11522,
+                "sha256": "3b6e74da455f0faafc26ad46f2d34976f6a0e3ca980dc4292feca50df782ef5a"
+              },
+              {
+                "x": 1,
+                "y": 0,
+                "file": "world-tree-z2048-x1-y0.webp",
+                "bytes": 22604,
+                "sha256": "e715b532ce27d2cbcac4768fdd94b5d5b734bca814fbfd06c2684b4923f7cf96"
+              },
+              {
+                "x": 2,
+                "y": 0,
+                "file": "world-tree-z2048-x2-y0.webp",
+                "bytes": 19296,
+                "sha256": "4aebede0cd0aeb8296bd45815e5083ac9f0735269c4ab6fe45d687ccf9f04313"
+              },
+              {
+                "x": 3,
+                "y": 0,
+                "file": "world-tree-z2048-x3-y0.webp",
+                "bytes": 724,
+                "sha256": "1ccfac851b154b956df6080f813fcaa5530bed599f4f8c9e7fc07a71c84fbc8a"
+              },
+              {
+                "x": 0,
+                "y": 1,
+                "file": "world-tree-z2048-x0-y1.webp",
+                "bytes": 20284,
+                "sha256": "970686d3a7ce4f1dd1585d12c5b76fb358a7f83beac7dc2aad0a6da80c7498fc"
+              },
+              {
+                "x": 1,
+                "y": 1,
+                "file": "world-tree-z2048-x1-y1.webp",
+                "bytes": 67802,
+                "sha256": "080f53ff8998c20fe845d2bd69d8b40618f83621ec2f1704f1806aade62c9dc4"
+              },
+              {
+                "x": 2,
+                "y": 1,
+                "file": "world-tree-z2048-x2-y1.webp",
+                "bytes": 71778,
+                "sha256": "84f05becb9f28ea2c7ddf03d7a096019d31e7e9a75c6689521f7e3191dc61c63"
+              },
+              {
+                "x": 3,
+                "y": 1,
+                "file": "world-tree-z2048-x3-y1.webp",
+                "bytes": 18018,
+                "sha256": "f4adf9cef7cefff4bde033ea4087adab7f9cec22829f01afcc55bcc9d05bc9db"
+              },
+              {
+                "x": 0,
+                "y": 2,
+                "file": "world-tree-z2048-x0-y2.webp",
+                "bytes": 19336,
+                "sha256": "e7f24e0e4a68ed0e95946c625db0f854e54963941a36187d1ff468a63482a93f"
+              },
+              {
+                "x": 1,
+                "y": 2,
+                "file": "world-tree-z2048-x1-y2.webp",
+                "bytes": 67276,
+                "sha256": "006a4534f8cff9f9cf29a0329588f182a45d8ee7af4643bcea80aceaff321a9a"
+              },
+              {
+                "x": 2,
+                "y": 2,
+                "file": "world-tree-z2048-x2-y2.webp",
+                "bytes": 25910,
+                "sha256": "273112bb5a70eaa0870316c49323feb0b4b8911841aca1778123030672fcda76"
+              },
+              {
+                "x": 3,
+                "y": 2,
+                "file": "world-tree-z2048-x3-y2.webp",
+                "bytes": 15732,
+                "sha256": "983b503b0b5343b06b415cb7f98779dc7357dbad8e44506051bd454cebdb82ac"
+              },
+              {
+                "x": 0,
+                "y": 3,
+                "file": "world-tree-z2048-x0-y3.webp",
+                "bytes": 6940,
+                "sha256": "db3d56245435cdbddfd09af78715386130d9c8f98c5820755ef6ed1c163ca995"
+              },
+              {
+                "x": 1,
+                "y": 3,
+                "file": "world-tree-z2048-x1-y3.webp",
+                "bytes": 10012,
+                "sha256": "f0bc832260cde981f8398391bc26fa4b0e5bd29462885247795f111925b5059b"
+              },
+              {
+                "x": 2,
+                "y": 3,
+                "file": "world-tree-z2048-x2-y3.webp",
+                "bytes": 534,
+                "sha256": "75ea4aa2a1aae758b05b373452ccf3c5fd86a9903172561f9012bae48445474c"
+              },
+              {
+                "x": 3,
+                "y": 3,
+                "file": "world-tree-z2048-x3-y3.webp",
+                "bytes": 534,
+                "sha256": "75ea4aa2a1aae758b05b373452ccf3c5fd86a9903172561f9012bae48445474c"
+              }
+            ]
+          },
+          {
+            "size": 4096,
+            "columns": 8,
+            "rows": 8,
+            "tiles": [
+              {
+                "x": 0,
+                "y": 0,
+                "file": "world-tree-z4096-x0-y0.webp",
+                "bytes": 642,
+                "sha256": "f4fcec70eb4cac9db0d619460c6e10114c78c9cd9fe6400548174f24e2355633"
+              },
+              {
+                "x": 1,
+                "y": 0,
+                "file": "world-tree-z4096-x1-y0.webp",
+                "bytes": 1226,
+                "sha256": "5dc1cddd92bed1d942940a86ff96a9a520dfa12b16d3da201e5f8e53caa539ee"
+              },
+              {
+                "x": 2,
+                "y": 0,
+                "file": "world-tree-z4096-x2-y0.webp",
+                "bytes": 1296,
+                "sha256": "b81f3039508cabbbb2a92c4fe349c14fc7beb428ee5a2008002d29402e16da99"
+              },
+              {
+                "x": 3,
+                "y": 0,
+                "file": "world-tree-z4096-x3-y0.webp",
+                "bytes": 752,
+                "sha256": "651470ea0d00325edc5c7e806356c45a972b0298c0fddf8cc4e64e870b62bdc6"
+              },
+              {
+                "x": 4,
+                "y": 0,
+                "file": "world-tree-z4096-x4-y0.webp",
+                "bytes": 722,
+                "sha256": "40fb87b657d9c635fcda24a3cb6111d1a1db0c5f91ec9cf7dbfb502017123e5f"
+              },
+              {
+                "x": 5,
+                "y": 0,
+                "file": "world-tree-z4096-x5-y0.webp",
+                "bytes": 590,
+                "sha256": "c7fc5b2fd626beb5751bbd99a57a0be75589258d63fc69e78202b4379b9b2424"
+              },
+              {
+                "x": 6,
+                "y": 0,
+                "file": "world-tree-z4096-x6-y0.webp",
+                "bytes": 534,
+                "sha256": "75ea4aa2a1aae758b05b373452ccf3c5fd86a9903172561f9012bae48445474c"
+              },
+              {
+                "x": 7,
+                "y": 0,
+                "file": "world-tree-z4096-x7-y0.webp",
+                "bytes": 534,
+                "sha256": "75ea4aa2a1aae758b05b373452ccf3c5fd86a9903172561f9012bae48445474c"
+              },
+              {
+                "x": 0,
+                "y": 1,
+                "file": "world-tree-z4096-x0-y1.webp",
+                "bytes": 3434,
+                "sha256": "8f44c2d09aa76c8d68185e9c3c38b712d79b11579122234ca4274ff087268b95"
+              },
+              {
+                "x": 1,
+                "y": 1,
+                "file": "world-tree-z4096-x1-y1.webp",
+                "bytes": 33460,
+                "sha256": "ca5c0104e4cdf837a486a7f7e5d9c81d1e9f88dc2fdc523e83ec2fd24b0192a9"
+              },
+              {
+                "x": 2,
+                "y": 1,
+                "file": "world-tree-z4096-x2-y1.webp",
+                "bytes": 43958,
+                "sha256": "1f8ed9984923f8b6387bfa633949462d7cadba70f80f4708942abe94b7cb16ed"
+              },
+              {
+                "x": 3,
+                "y": 1,
+                "file": "world-tree-z4096-x3-y1.webp",
+                "bytes": 34924,
+                "sha256": "04b8fdd4d100aaca7b96962ec7c3f45ef93dfec0bdd54b20285925b0ecb21a37"
+              },
+              {
+                "x": 4,
+                "y": 1,
+                "file": "world-tree-z4096-x4-y1.webp",
+                "bytes": 46210,
+                "sha256": "dfa23f5c07fef6afb9b5f8560ce54b3ee27fafcf40f35eec62187acabd162748"
+              },
+              {
+                "x": 5,
+                "y": 1,
+                "file": "world-tree-z4096-x5-y1.webp",
+                "bytes": 21342,
+                "sha256": "ed07aff8828341c285540d2f875fd7c0fb574433615b7a5c4a5a755a4fb08342"
+              },
+              {
+                "x": 6,
+                "y": 1,
+                "file": "world-tree-z4096-x6-y1.webp",
+                "bytes": 974,
+                "sha256": "f7c139787e39c862fb8c72bf5e702ad1b2952370dde0a95c1cdce5845b34b717"
+              },
+              {
+                "x": 7,
+                "y": 1,
+                "file": "world-tree-z4096-x7-y1.webp",
+                "bytes": 534,
+                "sha256": "75ea4aa2a1aae758b05b373452ccf3c5fd86a9903172561f9012bae48445474c"
+              },
+              {
+                "x": 0,
+                "y": 2,
+                "file": "world-tree-z4096-x0-y2.webp",
+                "bytes": 2816,
+                "sha256": "55e0ef360a312d98644fc059be4087dacb5128c1bba7fea2462a361243a2c29e"
+              },
+              {
+                "x": 1,
+                "y": 2,
+                "file": "world-tree-z4096-x1-y2.webp",
+                "bytes": 33632,
+                "sha256": "f6fbf79c57eb8dfeb16cde7770a6118d97c7187b6d381834a0ae7adb1eebe70f"
+              },
+              {
+                "x": 2,
+                "y": 2,
+                "file": "world-tree-z4096-x2-y2.webp",
+                "bytes": 49118,
+                "sha256": "04aa8188ac547d45a8ca90b9e17ff7a33313a06cc01207da0b565171ba0fbf43"
+              },
+              {
+                "x": 3,
+                "y": 2,
+                "file": "world-tree-z4096-x3-y2.webp",
+                "bytes": 59134,
+                "sha256": "c0a914ef8cf055aab7add6fba6b0a877419608e16dd2dd324d94200b459cb0d6"
+              },
+              {
+                "x": 4,
+                "y": 2,
+                "file": "world-tree-z4096-x4-y2.webp",
+                "bytes": 67096,
+                "sha256": "fb281c5079a64a6ef1e33ffe8d68fc60b6f1826f9c03ebd5cd7a9c1cd8846800"
+              },
+              {
+                "x": 5,
+                "y": 2,
+                "file": "world-tree-z4096-x5-y2.webp",
+                "bytes": 78112,
+                "sha256": "c96c4fe81a402d6fa35acb30c6282607195de6d79e27e4d74093005ff60dcd61"
+              },
+              {
+                "x": 6,
+                "y": 2,
+                "file": "world-tree-z4096-x6-y2.webp",
+                "bytes": 17920,
+                "sha256": "6b31e56b51a5c3570ae134a6ce1adc5b6afb5b95628d5682f17aef3cfea0b612"
+              },
+              {
+                "x": 7,
+                "y": 2,
+                "file": "world-tree-z4096-x7-y2.webp",
+                "bytes": 588,
+                "sha256": "a35baa9891afb44f9906815ceec213a94fd2ca686056054e0caf66dea4088037"
+              },
+              {
+                "x": 0,
+                "y": 3,
+                "file": "world-tree-z4096-x0-y3.webp",
+                "bytes": 680,
+                "sha256": "0b04a032362b7b396e502011541227f642f92764501384c51e7510a5ee51bb6d"
+              },
+              {
+                "x": 1,
+                "y": 3,
+                "file": "world-tree-z4096-x1-y3.webp",
+                "bytes": 30294,
+                "sha256": "77588c805722c7be4ba8406173a7cdfc94214565e124e44343b0fe6444ee7748"
+              },
+              {
+                "x": 2,
+                "y": 3,
+                "file": "world-tree-z4096-x2-y3.webp",
+                "bytes": 71474,
+                "sha256": "badfc6f4d17f6e7ed7194f66922920e313fd0fc6bd201f99f71dad8cffc90cbf"
+              },
+              {
+                "x": 3,
+                "y": 3,
+                "file": "world-tree-z4096-x3-y3.webp",
+                "bytes": 49008,
+                "sha256": "daad0637bc80870423e04d2b3035bbb6cbecf279f5c5d8eb4c3b66bd9015e009"
+              },
+              {
+                "x": 4,
+                "y": 3,
+                "file": "world-tree-z4096-x4-y3.webp",
+                "bytes": 52808,
+                "sha256": "9f0fb66919408ef3f2f068368ee9d5d513d5f77a4ba2f0cc4afc1791f5be0e4f"
+              },
+              {
+                "x": 5,
+                "y": 3,
+                "file": "world-tree-z4096-x5-y3.webp",
+                "bytes": 51294,
+                "sha256": "c5364adca7d7a512f468f2ee7cefdda1adf85b520d63dc92a0417ae1bea1b9cc"
+              },
+              {
+                "x": 6,
+                "y": 3,
+                "file": "world-tree-z4096-x6-y3.webp",
+                "bytes": 45552,
+                "sha256": "d52d26331b9bfa04860cadb7c4ada03b496274828f59fd10a43f038affbfc228"
+              },
+              {
+                "x": 7,
+                "y": 3,
+                "file": "world-tree-z4096-x7-y3.webp",
+                "bytes": 3520,
+                "sha256": "87c61a3a9fcec48fd92f793a1b4c87aac361f16d261cb5ecc828b0e22e61d397"
+              },
+              {
+                "x": 0,
+                "y": 4,
+                "file": "world-tree-z4096-x0-y4.webp",
+                "bytes": 730,
+                "sha256": "e8850d0a013b7f6c8dd08bf0ae1000ddcc602005ac645f153726af139fa8aae3"
+              },
+              {
+                "x": 1,
+                "y": 4,
+                "file": "world-tree-z4096-x1-y4.webp",
+                "bytes": 40336,
+                "sha256": "283b1d2ec86f8490d568146f9d7b79829cba166c97f867a209224aa05061fb06"
+              },
+              {
+                "x": 2,
+                "y": 4,
+                "file": "world-tree-z4096-x2-y4.webp",
+                "bytes": 61648,
+                "sha256": "ecc3027e6393f8ab9c30ac6baa16ea3ea0ed10f76bc8bdd5e33a4a6938b434de"
+              },
+              {
+                "x": 3,
+                "y": 4,
+                "file": "world-tree-z4096-x3-y4.webp",
+                "bytes": 64860,
+                "sha256": "9148d590994633474143a42c3e009586fa8d4ceba2fa8e276c8b3cd9ae6b54ea"
+              },
+              {
+                "x": 4,
+                "y": 4,
+                "file": "world-tree-z4096-x4-y4.webp",
+                "bytes": 45578,
+                "sha256": "c124efee3d227762253c1ad11de658b01ccb143fe5bd887ae1112976f7f360d4"
+              },
+              {
+                "x": 5,
+                "y": 4,
+                "file": "world-tree-z4096-x5-y4.webp",
+                "bytes": 46898,
+                "sha256": "02980d017b5a729aee93a5927863f02adb83ac011daa24375c336eea3a0ed379"
+              },
+              {
+                "x": 6,
+                "y": 4,
+                "file": "world-tree-z4096-x6-y4.webp",
+                "bytes": 47332,
+                "sha256": "41ace3ff1d095536088320be570657803979f4c550dc78c5178ac22a6cebb121"
+              },
+              {
+                "x": 7,
+                "y": 4,
+                "file": "world-tree-z4096-x7-y4.webp",
+                "bytes": 8444,
+                "sha256": "33fde6da6f7a157f2173e4046f0e7238f0354b1ef36fb392bbe615a6d9cfec53"
+              },
+              {
+                "x": 0,
+                "y": 5,
+                "file": "world-tree-z4096-x0-y5.webp",
+                "bytes": 534,
+                "sha256": "75ea4aa2a1aae758b05b373452ccf3c5fd86a9903172561f9012bae48445474c"
+              },
+              {
+                "x": 1,
+                "y": 5,
+                "file": "world-tree-z4096-x1-y5.webp",
+                "bytes": 27480,
+                "sha256": "1e1ee30b43aa7ee904199c62fc7c29a6145baf2685f3f5665d1369c57110c51b"
+              },
+              {
+                "x": 2,
+                "y": 5,
+                "file": "world-tree-z4096-x2-y5.webp",
+                "bytes": 69852,
+                "sha256": "b1f3e23ca4fe898f07e8c0fc6fbe2e6ffde3e585a42a88b565d0d422a7fef1b7"
+              },
+              {
+                "x": 3,
+                "y": 5,
+                "file": "world-tree-z4096-x3-y5.webp",
+                "bytes": 40288,
+                "sha256": "371adb1c2a2a4af86aa6075c429d1c84c1a55bd8a7c8dc82d7d183edf5da140a"
+              },
+              {
+                "x": 4,
+                "y": 5,
+                "file": "world-tree-z4096-x4-y5.webp",
+                "bytes": 3036,
+                "sha256": "194bd6fc5194a7e053e220836b45324f68f808eceb773d59f4b87fa7135d76c5"
+              },
+              {
+                "x": 5,
+                "y": 5,
+                "file": "world-tree-z4096-x5-y5.webp",
+                "bytes": 1834,
+                "sha256": "d9d3b404c1edcda901bf1b77bb96c7546fda2296df1b3a587c0dde162bd6cb53"
+              },
+              {
+                "x": 6,
+                "y": 5,
+                "file": "world-tree-z4096-x6-y5.webp",
+                "bytes": 1196,
+                "sha256": "dbe5b7e2144f99b4e18b8842795fd8a8f745910cc55b8f6ebc0100ed89a2f751"
+              },
+              {
+                "x": 7,
+                "y": 5,
+                "file": "world-tree-z4096-x7-y5.webp",
+                "bytes": 562,
+                "sha256": "56a51ad1ebafe063b3a534e1927758561b3e1ec478103fe424406adf8a140cce"
+              },
+              {
+                "x": 0,
+                "y": 6,
+                "file": "world-tree-z4096-x0-y6.webp",
+                "bytes": 534,
+                "sha256": "75ea4aa2a1aae758b05b373452ccf3c5fd86a9903172561f9012bae48445474c"
+              },
+              {
+                "x": 1,
+                "y": 6,
+                "file": "world-tree-z4096-x1-y6.webp",
+                "bytes": 22412,
+                "sha256": "234e85075d341f65fe80d8466d5020db6191a42a0ec4c787dc87794e3251d36c"
+              },
+              {
+                "x": 2,
+                "y": 6,
+                "file": "world-tree-z4096-x2-y6.webp",
+                "bytes": 33290,
+                "sha256": "6daa0af21c8b41087fcc03628ef76b81f6b7758ac9b6f02da0d8da34b475a34b"
+              },
+              {
+                "x": 3,
+                "y": 6,
+                "file": "world-tree-z4096-x3-y6.webp",
+                "bytes": 1486,
+                "sha256": "1ca8848f9ea2c8a51e8701faa221e0a9a00b519ad6c0c651d7a481e8e16a4de0"
+              },
+              {
+                "x": 4,
+                "y": 6,
+                "file": "world-tree-z4096-x4-y6.webp",
+                "bytes": 534,
+                "sha256": "75ea4aa2a1aae758b05b373452ccf3c5fd86a9903172561f9012bae48445474c"
+              },
+              {
+                "x": 5,
+                "y": 6,
+                "file": "world-tree-z4096-x5-y6.webp",
+                "bytes": 534,
+                "sha256": "75ea4aa2a1aae758b05b373452ccf3c5fd86a9903172561f9012bae48445474c"
+              },
+              {
+                "x": 6,
+                "y": 6,
+                "file": "world-tree-z4096-x6-y6.webp",
+                "bytes": 534,
+                "sha256": "75ea4aa2a1aae758b05b373452ccf3c5fd86a9903172561f9012bae48445474c"
+              },
+              {
+                "x": 7,
+                "y": 6,
+                "file": "world-tree-z4096-x7-y6.webp",
+                "bytes": 534,
+                "sha256": "75ea4aa2a1aae758b05b373452ccf3c5fd86a9903172561f9012bae48445474c"
+              },
+              {
+                "x": 0,
+                "y": 7,
+                "file": "world-tree-z4096-x0-y7.webp",
+                "bytes": 534,
+                "sha256": "75ea4aa2a1aae758b05b373452ccf3c5fd86a9903172561f9012bae48445474c"
+              },
+              {
+                "x": 1,
+                "y": 7,
+                "file": "world-tree-z4096-x1-y7.webp",
+                "bytes": 910,
+                "sha256": "358b3a51f9768da8b53ac5aeea679c31cc8bc992f87fb0f3884d4bb0d18aa90c"
+              },
+              {
+                "x": 2,
+                "y": 7,
+                "file": "world-tree-z4096-x2-y7.webp",
+                "bytes": 1008,
+                "sha256": "9659564ea6986451091c92f2ce0efcf38989b28427ef2bc3a16256f6da0fc0f5"
+              },
+              {
+                "x": 3,
+                "y": 7,
+                "file": "world-tree-z4096-x3-y7.webp",
+                "bytes": 534,
+                "sha256": "75ea4aa2a1aae758b05b373452ccf3c5fd86a9903172561f9012bae48445474c"
+              },
+              {
+                "x": 4,
+                "y": 7,
+                "file": "world-tree-z4096-x4-y7.webp",
+                "bytes": 534,
+                "sha256": "75ea4aa2a1aae758b05b373452ccf3c5fd86a9903172561f9012bae48445474c"
+              },
+              {
+                "x": 5,
+                "y": 7,
+                "file": "world-tree-z4096-x5-y7.webp",
+                "bytes": 534,
+                "sha256": "75ea4aa2a1aae758b05b373452ccf3c5fd86a9903172561f9012bae48445474c"
+              },
+              {
+                "x": 6,
+                "y": 7,
+                "file": "world-tree-z4096-x6-y7.webp",
+                "bytes": 534,
+                "sha256": "75ea4aa2a1aae758b05b373452ccf3c5fd86a9903172561f9012bae48445474c"
+              },
+              {
+                "x": 7,
+                "y": 7,
+                "file": "world-tree-z4096-x7-y7.webp",
+                "bytes": 534,
+                "sha256": "75ea4aa2a1aae758b05b373452ccf3c5fd86a9903172561f9012bae48445474c"
+              }
+            ]
+          },
+          {
+            "size": 8192,
+            "columns": 16,
+            "rows": 16,
+            "tiles": [
+              {
+                "x": 0,
+                "y": 0,
+                "file": "world-tree-z8192-x0-y0.webp",
+                "bytes": 534,
+                "sha256": "75ea4aa2a1aae758b05b373452ccf3c5fd86a9903172561f9012bae48445474c"
+              },
+              {
+                "x": 1,
+                "y": 0,
+                "file": "world-tree-z8192-x1-y0.webp",
+                "bytes": 534,
+                "sha256": "75ea4aa2a1aae758b05b373452ccf3c5fd86a9903172561f9012bae48445474c"
+              },
+              {
+                "x": 2,
+                "y": 0,
+                "file": "world-tree-z8192-x2-y0.webp",
+                "bytes": 534,
+                "sha256": "75ea4aa2a1aae758b05b373452ccf3c5fd86a9903172561f9012bae48445474c"
+              },
+              {
+                "x": 3,
+                "y": 0,
+                "file": "world-tree-z8192-x3-y0.webp",
+                "bytes": 534,
+                "sha256": "75ea4aa2a1aae758b05b373452ccf3c5fd86a9903172561f9012bae48445474c"
+              },
+              {
+                "x": 4,
+                "y": 0,
+                "file": "world-tree-z8192-x4-y0.webp",
+                "bytes": 534,
+                "sha256": "75ea4aa2a1aae758b05b373452ccf3c5fd86a9903172561f9012bae48445474c"
+              },
+              {
+                "x": 5,
+                "y": 0,
+                "file": "world-tree-z8192-x5-y0.webp",
+                "bytes": 534,
+                "sha256": "75ea4aa2a1aae758b05b373452ccf3c5fd86a9903172561f9012bae48445474c"
+              },
+              {
+                "x": 6,
+                "y": 0,
+                "file": "world-tree-z8192-x6-y0.webp",
+                "bytes": 534,
+                "sha256": "75ea4aa2a1aae758b05b373452ccf3c5fd86a9903172561f9012bae48445474c"
+              },
+              {
+                "x": 7,
+                "y": 0,
+                "file": "world-tree-z8192-x7-y0.webp",
+                "bytes": 534,
+                "sha256": "75ea4aa2a1aae758b05b373452ccf3c5fd86a9903172561f9012bae48445474c"
+              },
+              {
+                "x": 8,
+                "y": 0,
+                "file": "world-tree-z8192-x8-y0.webp",
+                "bytes": 534,
+                "sha256": "75ea4aa2a1aae758b05b373452ccf3c5fd86a9903172561f9012bae48445474c"
+              },
+              {
+                "x": 9,
+                "y": 0,
+                "file": "world-tree-z8192-x9-y0.webp",
+                "bytes": 534,
+                "sha256": "75ea4aa2a1aae758b05b373452ccf3c5fd86a9903172561f9012bae48445474c"
+              },
+              {
+                "x": 10,
+                "y": 0,
+                "file": "world-tree-z8192-x10-y0.webp",
+                "bytes": 534,
+                "sha256": "75ea4aa2a1aae758b05b373452ccf3c5fd86a9903172561f9012bae48445474c"
+              },
+              {
+                "x": 11,
+                "y": 0,
+                "file": "world-tree-z8192-x11-y0.webp",
+                "bytes": 534,
+                "sha256": "75ea4aa2a1aae758b05b373452ccf3c5fd86a9903172561f9012bae48445474c"
+              },
+              {
+                "x": 12,
+                "y": 0,
+                "file": "world-tree-z8192-x12-y0.webp",
+                "bytes": 534,
+                "sha256": "75ea4aa2a1aae758b05b373452ccf3c5fd86a9903172561f9012bae48445474c"
+              },
+              {
+                "x": 13,
+                "y": 0,
+                "file": "world-tree-z8192-x13-y0.webp",
+                "bytes": 534,
+                "sha256": "75ea4aa2a1aae758b05b373452ccf3c5fd86a9903172561f9012bae48445474c"
+              },
+              {
+                "x": 14,
+                "y": 0,
+                "file": "world-tree-z8192-x14-y0.webp",
+                "bytes": 534,
+                "sha256": "75ea4aa2a1aae758b05b373452ccf3c5fd86a9903172561f9012bae48445474c"
+              },
+              {
+                "x": 15,
+                "y": 0,
+                "file": "world-tree-z8192-x15-y0.webp",
+                "bytes": 534,
+                "sha256": "75ea4aa2a1aae758b05b373452ccf3c5fd86a9903172561f9012bae48445474c"
+              },
+              {
+                "x": 0,
+                "y": 1,
+                "file": "world-tree-z8192-x0-y1.webp",
+                "bytes": 534,
+                "sha256": "75ea4aa2a1aae758b05b373452ccf3c5fd86a9903172561f9012bae48445474c"
+              },
+              {
+                "x": 1,
+                "y": 1,
+                "file": "world-tree-z8192-x1-y1.webp",
+                "bytes": 784,
+                "sha256": "d21f4d395f984636ac0e6116e76d97e7922e8455291f0ff7f293e25539ec0ad5"
+              },
+              {
+                "x": 2,
+                "y": 1,
+                "file": "world-tree-z8192-x2-y1.webp",
+                "bytes": 1242,
+                "sha256": "0f9daec5617e347ad21d1c6dae23f76a4149fee285de2e7c49e262d33307bfcb"
+              },
+              {
+                "x": 3,
+                "y": 1,
+                "file": "world-tree-z8192-x3-y1.webp",
+                "bytes": 1714,
+                "sha256": "62635e8ef5452a55d98804c337996132aed59444d88cb1396843fa6e990aa8fb"
+              },
+              {
+                "x": 4,
+                "y": 1,
+                "file": "world-tree-z8192-x4-y1.webp",
+                "bytes": 1672,
+                "sha256": "20c3852f3dfd5914089249b8c170658d904f5c39c6101010b79142a248fc6675"
+              },
+              {
+                "x": 5,
+                "y": 1,
+                "file": "world-tree-z8192-x5-y1.webp",
+                "bytes": 1572,
+                "sha256": "b944d83dbb0cdb0715f979bc51caa4cd1378e00a8ac76390f2738dfeaabd1205"
+              },
+              {
+                "x": 6,
+                "y": 1,
+                "file": "world-tree-z8192-x6-y1.webp",
+                "bytes": 866,
+                "sha256": "2ea31c1fc2f01a6dec650222757b5b5f01202302d529ffad6b99bcc102841b2c"
+              },
+              {
+                "x": 7,
+                "y": 1,
+                "file": "world-tree-z8192-x7-y1.webp",
+                "bytes": 616,
+                "sha256": "d4ba1f27fc2de6f5483d81aef7cec6c19475e903f13310cada22662c6520d1ae"
+              },
+              {
+                "x": 8,
+                "y": 1,
+                "file": "world-tree-z8192-x8-y1.webp",
+                "bytes": 758,
+                "sha256": "a971da2fe0460bb784f2be941c8deeca0ad79f2cbc33bf557bb43686e1f501e7"
+              },
+              {
+                "x": 9,
+                "y": 1,
+                "file": "world-tree-z8192-x9-y1.webp",
+                "bytes": 770,
+                "sha256": "dea8a3adca14ea02c7e68727cc09a6f44c6e6f1b0c79c0dafedb6c87beaba512"
+              },
+              {
+                "x": 10,
+                "y": 1,
+                "file": "world-tree-z8192-x10-y1.webp",
+                "bytes": 626,
+                "sha256": "70f55605fef78cc937060c53f48ec6e69ec31d662672644af2614bbcb3daf2c9"
+              },
+              {
+                "x": 11,
+                "y": 1,
+                "file": "world-tree-z8192-x11-y1.webp",
+                "bytes": 534,
+                "sha256": "75ea4aa2a1aae758b05b373452ccf3c5fd86a9903172561f9012bae48445474c"
+              },
+              {
+                "x": 12,
+                "y": 1,
+                "file": "world-tree-z8192-x12-y1.webp",
+                "bytes": 534,
+                "sha256": "75ea4aa2a1aae758b05b373452ccf3c5fd86a9903172561f9012bae48445474c"
+              },
+              {
+                "x": 13,
+                "y": 1,
+                "file": "world-tree-z8192-x13-y1.webp",
+                "bytes": 534,
+                "sha256": "75ea4aa2a1aae758b05b373452ccf3c5fd86a9903172561f9012bae48445474c"
+              },
+              {
+                "x": 14,
+                "y": 1,
+                "file": "world-tree-z8192-x14-y1.webp",
+                "bytes": 534,
+                "sha256": "75ea4aa2a1aae758b05b373452ccf3c5fd86a9903172561f9012bae48445474c"
+              },
+              {
+                "x": 15,
+                "y": 1,
+                "file": "world-tree-z8192-x15-y1.webp",
+                "bytes": 534,
+                "sha256": "75ea4aa2a1aae758b05b373452ccf3c5fd86a9903172561f9012bae48445474c"
+              },
+              {
+                "x": 0,
+                "y": 2,
+                "file": "world-tree-z8192-x0-y2.webp",
+                "bytes": 648,
+                "sha256": "bf37d020f837deb076a0bcf9ffc0c4cd67a65f5cd02f55a507884376bb7ea8fe"
+              },
+              {
+                "x": 1,
+                "y": 2,
+                "file": "world-tree-z8192-x1-y2.webp",
+                "bytes": 4468,
+                "sha256": "c576b4176658799fb7222e7958429188ad5c31ffb1f4f93610802a6af3a56ad9"
+              },
+              {
+                "x": 2,
+                "y": 2,
+                "file": "world-tree-z8192-x2-y2.webp",
+                "bytes": 17206,
+                "sha256": "a0c57cfeed73dcf82dfd211efb2a9153b24c70e0a47d82d38a9882d8dc8d887c"
+              },
+              {
+                "x": 3,
+                "y": 2,
+                "file": "world-tree-z8192-x3-y2.webp",
+                "bytes": 32468,
+                "sha256": "8344c1b878b6c4532a500ba1546e5a2c15cffbb477739c7d8e264005f6c00d9b"
+              },
+              {
+                "x": 4,
+                "y": 2,
+                "file": "world-tree-z8192-x4-y2.webp",
+                "bytes": 38856,
+                "sha256": "03d189d956d1aff6edb416573792c6dd445ed44fabf029c4bb91ffbce1723a3a"
+              },
+              {
+                "x": 5,
+                "y": 2,
+                "file": "world-tree-z8192-x5-y2.webp",
+                "bytes": 30826,
+                "sha256": "5c848a38c40159e40893cc0347eb9dc80fde6458fb01171cfc73e77c26734bac"
+              },
+              {
+                "x": 6,
+                "y": 2,
+                "file": "world-tree-z8192-x6-y2.webp",
+                "bytes": 17058,
+                "sha256": "4e832941050e65b5f415ffc3a666a94080c6d4b3282ff6f0657eff66c87e589b"
+              },
+              {
+                "x": 7,
+                "y": 2,
+                "file": "world-tree-z8192-x7-y2.webp",
+                "bytes": 6264,
+                "sha256": "ac56c17e21a884541441d2a5565569ba832ba232e592654889fc0d7d1a840c44"
+              },
+              {
+                "x": 8,
+                "y": 2,
+                "file": "world-tree-z8192-x8-y2.webp",
+                "bytes": 12228,
+                "sha256": "eca8da61abfcbee538740c457a06540a6c489f4d6ec5aec394477de4ee6d1f6f"
+              },
+              {
+                "x": 9,
+                "y": 2,
+                "file": "world-tree-z8192-x9-y2.webp",
+                "bytes": 21852,
+                "sha256": "5e848d72fd6b9aea1fd110d26c5530cb135d8ea17ac78c86b77ee97d421f231d"
+              },
+              {
+                "x": 10,
+                "y": 2,
+                "file": "world-tree-z8192-x10-y2.webp",
+                "bytes": 5084,
+                "sha256": "b73d3b2928537de32c54e7894fc55b94b8b812aa0aea7e971427a964ea34f6a5"
+              },
+              {
+                "x": 11,
+                "y": 2,
+                "file": "world-tree-z8192-x11-y2.webp",
+                "bytes": 1176,
+                "sha256": "58d0af9b906e0a663904730874772a00ab0911df34191295cbabb38a950b3130"
+              },
+              {
+                "x": 12,
+                "y": 2,
+                "file": "world-tree-z8192-x12-y2.webp",
+                "bytes": 630,
+                "sha256": "ac8e038fcf44617f06d177778526af2264a51a679acabe2e808669f0206a5ce8"
+              },
+              {
+                "x": 13,
+                "y": 2,
+                "file": "world-tree-z8192-x13-y2.webp",
+                "bytes": 534,
+                "sha256": "75ea4aa2a1aae758b05b373452ccf3c5fd86a9903172561f9012bae48445474c"
+              },
+              {
+                "x": 14,
+                "y": 2,
+                "file": "world-tree-z8192-x14-y2.webp",
+                "bytes": 534,
+                "sha256": "75ea4aa2a1aae758b05b373452ccf3c5fd86a9903172561f9012bae48445474c"
+              },
+              {
+                "x": 15,
+                "y": 2,
+                "file": "world-tree-z8192-x15-y2.webp",
+                "bytes": 534,
+                "sha256": "75ea4aa2a1aae758b05b373452ccf3c5fd86a9903172561f9012bae48445474c"
+              },
+              {
+                "x": 0,
+                "y": 3,
+                "file": "world-tree-z8192-x0-y3.webp",
+                "bytes": 606,
+                "sha256": "cc92f54501303e618ac1c24d8718fc0d7d4d4b2eae1122ccc4ad16cd39fc387a"
+              },
+              {
+                "x": 1,
+                "y": 3,
+                "file": "world-tree-z8192-x1-y3.webp",
+                "bytes": 4302,
+                "sha256": "9169beb32c2c79fb94b985fd668c7dba0bfa25f718c11dde35d8ee8aa06b649a"
+              },
+              {
+                "x": 2,
+                "y": 3,
+                "file": "world-tree-z8192-x2-y3.webp",
+                "bytes": 24906,
+                "sha256": "dc8296a0bc550be4eb673242b0e51cd52d5f64a9f8a481d7c8f6a765f1025e3e"
+              },
+              {
+                "x": 3,
+                "y": 3,
+                "file": "world-tree-z8192-x3-y3.webp",
+                "bytes": 29766,
+                "sha256": "cab6dfaa662904ea2613c839228decd4216934d91ab7ecbe4751e637008ef3b0"
+              },
+              {
+                "x": 4,
+                "y": 3,
+                "file": "world-tree-z8192-x4-y3.webp",
+                "bytes": 32806,
+                "sha256": "7dadb09fd61509fc43842dbffa5f93cfd2b0bcae3f1e11b0381557635c22ef26"
+              },
+              {
+                "x": 5,
+                "y": 3,
+                "file": "world-tree-z8192-x5-y3.webp",
+                "bytes": 37132,
+                "sha256": "c6759f2dddc00c8fdce5d2410987528c90e452759857b728eef9f7e16a1daaa4"
+              },
+              {
+                "x": 6,
+                "y": 3,
+                "file": "world-tree-z8192-x6-y3.webp",
+                "bytes": 43904,
+                "sha256": "bdc2bcdd11540e27b39d57c6f9c4481b45de2d10e5d7c66edf755267a3e1c68b"
+              },
+              {
+                "x": 7,
+                "y": 3,
+                "file": "world-tree-z8192-x7-y3.webp",
+                "bytes": 58830,
+                "sha256": "241f00a15e5109696aa487f85d1ec4f035d375f7cc1e618a47e304e5523fb383"
+              },
+              {
+                "x": 8,
+                "y": 3,
+                "file": "world-tree-z8192-x8-y3.webp",
+                "bytes": 62704,
+                "sha256": "9fb9cd1bdd4bfb93b4388d6c3f46c8c911fe4ce054b9b211eb27dd333e76b5ea"
+              },
+              {
+                "x": 9,
+                "y": 3,
+                "file": "world-tree-z8192-x9-y3.webp",
+                "bytes": 61316,
+                "sha256": "2522ef55dd6cbf900f2ae0fb2f498aa20e931e38d17b0fb1ab1705219f5d138b"
+              },
+              {
+                "x": 10,
+                "y": 3,
+                "file": "world-tree-z8192-x10-y3.webp",
+                "bytes": 47176,
+                "sha256": "0f9b7e7458df4c834c45a3e8f780a1071497dd66799e7ae050ecbe6a54c24193"
+              },
+              {
+                "x": 11,
+                "y": 3,
+                "file": "world-tree-z8192-x11-y3.webp",
+                "bytes": 25296,
+                "sha256": "6b0f238bc19bc95ea73af6cc223af7fc208bc841e184a99c9bc2f7f8f9ebee4e"
+              },
+              {
+                "x": 12,
+                "y": 3,
+                "file": "world-tree-z8192-x12-y3.webp",
+                "bytes": 1456,
+                "sha256": "ccc1b19ac3d4d3f8faaa1a86de89c8c95eceb820a75c24dae7bfead99204fc7c"
+              },
+              {
+                "x": 13,
+                "y": 3,
+                "file": "world-tree-z8192-x13-y3.webp",
+                "bytes": 534,
+                "sha256": "75ea4aa2a1aae758b05b373452ccf3c5fd86a9903172561f9012bae48445474c"
+              },
+              {
+                "x": 14,
+                "y": 3,
+                "file": "world-tree-z8192-x14-y3.webp",
+                "bytes": 534,
+                "sha256": "75ea4aa2a1aae758b05b373452ccf3c5fd86a9903172561f9012bae48445474c"
+              },
+              {
+                "x": 15,
+                "y": 3,
+                "file": "world-tree-z8192-x15-y3.webp",
+                "bytes": 534,
+                "sha256": "75ea4aa2a1aae758b05b373452ccf3c5fd86a9903172561f9012bae48445474c"
+              },
+              {
+                "x": 0,
+                "y": 4,
+                "file": "world-tree-z8192-x0-y4.webp",
+                "bytes": 566,
+                "sha256": "f5bff6f9ac00a9bc25d86080286ea2a6d2eac921002596fe7c228ae82721fc37"
+              },
+              {
+                "x": 1,
+                "y": 4,
+                "file": "world-tree-z8192-x1-y4.webp",
+                "bytes": 6298,
+                "sha256": "3ebea7c7afe948fd91cef80d158b71ea1628119672885d87550941502614e049"
+              },
+              {
+                "x": 2,
+                "y": 4,
+                "file": "world-tree-z8192-x2-y4.webp",
+                "bytes": 27582,
+                "sha256": "36e83fede8e9317a81f2fde6e524bb0893292827ad7afd9bfbc6dc4e6b7e94d0"
+              },
+              {
+                "x": 3,
+                "y": 4,
+                "file": "world-tree-z8192-x3-y4.webp",
+                "bytes": 20356,
+                "sha256": "2e6393da23e08182c7301aa5913963a6adca640aa02fffc453e86a03f45a2e5b"
+              },
+              {
+                "x": 4,
+                "y": 4,
+                "file": "world-tree-z8192-x4-y4.webp",
+                "bytes": 38964,
+                "sha256": "a1aac6d0a2f2068f36fe25ced7f5a6bc08d0448803297e723bdad25411632ab2"
+              },
+              {
+                "x": 5,
+                "y": 4,
+                "file": "world-tree-z8192-x5-y4.webp",
+                "bytes": 37980,
+                "sha256": "93c19434390b88e9f75af6d75a7dc8c79ca8c4a2217755951c622ed9200b9d09"
+              },
+              {
+                "x": 6,
+                "y": 4,
+                "file": "world-tree-z8192-x6-y4.webp",
+                "bytes": 44348,
+                "sha256": "2c3b974b586e2547c1ed78156187144b775e644078702e9c8a8fd652e27052fe"
+              },
+              {
+                "x": 7,
+                "y": 4,
+                "file": "world-tree-z8192-x7-y4.webp",
+                "bytes": 45480,
+                "sha256": "cb908cc1a78917140f19bfcfdbf352fe6b758e35f8ee030eea4943ab00ebb0e7"
+              },
+              {
+                "x": 8,
+                "y": 4,
+                "file": "world-tree-z8192-x8-y4.webp",
+                "bytes": 65490,
+                "sha256": "b37e0a752fe9a93128dfc9560adf69a134493351859a44d8f9908715f8d005c3"
+              },
+              {
+                "x": 9,
+                "y": 4,
+                "file": "world-tree-z8192-x9-y4.webp",
+                "bytes": 63932,
+                "sha256": "5d5ace4d91bcc155116680d082f05cf37bf50c3b494ce5c241b56fad87ab43a4"
+              },
+              {
+                "x": 10,
+                "y": 4,
+                "file": "world-tree-z8192-x10-y4.webp",
+                "bytes": 70202,
+                "sha256": "e7f295706aefddffc8aa5cf5be55c217936f348dcea2c3f71f1a8dcfb2e5f70b"
+              },
+              {
+                "x": 11,
+                "y": 4,
+                "file": "world-tree-z8192-x11-y4.webp",
+                "bytes": 66418,
+                "sha256": "005a800bd547e406e894915ee84919ab4313aebdfe0f72c06684749232544885"
+              },
+              {
+                "x": 12,
+                "y": 4,
+                "file": "world-tree-z8192-x12-y4.webp",
+                "bytes": 10998,
+                "sha256": "3b0ae741e640d6377c8ae1d61072bc747266446792f6f16501a2a9edbfab067f"
+              },
+              {
+                "x": 13,
+                "y": 4,
+                "file": "world-tree-z8192-x13-y4.webp",
+                "bytes": 1030,
+                "sha256": "9f850accfc0c6d4f62a185e740173dfecf61d1b7ce49c3bc52053f2f4e25b8c4"
+              },
+              {
+                "x": 14,
+                "y": 4,
+                "file": "world-tree-z8192-x14-y4.webp",
+                "bytes": 534,
+                "sha256": "75ea4aa2a1aae758b05b373452ccf3c5fd86a9903172561f9012bae48445474c"
+              },
+              {
+                "x": 15,
+                "y": 4,
+                "file": "world-tree-z8192-x15-y4.webp",
+                "bytes": 534,
+                "sha256": "75ea4aa2a1aae758b05b373452ccf3c5fd86a9903172561f9012bae48445474c"
+              },
+              {
+                "x": 0,
+                "y": 5,
+                "file": "world-tree-z8192-x0-y5.webp",
+                "bytes": 534,
+                "sha256": "75ea4aa2a1aae758b05b373452ccf3c5fd86a9903172561f9012bae48445474c"
+              },
+              {
+                "x": 1,
+                "y": 5,
+                "file": "world-tree-z8192-x1-y5.webp",
+                "bytes": 1456,
+                "sha256": "7fe2cc8a14078e0226bf494de28b30db985be7681b89c30ddadb03e8a8c1118b"
+              },
+              {
+                "x": 2,
+                "y": 5,
+                "file": "world-tree-z8192-x2-y5.webp",
+                "bytes": 25718,
+                "sha256": "13a8d94f95e446c8aa636719963e8901793e38cb24dd1104f383174530d441f5"
+              },
+              {
+                "x": 3,
+                "y": 5,
+                "file": "world-tree-z8192-x3-y5.webp",
+                "bytes": 28792,
+                "sha256": "e32f9ef64a5e64bc4276775755f9b164b53d954cae1ad61f2cda5ecbd13d6559"
+              },
+              {
+                "x": 4,
+                "y": 5,
+                "file": "world-tree-z8192-x4-y5.webp",
+                "bytes": 38582,
+                "sha256": "fb7cc784ed0dadbb8a0d31f877f93545f2e6d9668826ae182c3e56009a0d085f"
+              },
+              {
+                "x": 5,
+                "y": 5,
+                "file": "world-tree-z8192-x5-y5.webp",
+                "bytes": 36864,
+                "sha256": "5cba9abf010c1820adc6789edd7936af2c950335bab82ef21e407b2f9c9e5c6a"
+              },
+              {
+                "x": 6,
+                "y": 5,
+                "file": "world-tree-z8192-x6-y5.webp",
+                "bytes": 49168,
+                "sha256": "c169f69779d5cb4f686533239e55e0c6d396baee0547999071007aa0cb6a4af6"
+              },
+              {
+                "x": 7,
+                "y": 5,
+                "file": "world-tree-z8192-x7-y5.webp",
+                "bytes": 60728,
+                "sha256": "bf3b5e5a2fa0bf162a072adfc18c76b3403f7619821cc503842eb810bb17c4f6"
+              },
+              {
+                "x": 8,
+                "y": 5,
+                "file": "world-tree-z8192-x8-y5.webp",
+                "bytes": 45026,
+                "sha256": "990106d26c2cc2df53cacfc954d8bff6fedb5503c32adbee5c33db9a1fec02cd"
+              },
+              {
+                "x": 9,
+                "y": 5,
+                "file": "world-tree-z8192-x9-y5.webp",
+                "bytes": 50198,
+                "sha256": "48339a239e3a7fc17b622a0c0fbfd60a70447e23ff8fdcf13d9975320131e83d"
+              },
+              {
+                "x": 10,
+                "y": 5,
+                "file": "world-tree-z8192-x10-y5.webp",
+                "bytes": 61100,
+                "sha256": "65cddc98c6d88acbcb3c20168f4ae5f01d51cc198a4dd32b90be66bb4e8418ff"
+              },
+              {
+                "x": 11,
+                "y": 5,
+                "file": "world-tree-z8192-x11-y5.webp",
+                "bytes": 67552,
+                "sha256": "14501482d0938011242001d8790ef8b74441aa54c57bb5b9e0c9de3935dc2a60"
+              },
+              {
+                "x": 12,
+                "y": 5,
+                "file": "world-tree-z8192-x12-y5.webp",
+                "bytes": 48498,
+                "sha256": "d163c2ad5f48810736207e307bcbd2b028f8844af8d9dd548442eef21eb321e4"
+              },
+              {
+                "x": 13,
+                "y": 5,
+                "file": "world-tree-z8192-x13-y5.webp",
+                "bytes": 5826,
+                "sha256": "378c77063bcf8d025c3a4753b53865fb76ebaca2c481e750c9dffffb8e6c8383"
+              },
+              {
+                "x": 14,
+                "y": 5,
+                "file": "world-tree-z8192-x14-y5.webp",
+                "bytes": 608,
+                "sha256": "5689777ed4c505dcd38d9798412c52a4002b8ef3a2b2a493a466c157ba5f9733"
+              },
+              {
+                "x": 15,
+                "y": 5,
+                "file": "world-tree-z8192-x15-y5.webp",
+                "bytes": 534,
+                "sha256": "75ea4aa2a1aae758b05b373452ccf3c5fd86a9903172561f9012bae48445474c"
+              },
+              {
+                "x": 0,
+                "y": 6,
+                "file": "world-tree-z8192-x0-y6.webp",
+                "bytes": 534,
+                "sha256": "75ea4aa2a1aae758b05b373452ccf3c5fd86a9903172561f9012bae48445474c"
+              },
+              {
+                "x": 1,
+                "y": 6,
+                "file": "world-tree-z8192-x1-y6.webp",
+                "bytes": 736,
+                "sha256": "2a97bd3a585caaf9632c52a6c6b376111062dbf25d41a9ba869ac9972c225065"
+              },
+              {
+                "x": 2,
+                "y": 6,
+                "file": "world-tree-z8192-x2-y6.webp",
+                "bytes": 14722,
+                "sha256": "ab42b3ecbda44778bfe1483f9501f48254abaa55bfbd06dda72972cb7aa7fe08"
+              },
+              {
+                "x": 3,
+                "y": 6,
+                "file": "world-tree-z8192-x3-y6.webp",
+                "bytes": 27116,
+                "sha256": "7fd3b5979f8e9c29690cb91ad4698351e20dc6c3d8db0bd3281a97bee0cde4e5"
+              },
+              {
+                "x": 4,
+                "y": 6,
+                "file": "world-tree-z8192-x4-y6.webp",
+                "bytes": 40276,
+                "sha256": "7e7bd8b9a44d325605ba668469e88c4121854e4d3b1c30f8f4ceed18266fd51c"
+              },
+              {
+                "x": 5,
+                "y": 6,
+                "file": "world-tree-z8192-x5-y6.webp",
+                "bytes": 52090,
+                "sha256": "b1b318ba07f571f70208054caeae44cece265fe17abfdf176af1c4b6f352b5d9"
+              },
+              {
+                "x": 6,
+                "y": 6,
+                "file": "world-tree-z8192-x6-y6.webp",
+                "bytes": 40618,
+                "sha256": "af3e107ac009b5864b7e7499dc7adade823e13accd7de06906e4c8900e168fa1"
+              },
+              {
+                "x": 7,
+                "y": 6,
+                "file": "world-tree-z8192-x7-y6.webp",
+                "bytes": 39932,
+                "sha256": "2af1685e4fb293b950420aec83e8ac6c40de8cee34d549dc1602b77fb2efcc9f"
+              },
+              {
+                "x": 8,
+                "y": 6,
+                "file": "world-tree-z8192-x8-y6.webp",
+                "bytes": 45270,
+                "sha256": "b31b421f718a09fc9b5f789fc3c1f6a3f34321a542c13661f1c9a0485c78a6dc"
+              },
+              {
+                "x": 9,
+                "y": 6,
+                "file": "world-tree-z8192-x9-y6.webp",
+                "bytes": 47964,
+                "sha256": "5dfff851540d91a2ce73226aabbdca613b59d6f148633fc9ddd791043a024a8e"
+              },
+              {
+                "x": 10,
+                "y": 6,
+                "file": "world-tree-z8192-x10-y6.webp",
+                "bytes": 46138,
+                "sha256": "344b5448a3c57443a1d2a5287595c4e93a317f69918a9593edae909577cdd2fb"
+              },
+              {
+                "x": 11,
+                "y": 6,
+                "file": "world-tree-z8192-x11-y6.webp",
+                "bytes": 39210,
+                "sha256": "7f2bf263fbd4b64a245e6917dc13ec10749aff4413fe6748454e473d61f0f666"
+              },
+              {
+                "x": 12,
+                "y": 6,
+                "file": "world-tree-z8192-x12-y6.webp",
+                "bytes": 37170,
+                "sha256": "84f255a7dda59ddcfe11e21df9ef3a0c6df9580281ee6ef386c9844de78acf18"
+              },
+              {
+                "x": 13,
+                "y": 6,
+                "file": "world-tree-z8192-x13-y6.webp",
+                "bytes": 18618,
+                "sha256": "771a9b415ceb6ca35af83abad025a91f62e944e0d4be0662644c9d0ab5c3f255"
+              },
+              {
+                "x": 14,
+                "y": 6,
+                "file": "world-tree-z8192-x14-y6.webp",
+                "bytes": 1128,
+                "sha256": "e46dcd7fff13918575e86af58228f6dec4f48fae2fe8807305e4bd07e44d7c28"
+              },
+              {
+                "x": 15,
+                "y": 6,
+                "file": "world-tree-z8192-x15-y6.webp",
+                "bytes": 534,
+                "sha256": "75ea4aa2a1aae758b05b373452ccf3c5fd86a9903172561f9012bae48445474c"
+              },
+              {
+                "x": 0,
+                "y": 7,
+                "file": "world-tree-z8192-x0-y7.webp",
+                "bytes": 534,
+                "sha256": "75ea4aa2a1aae758b05b373452ccf3c5fd86a9903172561f9012bae48445474c"
+              },
+              {
+                "x": 1,
+                "y": 7,
+                "file": "world-tree-z8192-x1-y7.webp",
+                "bytes": 642,
+                "sha256": "f40b9137725e6786d5581afcd4dda558ae6cf3d2d57ba226a19bbcb4f127abf6"
+              },
+              {
+                "x": 2,
+                "y": 7,
+                "file": "world-tree-z8192-x2-y7.webp",
+                "bytes": 5760,
+                "sha256": "4962a2b8d52db676bbe865d190a5954c995f81bf8a715e215b23242eb2c08c8a"
+              },
+              {
+                "x": 3,
+                "y": 7,
+                "file": "world-tree-z8192-x3-y7.webp",
+                "bytes": 46012,
+                "sha256": "f4bc789dfedb4f7347141a7702bc918199946f2272b07b0ae82ab3951e303bf5"
+              },
+              {
+                "x": 4,
+                "y": 7,
+                "file": "world-tree-z8192-x4-y7.webp",
+                "bytes": 67940,
+                "sha256": "f406f76068fda52d13c83dd71c60e27947829b60faa1e3641faba605a2e0a0eb"
+              },
+              {
+                "x": 5,
+                "y": 7,
+                "file": "world-tree-z8192-x5-y7.webp",
+                "bytes": 71482,
+                "sha256": "a0563c1595aeaa7e64d931b37ac34bf043e095a34dead8971b3bd860cf9fc978"
+              },
+              {
+                "x": 6,
+                "y": 7,
+                "file": "world-tree-z8192-x6-y7.webp",
+                "bytes": 44348,
+                "sha256": "7c9a8330b41bdf264536e559683ae65097b0cbecf2dc7c581a85fb2303d0d639"
+              },
+              {
+                "x": 7,
+                "y": 7,
+                "file": "world-tree-z8192-x7-y7.webp",
+                "bytes": 36660,
+                "sha256": "650b7d9ee91cbbd4001b677d541ae6eaf49c51878fff05d08b5b32bf35288f4f"
+              },
+              {
+                "x": 8,
+                "y": 7,
+                "file": "world-tree-z8192-x8-y7.webp",
+                "bytes": 37470,
+                "sha256": "e0d510fcaa4367572fe657f741a4f0ca903a3f5caa1e52942ef8d9c75b919fa4"
+              },
+              {
+                "x": 9,
+                "y": 7,
+                "file": "world-tree-z8192-x9-y7.webp",
+                "bytes": 42868,
+                "sha256": "f3b36081c77f08f5a859b14d905d6a2afcefb7a1ddd6305488972e129838008d"
+              },
+              {
+                "x": 10,
+                "y": 7,
+                "file": "world-tree-z8192-x10-y7.webp",
+                "bytes": 42336,
+                "sha256": "4af2a65b6ba36c42a421ab1a0d6a1b2b2aadb3fde10f1fb38a279ff10b79d39d"
+              },
+              {
+                "x": 11,
+                "y": 7,
+                "file": "world-tree-z8192-x11-y7.webp",
+                "bytes": 49732,
+                "sha256": "7e971b55df49a0f640affdf8b99ff294dc4c5a573436effcf409668a0b9f6c7f"
+              },
+              {
+                "x": 12,
+                "y": 7,
+                "file": "world-tree-z8192-x12-y7.webp",
+                "bytes": 44398,
+                "sha256": "d2af305f5c3136055ae24d31f2a86e9bf5408b57658caaa83721539095dc754d"
+              },
+              {
+                "x": 13,
+                "y": 7,
+                "file": "world-tree-z8192-x13-y7.webp",
+                "bytes": 51204,
+                "sha256": "16d193a18509660d40a26fc483a5c3a244800edbe699037f1b2142970cb85374"
+              },
+              {
+                "x": 14,
+                "y": 7,
+                "file": "world-tree-z8192-x14-y7.webp",
+                "bytes": 8714,
+                "sha256": "692c761f7d1db0a9ee038f8c94bd1a11579eb088ab9d2f1747498ff55e280c7f"
+              },
+              {
+                "x": 15,
+                "y": 7,
+                "file": "world-tree-z8192-x15-y7.webp",
+                "bytes": 892,
+                "sha256": "3fd402c2d004a98a23514e6cd1866b811eff44b7338e9c954e21f24a02e3fbb3"
+              },
+              {
+                "x": 0,
+                "y": 8,
+                "file": "world-tree-z8192-x0-y8.webp",
+                "bytes": 534,
+                "sha256": "75ea4aa2a1aae758b05b373452ccf3c5fd86a9903172561f9012bae48445474c"
+              },
+              {
+                "x": 1,
+                "y": 8,
+                "file": "world-tree-z8192-x1-y8.webp",
+                "bytes": 874,
+                "sha256": "c278909e3dc444578bb0725022679a4b534f833a058f93d30e3a42b27b82c2e2"
+              },
+              {
+                "x": 2,
+                "y": 8,
+                "file": "world-tree-z8192-x2-y8.webp",
+                "bytes": 20048,
+                "sha256": "24343c1c6d51937b5bfb93a3c2f5ab770311cdd9f02c9368aada0058bb285323"
+              },
+              {
+                "x": 3,
+                "y": 8,
+                "file": "world-tree-z8192-x3-y8.webp",
+                "bytes": 53022,
+                "sha256": "532b98985dc1f4f3042e181d9a2c86fb2ebe894cbdf7dab83a343653b01fc790"
+              },
+              {
+                "x": 4,
+                "y": 8,
+                "file": "world-tree-z8192-x4-y8.webp",
+                "bytes": 48446,
+                "sha256": "6323200b7657dbce6836e967acab21655d858505cd8be66df544c931884fcf27"
+              },
+              {
+                "x": 5,
+                "y": 8,
+                "file": "world-tree-z8192-x5-y8.webp",
+                "bytes": 50822,
+                "sha256": "fcff0ab19cacc0dc04e656e05b41915870f41b2edac70c1f36afd0f64551639e"
+              },
+              {
+                "x": 6,
+                "y": 8,
+                "file": "world-tree-z8192-x6-y8.webp",
+                "bytes": 56726,
+                "sha256": "e9c3c9b32d22e42511a1b1b84aa4303df2ce6c522de2b77a5318d45e395896dd"
+              },
+              {
+                "x": 7,
+                "y": 8,
+                "file": "world-tree-z8192-x7-y8.webp",
+                "bytes": 47216,
+                "sha256": "b8f78db7b52e39079e92a40bfa111cae6817a82a0f69b4002890b3481f5a0e1c"
+              },
+              {
+                "x": 8,
+                "y": 8,
+                "file": "world-tree-z8192-x8-y8.webp",
+                "bytes": 37984,
+                "sha256": "6724078fcf95dd514c1b5d0ad6626bba300a2071229cbbcbc09bfd61ea0dc20c"
+              },
+              {
+                "x": 9,
+                "y": 8,
+                "file": "world-tree-z8192-x9-y8.webp",
+                "bytes": 36460,
+                "sha256": "a78ac1bf5cc16a3ecd2137d6e14233bbaf0a9b029051c58547d59fe96461c581"
+              },
+              {
+                "x": 10,
+                "y": 8,
+                "file": "world-tree-z8192-x10-y8.webp",
+                "bytes": 43560,
+                "sha256": "921d549417fe581654d9dd62411d3a652af83ada3f36432fc3843b5f1f1bcd63"
+              },
+              {
+                "x": 11,
+                "y": 8,
+                "file": "world-tree-z8192-x11-y8.webp",
+                "bytes": 51318,
+                "sha256": "8d2c71f69a895cf37344390616c71035f41834e6f42588498919112cf37ff6ce"
+              },
+              {
+                "x": 12,
+                "y": 8,
+                "file": "world-tree-z8192-x12-y8.webp",
+                "bytes": 53010,
+                "sha256": "b99d0f8277cd82092c89315c6c35d8cd901437d70ce1dc0a428438a21174da72"
+              },
+              {
+                "x": 13,
+                "y": 8,
+                "file": "world-tree-z8192-x13-y8.webp",
+                "bytes": 52522,
+                "sha256": "2b4bf5c886b702086c75903527431e4c0016ddd4cd24c392fc34f0b66d62de9a"
+              },
+              {
+                "x": 14,
+                "y": 8,
+                "file": "world-tree-z8192-x14-y8.webp",
+                "bytes": 24034,
+                "sha256": "49b48d1b9395001eb1d8cd713b53e39622fd4b234c6d87d89cf1332c2c607c03"
+              },
+              {
+                "x": 15,
+                "y": 8,
+                "file": "world-tree-z8192-x15-y8.webp",
+                "bytes": 1232,
+                "sha256": "6d0a4036df1560d1d080d16c8ec05fec68fda09b3bb4888241c50cb464fa3655"
+              },
+              {
+                "x": 0,
+                "y": 9,
+                "file": "world-tree-z8192-x0-y9.webp",
+                "bytes": 534,
+                "sha256": "75ea4aa2a1aae758b05b373452ccf3c5fd86a9903172561f9012bae48445474c"
+              },
+              {
+                "x": 1,
+                "y": 9,
+                "file": "world-tree-z8192-x1-y9.webp",
+                "bytes": 684,
+                "sha256": "f485b6e5141488674fbd6e471f99cfa207bc16f73af03a20ee4bf5635a8b2f21"
+              },
+              {
+                "x": 2,
+                "y": 9,
+                "file": "world-tree-z8192-x2-y9.webp",
+                "bytes": 9804,
+                "sha256": "90a3002cb056dc1795fed25ea78c9f859b20f36ade7e0b80a68d11e392f623f5"
+              },
+              {
+                "x": 3,
+                "y": 9,
+                "file": "world-tree-z8192-x3-y9.webp",
+                "bytes": 44094,
+                "sha256": "1d1d91676cea84b7801e229141a473d6dac696222f31fdece77d5f1e6ff4d8aa"
+              },
+              {
+                "x": 4,
+                "y": 9,
+                "file": "world-tree-z8192-x4-y9.webp",
+                "bytes": 58080,
+                "sha256": "c01c4c3c0118051e3821b86b02d8ef3e644a7e169db177ed5cd22a6ead54bfdb"
+              },
+              {
+                "x": 5,
+                "y": 9,
+                "file": "world-tree-z8192-x5-y9.webp",
+                "bytes": 38620,
+                "sha256": "6fc5ce022626baf6a3e49c695d6716acddbafef05af4854289405ed3edb4dac6"
+              },
+              {
+                "x": 6,
+                "y": 9,
+                "file": "world-tree-z8192-x6-y9.webp",
+                "bytes": 56292,
+                "sha256": "5842c3af8c9e18e36e00a30437a76d4d46f295a8aaec33edebd6f8a4895f3480"
+              },
+              {
+                "x": 7,
+                "y": 9,
+                "file": "world-tree-z8192-x7-y9.webp",
+                "bytes": 47762,
+                "sha256": "f7292414c25321816792713e711e666273822dda75f9a8336e85f33a0d706a99"
+              },
+              {
+                "x": 8,
+                "y": 9,
+                "file": "world-tree-z8192-x8-y9.webp",
+                "bytes": 44360,
+                "sha256": "9ddf617898e93205b320f927575e53efbbe10377f0007d98f566b25ec9c5da33"
+              },
+              {
+                "x": 9,
+                "y": 9,
+                "file": "world-tree-z8192-x9-y9.webp",
+                "bytes": 32682,
+                "sha256": "092952a068c9dce2ee47e358a5cdabb537e9723bb9a1aee1839680bb39bcd8ae"
+              },
+              {
+                "x": 10,
+                "y": 9,
+                "file": "world-tree-z8192-x10-y9.webp",
+                "bytes": 36134,
+                "sha256": "a2c85a3af45e3fed2dfda41f86fca237668f8e6fa9971a721c4c2407a5717e94"
+              },
+              {
+                "x": 11,
+                "y": 9,
+                "file": "world-tree-z8192-x11-y9.webp",
+                "bytes": 33560,
+                "sha256": "159b3d2e53e7531531d337e2e82b99e3a3166099c0adf0841addb959a629dff5"
+              },
+              {
+                "x": 12,
+                "y": 9,
+                "file": "world-tree-z8192-x12-y9.webp",
+                "bytes": 36966,
+                "sha256": "90457241dce4637f379bfdac1a70142b81b258ad1f028ff4176a716bb8c7bfd2"
+              },
+              {
+                "x": 13,
+                "y": 9,
+                "file": "world-tree-z8192-x13-y9.webp",
+                "bytes": 18776,
+                "sha256": "db7b431c5f8321bc651d20015eaf63c6e38bb9f8b22f17cb3d5ec7ec65016ec6"
+              },
+              {
+                "x": 14,
+                "y": 9,
+                "file": "world-tree-z8192-x14-y9.webp",
+                "bytes": 1922,
+                "sha256": "90c8ca5f1c820eba0877f5b157bb26adc939a1bad370a71a75bb916c78d26c16"
+              },
+              {
+                "x": 15,
+                "y": 9,
+                "file": "world-tree-z8192-x15-y9.webp",
+                "bytes": 642,
+                "sha256": "e94f19bb6cf540b3f981096e5ec26bd5690ec0a34c33b37fbd73cb89b9052e30"
+              },
+              {
+                "x": 0,
+                "y": 10,
+                "file": "world-tree-z8192-x0-y10.webp",
+                "bytes": 534,
+                "sha256": "75ea4aa2a1aae758b05b373452ccf3c5fd86a9903172561f9012bae48445474c"
+              },
+              {
+                "x": 1,
+                "y": 10,
+                "file": "world-tree-z8192-x1-y10.webp",
+                "bytes": 534,
+                "sha256": "75ea4aa2a1aae758b05b373452ccf3c5fd86a9903172561f9012bae48445474c"
+              },
+              {
+                "x": 2,
+                "y": 10,
+                "file": "world-tree-z8192-x2-y10.webp",
+                "bytes": 1356,
+                "sha256": "959e9bd600b5c80e8cce589dc89d19e3e54cc24a85a132d41869812ac207dfab"
+              },
+              {
+                "x": 3,
+                "y": 10,
+                "file": "world-tree-z8192-x3-y10.webp",
+                "bytes": 43204,
+                "sha256": "c1722925bcd18a414e2c4e5062c5979690a76a191e701a194b73542321469849"
+              },
+              {
+                "x": 4,
+                "y": 10,
+                "file": "world-tree-z8192-x4-y10.webp",
+                "bytes": 59538,
+                "sha256": "1301937389faa7a78ff4b58b7174b652730ad5e8d05c52757b806bb0379ae16f"
+              },
+              {
+                "x": 5,
+                "y": 10,
+                "file": "world-tree-z8192-x5-y10.webp",
+                "bytes": 51294,
+                "sha256": "f231b0d2496d8aa95299581fc069ca2bf39495db90bf27973e0f0e028292650e"
+              },
+              {
+                "x": 6,
+                "y": 10,
+                "file": "world-tree-z8192-x6-y10.webp",
+                "bytes": 63066,
+                "sha256": "8532bef7673dfe513cbb13a07c1c5376c685e9259d052f5fa327f0c42e26b089"
+              },
+              {
+                "x": 7,
+                "y": 10,
+                "file": "world-tree-z8192-x7-y10.webp",
+                "bytes": 34784,
+                "sha256": "a5a538d0a54291c45314eec8574f4ae6552e0ca9db45b7b168e51f72079576f4"
+              },
+              {
+                "x": 8,
+                "y": 10,
+                "file": "world-tree-z8192-x8-y10.webp",
+                "bytes": 5926,
+                "sha256": "a8dbfabbebf0b7abd69db7fc4ca2fe148f5d9eaf3e6f686c9192ab9e115fed61"
+              },
+              {
+                "x": 9,
+                "y": 10,
+                "file": "world-tree-z8192-x9-y10.webp",
+                "bytes": 2140,
+                "sha256": "6e60c510d2657ea8b35f267d7ea2d0f22d224c633c116f8a13d4595f2c0b796f"
+              },
+              {
+                "x": 10,
+                "y": 10,
+                "file": "world-tree-z8192-x10-y10.webp",
+                "bytes": 2680,
+                "sha256": "250f17f9ad7d608b79ea2b1e015a00f394dc539c42142405e68386e7a8f07ee4"
+              },
+              {
+                "x": 11,
+                "y": 10,
+                "file": "world-tree-z8192-x11-y10.webp",
+                "bytes": 1956,
+                "sha256": "5b4c53384848788af1a991257cac112c509d6ee29b197e1d8c0a9f7d0e7f0630"
+              },
+              {
+                "x": 12,
+                "y": 10,
+                "file": "world-tree-z8192-x12-y10.webp",
+                "bytes": 1616,
+                "sha256": "ca2c51d04bc3c22dce1a8587ab7604226eeb96e79c779817191491245447edd7"
+              },
+              {
+                "x": 13,
+                "y": 10,
+                "file": "world-tree-z8192-x13-y10.webp",
+                "bytes": 1118,
+                "sha256": "b828dd2c7ac533d99909718091a4c2b711521d232b60aa40181b629260d11dd4"
+              },
+              {
+                "x": 14,
+                "y": 10,
+                "file": "world-tree-z8192-x14-y10.webp",
+                "bytes": 614,
+                "sha256": "ac05b17c4261b66656892057daff1c9e0e6e12ed27e06aa6b8f3e12a953b60b6"
+              },
+              {
+                "x": 15,
+                "y": 10,
+                "file": "world-tree-z8192-x15-y10.webp",
+                "bytes": 534,
+                "sha256": "75ea4aa2a1aae758b05b373452ccf3c5fd86a9903172561f9012bae48445474c"
+              },
+              {
+                "x": 0,
+                "y": 11,
+                "file": "world-tree-z8192-x0-y11.webp",
+                "bytes": 534,
+                "sha256": "75ea4aa2a1aae758b05b373452ccf3c5fd86a9903172561f9012bae48445474c"
+              },
+              {
+                "x": 1,
+                "y": 11,
+                "file": "world-tree-z8192-x1-y11.webp",
+                "bytes": 534,
+                "sha256": "75ea4aa2a1aae758b05b373452ccf3c5fd86a9903172561f9012bae48445474c"
+              },
+              {
+                "x": 2,
+                "y": 11,
+                "file": "world-tree-z8192-x2-y11.webp",
+                "bytes": 1448,
+                "sha256": "68a67d134284723bee7f8ae73f97b169afa6e6df6ec9786906e8763f0d72c3c7"
+              },
+              {
+                "x": 3,
+                "y": 11,
+                "file": "world-tree-z8192-x3-y11.webp",
+                "bytes": 45094,
+                "sha256": "57e4f304e05de7f6264775bd130dfdc334a96215487733bb69072b75e4c91967"
+              },
+              {
+                "x": 4,
+                "y": 11,
+                "file": "world-tree-z8192-x4-y11.webp",
+                "bytes": 54848,
+                "sha256": "0d7615cd543456a29904aa57308997c87bfe54fdd8aa72bf6c058c12764ad8cd"
+              },
+              {
+                "x": 5,
+                "y": 11,
+                "file": "world-tree-z8192-x5-y11.webp",
+                "bytes": 62722,
+                "sha256": "f089a0c63b7fe6bf1a101445d5b98f32322125ec7bc44727b981e831f0da222f"
+              },
+              {
+                "x": 6,
+                "y": 11,
+                "file": "world-tree-z8192-x6-y11.webp",
+                "bytes": 35654,
+                "sha256": "2be1c30e376d4be1132c0ea36916e7fc36a183a54ffb5cd2317a2ebc044d215d"
+              },
+              {
+                "x": 7,
+                "y": 11,
+                "file": "world-tree-z8192-x7-y11.webp",
+                "bytes": 3108,
+                "sha256": "190bf3f8ed442e402563dc9b8dd88c48c2c2f6ffc20d9fa911199455c2949675"
+              },
+              {
+                "x": 8,
+                "y": 11,
+                "file": "world-tree-z8192-x8-y11.webp",
+                "bytes": 806,
+                "sha256": "79defeb4a6c73b4879950c62f69a3a014b6db31332a7e7be2c2b21f26f6c0c2d"
+              },
+              {
+                "x": 9,
+                "y": 11,
+                "file": "world-tree-z8192-x9-y11.webp",
+                "bytes": 534,
+                "sha256": "75ea4aa2a1aae758b05b373452ccf3c5fd86a9903172561f9012bae48445474c"
+              },
+              {
+                "x": 10,
+                "y": 11,
+                "file": "world-tree-z8192-x10-y11.webp",
+                "bytes": 534,
+                "sha256": "75ea4aa2a1aae758b05b373452ccf3c5fd86a9903172561f9012bae48445474c"
+              },
+              {
+                "x": 11,
+                "y": 11,
+                "file": "world-tree-z8192-x11-y11.webp",
+                "bytes": 534,
+                "sha256": "75ea4aa2a1aae758b05b373452ccf3c5fd86a9903172561f9012bae48445474c"
+              },
+              {
+                "x": 12,
+                "y": 11,
+                "file": "world-tree-z8192-x12-y11.webp",
+                "bytes": 534,
+                "sha256": "75ea4aa2a1aae758b05b373452ccf3c5fd86a9903172561f9012bae48445474c"
+              },
+              {
+                "x": 13,
+                "y": 11,
+                "file": "world-tree-z8192-x13-y11.webp",
+                "bytes": 534,
+                "sha256": "75ea4aa2a1aae758b05b373452ccf3c5fd86a9903172561f9012bae48445474c"
+              },
+              {
+                "x": 14,
+                "y": 11,
+                "file": "world-tree-z8192-x14-y11.webp",
+                "bytes": 534,
+                "sha256": "75ea4aa2a1aae758b05b373452ccf3c5fd86a9903172561f9012bae48445474c"
+              },
+              {
+                "x": 15,
+                "y": 11,
+                "file": "world-tree-z8192-x15-y11.webp",
+                "bytes": 534,
+                "sha256": "75ea4aa2a1aae758b05b373452ccf3c5fd86a9903172561f9012bae48445474c"
+              },
+              {
+                "x": 0,
+                "y": 12,
+                "file": "world-tree-z8192-x0-y12.webp",
+                "bytes": 534,
+                "sha256": "75ea4aa2a1aae758b05b373452ccf3c5fd86a9903172561f9012bae48445474c"
+              },
+              {
+                "x": 1,
+                "y": 12,
+                "file": "world-tree-z8192-x1-y12.webp",
+                "bytes": 534,
+                "sha256": "75ea4aa2a1aae758b05b373452ccf3c5fd86a9903172561f9012bae48445474c"
+              },
+              {
+                "x": 2,
+                "y": 12,
+                "file": "world-tree-z8192-x2-y12.webp",
+                "bytes": 1724,
+                "sha256": "5738a91bfb699915bc69bb7d592c2c372f02a5709316c2474d872194c43c453e"
+              },
+              {
+                "x": 3,
+                "y": 12,
+                "file": "world-tree-z8192-x3-y12.webp",
+                "bytes": 51862,
+                "sha256": "ffbd77574f7929b3fdbb83329738b82e12465189aca698fa7518f1e443f1a4e0"
+              },
+              {
+                "x": 4,
+                "y": 12,
+                "file": "world-tree-z8192-x4-y12.webp",
+                "bytes": 63948,
+                "sha256": "9d4a8c5e70b6d39cd1e04426675ef4c71d0b9085487e5fc2706f2ad5ba079b81"
+              },
+              {
+                "x": 5,
+                "y": 12,
+                "file": "world-tree-z8192-x5-y12.webp",
+                "bytes": 25194,
+                "sha256": "8080ebdc6424fad235bd27d0226cec1c1e2b514b685bf9b1cd6bc3c6182dd20f"
+              },
+              {
+                "x": 6,
+                "y": 12,
+                "file": "world-tree-z8192-x6-y12.webp",
+                "bytes": 2516,
+                "sha256": "9a074ecfada9f8ff56aff4dcd339413e6c14ed936a561d0247e8926cce3916cb"
+              },
+              {
+                "x": 7,
+                "y": 12,
+                "file": "world-tree-z8192-x7-y12.webp",
+                "bytes": 692,
+                "sha256": "687907315a915b3d76f9f4fcfc702e60b2bf94d2fde87041b9a03585a86409ba"
+              },
+              {
+                "x": 8,
+                "y": 12,
+                "file": "world-tree-z8192-x8-y12.webp",
+                "bytes": 534,
+                "sha256": "75ea4aa2a1aae758b05b373452ccf3c5fd86a9903172561f9012bae48445474c"
+              },
+              {
+                "x": 9,
+                "y": 12,
+                "file": "world-tree-z8192-x9-y12.webp",
+                "bytes": 534,
+                "sha256": "75ea4aa2a1aae758b05b373452ccf3c5fd86a9903172561f9012bae48445474c"
+              },
+              {
+                "x": 10,
+                "y": 12,
+                "file": "world-tree-z8192-x10-y12.webp",
+                "bytes": 534,
+                "sha256": "75ea4aa2a1aae758b05b373452ccf3c5fd86a9903172561f9012bae48445474c"
+              },
+              {
+                "x": 11,
+                "y": 12,
+                "file": "world-tree-z8192-x11-y12.webp",
+                "bytes": 534,
+                "sha256": "75ea4aa2a1aae758b05b373452ccf3c5fd86a9903172561f9012bae48445474c"
+              },
+              {
+                "x": 12,
+                "y": 12,
+                "file": "world-tree-z8192-x12-y12.webp",
+                "bytes": 534,
+                "sha256": "75ea4aa2a1aae758b05b373452ccf3c5fd86a9903172561f9012bae48445474c"
+              },
+              {
+                "x": 13,
+                "y": 12,
+                "file": "world-tree-z8192-x13-y12.webp",
+                "bytes": 534,
+                "sha256": "75ea4aa2a1aae758b05b373452ccf3c5fd86a9903172561f9012bae48445474c"
+              },
+              {
+                "x": 14,
+                "y": 12,
+                "file": "world-tree-z8192-x14-y12.webp",
+                "bytes": 534,
+                "sha256": "75ea4aa2a1aae758b05b373452ccf3c5fd86a9903172561f9012bae48445474c"
+              },
+              {
+                "x": 15,
+                "y": 12,
+                "file": "world-tree-z8192-x15-y12.webp",
+                "bytes": 534,
+                "sha256": "75ea4aa2a1aae758b05b373452ccf3c5fd86a9903172561f9012bae48445474c"
+              },
+              {
+                "x": 0,
+                "y": 13,
+                "file": "world-tree-z8192-x0-y13.webp",
+                "bytes": 534,
+                "sha256": "75ea4aa2a1aae758b05b373452ccf3c5fd86a9903172561f9012bae48445474c"
+              },
+              {
+                "x": 1,
+                "y": 13,
+                "file": "world-tree-z8192-x1-y13.webp",
+                "bytes": 534,
+                "sha256": "75ea4aa2a1aae758b05b373452ccf3c5fd86a9903172561f9012bae48445474c"
+              },
+              {
+                "x": 2,
+                "y": 13,
+                "file": "world-tree-z8192-x2-y13.webp",
+                "bytes": 1414,
+                "sha256": "5d2b5f6ea2224faf8efd6262f2bcfc4cd1e507c19090226760268e35b72d7a69"
+              },
+              {
+                "x": 3,
+                "y": 13,
+                "file": "world-tree-z8192-x3-y13.webp",
+                "bytes": 29226,
+                "sha256": "49dea4b79bb5909ce338692498f7848232d5b646cf876f4bfcc40bc80a1fcb43"
+              },
+              {
+                "x": 4,
+                "y": 13,
+                "file": "world-tree-z8192-x4-y13.webp",
+                "bytes": 27212,
+                "sha256": "3d1d6609e2794aa306342f389b087777caad016f9babaf4954c56f269c1e4979"
+              },
+              {
+                "x": 5,
+                "y": 13,
+                "file": "world-tree-z8192-x5-y13.webp",
+                "bytes": 2084,
+                "sha256": "5d3479700ef3cfd56ed94f13dd560a948dbdd62118827e781562c593b5e335d1"
+              },
+              {
+                "x": 6,
+                "y": 13,
+                "file": "world-tree-z8192-x6-y13.webp",
+                "bytes": 652,
+                "sha256": "3cd44972a30f8a18148b029800e710e8a3ed8dbf18bc4443b2d9b614488bc6d2"
+              },
+              {
+                "x": 7,
+                "y": 13,
+                "file": "world-tree-z8192-x7-y13.webp",
+                "bytes": 534,
+                "sha256": "75ea4aa2a1aae758b05b373452ccf3c5fd86a9903172561f9012bae48445474c"
+              },
+              {
+                "x": 8,
+                "y": 13,
+                "file": "world-tree-z8192-x8-y13.webp",
+                "bytes": 534,
+                "sha256": "75ea4aa2a1aae758b05b373452ccf3c5fd86a9903172561f9012bae48445474c"
+              },
+              {
+                "x": 9,
+                "y": 13,
+                "file": "world-tree-z8192-x9-y13.webp",
+                "bytes": 534,
+                "sha256": "75ea4aa2a1aae758b05b373452ccf3c5fd86a9903172561f9012bae48445474c"
+              },
+              {
+                "x": 10,
+                "y": 13,
+                "file": "world-tree-z8192-x10-y13.webp",
+                "bytes": 534,
+                "sha256": "75ea4aa2a1aae758b05b373452ccf3c5fd86a9903172561f9012bae48445474c"
+              },
+              {
+                "x": 11,
+                "y": 13,
+                "file": "world-tree-z8192-x11-y13.webp",
+                "bytes": 534,
+                "sha256": "75ea4aa2a1aae758b05b373452ccf3c5fd86a9903172561f9012bae48445474c"
+              },
+              {
+                "x": 12,
+                "y": 13,
+                "file": "world-tree-z8192-x12-y13.webp",
+                "bytes": 534,
+                "sha256": "75ea4aa2a1aae758b05b373452ccf3c5fd86a9903172561f9012bae48445474c"
+              },
+              {
+                "x": 13,
+                "y": 13,
+                "file": "world-tree-z8192-x13-y13.webp",
+                "bytes": 534,
+                "sha256": "75ea4aa2a1aae758b05b373452ccf3c5fd86a9903172561f9012bae48445474c"
+              },
+              {
+                "x": 14,
+                "y": 13,
+                "file": "world-tree-z8192-x14-y13.webp",
+                "bytes": 534,
+                "sha256": "75ea4aa2a1aae758b05b373452ccf3c5fd86a9903172561f9012bae48445474c"
+              },
+              {
+                "x": 15,
+                "y": 13,
+                "file": "world-tree-z8192-x15-y13.webp",
+                "bytes": 534,
+                "sha256": "75ea4aa2a1aae758b05b373452ccf3c5fd86a9903172561f9012bae48445474c"
+              },
+              {
+                "x": 0,
+                "y": 14,
+                "file": "world-tree-z8192-x0-y14.webp",
+                "bytes": 534,
+                "sha256": "75ea4aa2a1aae758b05b373452ccf3c5fd86a9903172561f9012bae48445474c"
+              },
+              {
+                "x": 1,
+                "y": 14,
+                "file": "world-tree-z8192-x1-y14.webp",
+                "bytes": 534,
+                "sha256": "75ea4aa2a1aae758b05b373452ccf3c5fd86a9903172561f9012bae48445474c"
+              },
+              {
+                "x": 2,
+                "y": 14,
+                "file": "world-tree-z8192-x2-y14.webp",
+                "bytes": 610,
+                "sha256": "2711748320bca3a5d377f3030a2763254525e0b7dd2578e483b2ed95513d53b7"
+              },
+              {
+                "x": 3,
+                "y": 14,
+                "file": "world-tree-z8192-x3-y14.webp",
+                "bytes": 1348,
+                "sha256": "32dd67ed2ac0abdc992f053bdc286dc0d3560434f9027e955cc7c6fed337818a"
+              },
+              {
+                "x": 4,
+                "y": 14,
+                "file": "world-tree-z8192-x4-y14.webp",
+                "bytes": 1546,
+                "sha256": "dbb865482dc03f22925d83857b89b9901617db448f8d10763bd7db45f6dfef1a"
+              },
+              {
+                "x": 5,
+                "y": 14,
+                "file": "world-tree-z8192-x5-y14.webp",
+                "bytes": 632,
+                "sha256": "34faec28dc45f6263b76fd3f093b176f145f9dd2c1658f8d2f903a707473de0a"
+              },
+              {
+                "x": 6,
+                "y": 14,
+                "file": "world-tree-z8192-x6-y14.webp",
+                "bytes": 534,
+                "sha256": "75ea4aa2a1aae758b05b373452ccf3c5fd86a9903172561f9012bae48445474c"
+              },
+              {
+                "x": 7,
+                "y": 14,
+                "file": "world-tree-z8192-x7-y14.webp",
+                "bytes": 534,
+                "sha256": "75ea4aa2a1aae758b05b373452ccf3c5fd86a9903172561f9012bae48445474c"
+              },
+              {
+                "x": 8,
+                "y": 14,
+                "file": "world-tree-z8192-x8-y14.webp",
+                "bytes": 534,
+                "sha256": "75ea4aa2a1aae758b05b373452ccf3c5fd86a9903172561f9012bae48445474c"
+              },
+              {
+                "x": 9,
+                "y": 14,
+                "file": "world-tree-z8192-x9-y14.webp",
+                "bytes": 534,
+                "sha256": "75ea4aa2a1aae758b05b373452ccf3c5fd86a9903172561f9012bae48445474c"
+              },
+              {
+                "x": 10,
+                "y": 14,
+                "file": "world-tree-z8192-x10-y14.webp",
+                "bytes": 534,
+                "sha256": "75ea4aa2a1aae758b05b373452ccf3c5fd86a9903172561f9012bae48445474c"
+              },
+              {
+                "x": 11,
+                "y": 14,
+                "file": "world-tree-z8192-x11-y14.webp",
+                "bytes": 534,
+                "sha256": "75ea4aa2a1aae758b05b373452ccf3c5fd86a9903172561f9012bae48445474c"
+              },
+              {
+                "x": 12,
+                "y": 14,
+                "file": "world-tree-z8192-x12-y14.webp",
+                "bytes": 534,
+                "sha256": "75ea4aa2a1aae758b05b373452ccf3c5fd86a9903172561f9012bae48445474c"
+              },
+              {
+                "x": 13,
+                "y": 14,
+                "file": "world-tree-z8192-x13-y14.webp",
+                "bytes": 534,
+                "sha256": "75ea4aa2a1aae758b05b373452ccf3c5fd86a9903172561f9012bae48445474c"
+              },
+              {
+                "x": 14,
+                "y": 14,
+                "file": "world-tree-z8192-x14-y14.webp",
+                "bytes": 534,
+                "sha256": "75ea4aa2a1aae758b05b373452ccf3c5fd86a9903172561f9012bae48445474c"
+              },
+              {
+                "x": 15,
+                "y": 14,
+                "file": "world-tree-z8192-x15-y14.webp",
+                "bytes": 534,
+                "sha256": "75ea4aa2a1aae758b05b373452ccf3c5fd86a9903172561f9012bae48445474c"
+              },
+              {
+                "x": 0,
+                "y": 15,
+                "file": "world-tree-z8192-x0-y15.webp",
+                "bytes": 534,
+                "sha256": "75ea4aa2a1aae758b05b373452ccf3c5fd86a9903172561f9012bae48445474c"
+              },
+              {
+                "x": 1,
+                "y": 15,
+                "file": "world-tree-z8192-x1-y15.webp",
+                "bytes": 534,
+                "sha256": "75ea4aa2a1aae758b05b373452ccf3c5fd86a9903172561f9012bae48445474c"
+              },
+              {
+                "x": 2,
+                "y": 15,
+                "file": "world-tree-z8192-x2-y15.webp",
+                "bytes": 534,
+                "sha256": "75ea4aa2a1aae758b05b373452ccf3c5fd86a9903172561f9012bae48445474c"
+              },
+              {
+                "x": 3,
+                "y": 15,
+                "file": "world-tree-z8192-x3-y15.webp",
+                "bytes": 534,
+                "sha256": "75ea4aa2a1aae758b05b373452ccf3c5fd86a9903172561f9012bae48445474c"
+              },
+              {
+                "x": 4,
+                "y": 15,
+                "file": "world-tree-z8192-x4-y15.webp",
+                "bytes": 534,
+                "sha256": "75ea4aa2a1aae758b05b373452ccf3c5fd86a9903172561f9012bae48445474c"
+              },
+              {
+                "x": 5,
+                "y": 15,
+                "file": "world-tree-z8192-x5-y15.webp",
+                "bytes": 534,
+                "sha256": "75ea4aa2a1aae758b05b373452ccf3c5fd86a9903172561f9012bae48445474c"
+              },
+              {
+                "x": 6,
+                "y": 15,
+                "file": "world-tree-z8192-x6-y15.webp",
+                "bytes": 534,
+                "sha256": "75ea4aa2a1aae758b05b373452ccf3c5fd86a9903172561f9012bae48445474c"
+              },
+              {
+                "x": 7,
+                "y": 15,
+                "file": "world-tree-z8192-x7-y15.webp",
+                "bytes": 534,
+                "sha256": "75ea4aa2a1aae758b05b373452ccf3c5fd86a9903172561f9012bae48445474c"
+              },
+              {
+                "x": 8,
+                "y": 15,
+                "file": "world-tree-z8192-x8-y15.webp",
+                "bytes": 534,
+                "sha256": "75ea4aa2a1aae758b05b373452ccf3c5fd86a9903172561f9012bae48445474c"
+              },
+              {
+                "x": 9,
+                "y": 15,
+                "file": "world-tree-z8192-x9-y15.webp",
+                "bytes": 534,
+                "sha256": "75ea4aa2a1aae758b05b373452ccf3c5fd86a9903172561f9012bae48445474c"
+              },
+              {
+                "x": 10,
+                "y": 15,
+                "file": "world-tree-z8192-x10-y15.webp",
+                "bytes": 534,
+                "sha256": "75ea4aa2a1aae758b05b373452ccf3c5fd86a9903172561f9012bae48445474c"
+              },
+              {
+                "x": 11,
+                "y": 15,
+                "file": "world-tree-z8192-x11-y15.webp",
+                "bytes": 534,
+                "sha256": "75ea4aa2a1aae758b05b373452ccf3c5fd86a9903172561f9012bae48445474c"
+              },
+              {
+                "x": 12,
+                "y": 15,
+                "file": "world-tree-z8192-x12-y15.webp",
+                "bytes": 534,
+                "sha256": "75ea4aa2a1aae758b05b373452ccf3c5fd86a9903172561f9012bae48445474c"
+              },
+              {
+                "x": 13,
+                "y": 15,
+                "file": "world-tree-z8192-x13-y15.webp",
+                "bytes": 534,
+                "sha256": "75ea4aa2a1aae758b05b373452ccf3c5fd86a9903172561f9012bae48445474c"
+              },
+              {
+                "x": 14,
+                "y": 15,
+                "file": "world-tree-z8192-x14-y15.webp",
+                "bytes": 534,
+                "sha256": "75ea4aa2a1aae758b05b373452ccf3c5fd86a9903172561f9012bae48445474c"
+              },
+              {
+                "x": 15,
+                "y": 15,
+                "file": "world-tree-z8192-x15-y15.webp",
+                "bytes": 534,
+                "sha256": "75ea4aa2a1aae758b05b373452ccf3c5fd86a9903172561f9012bae48445474c"
+              }
+            ]
+          }
+        ]
+      }
     }
   ]
 }

@@ -4,7 +4,10 @@ import "embed"
 
 // Maps contains the terrain artwork shipped with the application.
 //
-//go:embed palworld/maps/*.jpg palworld/maps/manifest.json
+// Generated WebP tiles are intentionally absent from Git. Supported build
+// workflows create them beside the source artwork before compiling this tree.
+//
+//go:embed palworld/maps
 var Maps embed.FS
 
 // Landmarks contains versioned, non-player encounter locations extracted

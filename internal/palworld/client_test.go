@@ -609,10 +609,10 @@ func TestClientWorldObjectsSanitizesAndClassifiesActors(t *testing.T) {
 	if err != nil {
 		t.Fatalf("WorldObjects() error = %v", err)
 	}
-	if len(objects) != 4 {
+	if len(objects) != 3 {
 		t.Fatalf("objects = %#v", objects)
 	}
-	var primaryBase, secondBase, worker, npc *WorldObject
+	var primaryBase, secondBase, worker *WorldObject
 	for i := range objects {
 		switch {
 		case objects[i].Kind == "bases" && objects[i].X == -100:
@@ -621,8 +621,6 @@ func TestClientWorldObjectsSanitizesAndClassifiesActors(t *testing.T) {
 			secondBase = &objects[i]
 		case objects[i].Kind == "workers":
 			worker = &objects[i]
-		case objects[i].Kind == "npcs":
-			npc = &objects[i]
 		}
 	}
 	if primaryBase == nil || primaryBase.Name != "The Chaos" || primaryBase.ID == "" || primaryBase.BaseID != primaryBase.ID || primaryBase.GuildKey == "" {
@@ -635,8 +633,10 @@ func TestClientWorldObjectsSanitizesAndClassifiesActors(t *testing.T) {
 		worker.GuildKey != primaryBase.GuildKey {
 		t.Fatalf("worker = %#v", worker)
 	}
-	if npc == nil || npc.Name != "Desert Trader" || npc.GuildKey != "" {
-		t.Fatalf("npc = %#v", npc)
+	for _, object := range objects {
+		if object.Kind == "npcs" || object.Kind == "wild-pals" {
+			t.Fatalf("unused live object was published: %#v", object)
+		}
 	}
 	encoded, err := json.Marshal(objects)
 	if err != nil {
@@ -773,7 +773,7 @@ func TestClientWorldObjectsOmitAmbiguousIdentities(t *testing.T) {
 			{"InstanceID": "duplicate", "Type": "Character", "UnitType": "NPC", "NickName": "Two", "LocationX": 3, "LocationY": 4},
 			{"TrainerInstanceID": "owner", "Type": "Character", "UnitType": "OtomoPal", "Class": "BP_Pal_C", "NickName": "Pal", "LocationX": 5, "LocationY": 6},
 			{"TrainerInstanceID": "owner", "Type": "Character", "UnitType": "OtomoPal", "Class": "BP_Pal_C", "NickName": "Pal", "LocationX": 7, "LocationY": 8},
-			{"InstanceID": "unique", "Type": "Character", "UnitType": "NPC", "NickName": "Merchant", "LocationX": 9, "LocationY": 10},
+			{"InstanceID": "unique", "Type": "Character", "UnitType": "BaseCampPal", "NickName": "Worker", "LocationX": 9, "LocationY": 10},
 		}})
 	}))
 	defer server.Close()
@@ -785,7 +785,7 @@ func TestClientWorldObjectsOmitAmbiguousIdentities(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(objects) != 1 || objects[0].Name != "Merchant" {
+	if len(objects) != 1 || objects[0].Name != "Worker" {
 		t.Fatalf("ambiguous world identities were published: %#v", objects)
 	}
 }
@@ -811,7 +811,7 @@ func TestClientWorldObjectsReturnsExplicitPartialResultAtObjectLimit(t *testing.
 			if i > 0 {
 				_, _ = io.WriteString(w, ",")
 			}
-			_, _ = fmt.Fprintf(w, `{"InstanceID":"actor-%d","Type":"Character","UnitType":"NPC","NickName":"Merchant","LocationX":%d,"LocationY":0}`, i, i)
+			_, _ = fmt.Fprintf(w, `{"InstanceID":"actor-%d","Type":"Character","UnitType":"BaseCampPal","NickName":"Worker","LocationX":%d,"LocationY":0}`, i, i)
 		}
 		_, _ = io.WriteString(w, `,{"Type":"PalBox","GuildID":"guild","GuildName":"Priority base","LocationX":0,"LocationY":0}]}`)
 	}))
