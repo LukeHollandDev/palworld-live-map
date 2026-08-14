@@ -3,8 +3,8 @@ ARG NODE_VERSION=24.18.0
 ARG PYTHON_VERSION=3.13.5
 
 # The palworld-save-reader release this image ships as its save decoder.
-ARG SAVE_READER_VERSION=v0.1.0
-ARG SAVE_READER_REVISION=fb88288814f55ceaeb298a1242e96114f30672cc
+ARG SAVE_READER_VERSION=v0.2.0
+ARG SAVE_READER_REVISION=c6560931f407abcbe3398a3fc73840b51bb56974
 
 # Web build
 FROM --platform=$BUILDPLATFORM node:${NODE_VERSION}-alpine AS web
@@ -58,7 +58,7 @@ ARG SAVE_READER_REVISION
 
 WORKDIR /reader
 
-COPY patches/palworld-save-reader-v0.1.0-leaderboards.patch /tmp/palworld-save-reader-leaderboards.patch
+COPY patches/palworld-save-reader-v0.2.0-leaderboards.patch /tmp/palworld-save-reader-leaderboards.patch
 
 RUN git clone --branch "${SAVE_READER_VERSION}" --depth 1 \
       https://github.com/LukeHollandDev/palworld-save-reader.git . \

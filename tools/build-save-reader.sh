@@ -1,8 +1,8 @@
 #!/bin/sh
 set -eu
 
-reader_version=v0.1.0
-reader_revision=fb88288814f55ceaeb298a1242e96114f30672cc
+reader_version=v0.2.0
+reader_revision=c6560931f407abcbe3398a3fc73840b51bb56974
 reader_build_version="${reader_version}+live-map.1"
 
 project_root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
@@ -18,9 +18,9 @@ if [ "$actual_revision" != "$reader_revision" ]; then
   exit 1
 fi
 git -C "$reader_stage/source" apply --check \
-  "$project_root/patches/palworld-save-reader-v0.1.0-leaderboards.patch"
+  "$project_root/patches/palworld-save-reader-v0.2.0-leaderboards.patch"
 git -C "$reader_stage/source" apply \
-  "$project_root/patches/palworld-save-reader-v0.1.0-leaderboards.patch"
+  "$project_root/patches/palworld-save-reader-v0.2.0-leaderboards.patch"
 
 mkdir -p "$project_root/bin"
 make -C "$reader_stage/source" release-build \
