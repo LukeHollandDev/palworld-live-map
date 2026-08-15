@@ -29,11 +29,14 @@ import {
   type View
 } from '../lib/map'
 import { loadZoomRatio, saveZoomRatio } from '../lib/preferences'
+import type { SharedPosition } from '../lib/sharePosition'
 import type { ItemKind, MapItem, MapLayer, PlayerStatus } from '../types'
 import { MarkerGlyph } from './MarkerGlyph'
 
 export interface MapViewportHandle {
   focusItem: (item: MapItem, returnFocus: HTMLElement) => void
+  focusPosition: (position: SharedPosition) => void
+  getZoomRatio: () => number
   clearSelection: () => void
 }
 
@@ -47,6 +50,7 @@ interface MapViewportProps {
   search: string
   onShowItem: (item: MapItem, returnFocus: HTMLElement) => void
   inspectorOpen: boolean
+  sharedPosition?: SharedPosition | null
   children: React.ReactNode
 }
 
@@ -252,6 +256,7 @@ export const MapViewport = forwardRef<MapViewportHandle, MapViewportProps>(funct
     search,
     onShowItem,
     inspectorOpen,
+    sharedPosition,
     children
   },
   ref
@@ -379,6 +384,13 @@ export const MapViewport = forwardRef<MapViewportHandle, MapViewportProps>(funct
       byId: new Map(entries.map((entry) => [entry.value.id, entry]))
     }
   }, [activeLayer, size, visibleItems])
+  const projectedSharedPosition = useMemo(
+    () =>
+      sharedPosition?.region === activeLayer.id
+        ? toScene({ x: sharedPosition.x, y: sharedPosition.y }, activeLayer, size)
+        : null,
+    [activeLayer, sharedPosition, size]
+  )
 
   const renderMarkers = useMemo<RenderMarker[]>(() => {
     const bounds = sceneViewportBounds(
@@ -635,7 +647,45 @@ export const MapViewport = forwardRef<MapViewportHandle, MapViewportProps>(funct
     onShowItem(item, returnFocus)
   }
 
-  useImperativeHandle(ref, () => ({ focusItem, clearSelection: () => setSelectedId(null) }))
+  const getZoomRatio = () => {
+    const rect = viewportRef.current?.getBoundingClientRect()
+    if (!rect?.width || !rect.height) return 1
+    return Math.max(1, viewRef.current.scale / fitScale(rect.width, rect.height, size))
+  }
+
+  const focusPosition = (position: SharedPosition) => {
+    const viewport = viewportRef.current
+    if (!viewport || position.region !== activeLayer.id) return
+    const scenePosition = toScene(position, activeLayer, size)
+    if (!scenePosition) return
+    const rect = viewport.getBoundingClientRect()
+    const minimum = fitScale(rect.width, rect.height, size)
+    const maximum = coverScale(rect.width, rect.height, size) * MAX_ZOOM_RATIO
+    const scale = Math.min(maximum, Math.max(minimum, minimum * position.zoom))
+    cancelViewAnimation()
+    cancelResizeRenderSync()
+    setSelectedId(null)
+    applyView(
+      clampView(
+        {
+          scale,
+          x: rect.width / 2 - scenePosition.x * scale,
+          y: rect.height / 2 - scenePosition.y * scale
+        },
+        rect.width,
+        rect.height,
+        size
+      )
+    )
+    syncRenderViewport()
+  }
+
+  useImperativeHandle(ref, () => ({
+    focusItem,
+    focusPosition,
+    getZoomRatio,
+    clearSelection: () => setSelectedId(null)
+  }))
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: changing maps must reset the selection and fitted view
   useEffect(() => {
@@ -958,6 +1008,18 @@ export const MapViewport = forwardRef<MapViewportHandle, MapViewportProps>(funct
               </button>
             )
           })}
+          {projectedSharedPosition ? (
+            <div
+              className="shared-position-marker"
+              style={{ left: projectedSharedPosition.x, top: projectedSharedPosition.y }}
+              role="img"
+              aria-label={`Shared position at X ${Math.round(sharedPosition?.x || 0)}, Y ${Math.round(sharedPosition?.y || 0)}`}
+              data-shared-position
+            >
+              <IconCrosshair aria-hidden="true" focusable="false" />
+              <span className="marker-label">Shared position</span>
+            </div>
+          ) : null}
         </div>
       </div>
 

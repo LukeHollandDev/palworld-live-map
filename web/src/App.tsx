@@ -26,6 +26,12 @@ import {
   saveFilterPreferences
 } from './lib/preferences'
 import {
+  buildSharedPositionUrl,
+  copySharedPositionUrl,
+  parseSharedPosition,
+  SHARE_POSITION_MIN_ZOOM
+} from './lib/sharePosition'
+import {
   EMPTY_OBJECT_STATE,
   type ItemKind,
   type MapItem,
@@ -174,8 +180,12 @@ function LiveMap({
   const objectState = objects.data || { ...EMPTY_OBJECT_STATE, enabled: config.worldDataEnabled }
   const initialPreferences = useMemo(loadFilterPreferences, [])
   const [localCompletion, setLocalCompletion] = useState(loadLocalCompletionState)
+  const [sharedPosition] = useState(() => parseSharedPosition(window.location.href, config.layers))
   const [activeLayer, setActiveLayer] = useState<MapLayer>(
-    () => config.layers.find((layer) => layer.id === initialPreferences.activeLayerId) || config.layers[0]
+    () =>
+      config.layers.find((layer) => layer.id === sharedPosition?.region) ||
+      config.layers.find((layer) => layer.id === initialPreferences.activeLayerId) ||
+      config.layers[0]
   )
   const [enabledKinds, setEnabledKinds] = useState(
     () => new Set<ItemKind>(initialPreferences.enabledKinds || DEFAULT_ENABLED_KINDS)
@@ -192,6 +202,7 @@ function LiveMap({
   const [detail, setDetail] = useState<Detail | null>(null)
   const [returnFocus, setReturnFocus] = useState<HTMLElement | null>(null)
   const mapRef = useRef<MapViewportHandle>(null)
+  const sharedPositionPendingRef = useRef(Boolean(sharedPosition))
   const pendingFocusRef = useRef<{ itemId: string; returnFocus: HTMLElement } | null>(null)
   const searchRef = useRef<HTMLInputElement>(null)
   const filterButtonRef = useRef<HTMLButtonElement>(null)
@@ -202,6 +213,16 @@ function LiveMap({
   }, [activeLayer.id, enabledKinds, enabledPlayerStatuses, hiddenIds, seenKinds])
 
   useEffect(() => saveLocalCompletionState(localCompletion), [localCompletion])
+
+  useEffect(() => {
+    if (!sharedPositionPendingRef.current || sharedPosition?.region !== activeLayer.id) return
+    const frame = window.requestAnimationFrame(() => {
+      if (!mapRef.current || !sharedPositionPendingRef.current) return
+      sharedPositionPendingRef.current = false
+      mapRef.current.focusPosition(sharedPosition)
+    })
+    return () => window.cancelAnimationFrame(frame)
+  }, [activeLayer.id, sharedPosition])
 
   const items = useMemo<MapItem[]>(() => {
     const combined: MapItem[] = [
@@ -405,6 +426,17 @@ function LiveMap({
       return
     }
     mapRef.current?.focusItem(item, focus)
+  }
+
+  const shareItemPosition = async (item: MapItem) => {
+    const currentZoom = item.map === activeLayer.id ? mapRef.current?.getZoomRatio() || 1 : 1
+    const url = buildSharedPositionUrl({
+      region: item.map,
+      x: item.x,
+      y: item.y,
+      zoom: Math.max(SHARE_POSITION_MIN_ZOOM, currentZoom)
+    })
+    return { url, copied: await copySharedPositionUrl(url) }
   }
 
   const toggleKinds = (kinds: ItemKind[], visible: boolean) => {
@@ -646,6 +678,7 @@ function LiveMap({
             search={search}
             onShowItem={showItem}
             inspectorOpen={Boolean(detail)}
+            sharedPosition={sharedPosition}
           >
             <ProjectLinks hidden={Boolean(detail && detail.kind !== 'leaderboard')} />
             <DetailsDialog
@@ -671,6 +704,7 @@ function LiveMap({
               onSelectLeaderboard={(leaderboardId) => {
                 setDetail({ kind: 'leaderboard', leaderboardId })
               }}
+              onSharePosition={shareItemPosition}
               onClose={() => {
                 pendingFocusRef.current = null
                 setDetail(null)

@@ -1,10 +1,11 @@
-import { IconCheck, IconChevronDown, IconChevronRight } from '@tabler/icons-react'
+import { IconCheck, IconChevronDown, IconChevronRight, IconLink } from '@tabler/icons-react'
 import { useEffect, useId, useRef, useState } from 'react'
 import { isChecklistItem } from '../lib/completion'
 import { buildGuildDetails, type GuildDetails as GuildDetailsModel } from '../lib/guilds'
 import { LEADERBOARDS, type LeaderboardId, leaderboardById } from '../lib/leaderboards'
 import { kindLabel } from '../lib/map'
 import type { ItemKind, LandmarkReward, MapItem, MapLayer } from '../types'
+import type { SharePositionResult } from '../lib/sharePosition'
 import { MapPanelHeader, MapPanelShell } from './MapPanel'
 import { MarkerGlyph } from './MarkerGlyph'
 
@@ -45,6 +46,7 @@ interface DetailsDialogProps {
   onSelectItem: (item: MapItem, focus: HTMLElement) => void
   onSelectGuild: (guildId: string, focus: HTMLElement) => void
   onSelectLeaderboard: (leaderboardId: LeaderboardId) => void
+  onSharePosition: (item: MapItem) => Promise<SharePositionResult>
 }
 
 interface ManualChecklistDetails {
@@ -76,7 +78,8 @@ export function DetailsDialog({
   onClose,
   onSelectItem,
   onSelectGuild,
-  onSelectLeaderboard
+  onSelectLeaderboard,
+  onSharePosition
 }: DetailsDialogProps) {
   const titleRef = useRef<HTMLHeadingElement>(null)
   const bodyRef = useRef<HTMLDivElement>(null)
@@ -149,12 +152,14 @@ export function DetailsDialog({
         <div className="grid gap-5 p-[18px] max-sm:p-3.5">
           {item ? (
             <ItemDetails
+              key={`${item.id}:${item.map}:${item.x}:${item.y}`}
               item={item}
               items={items}
               layers={layers}
               manualChecklist={manualChecklist}
               onSelectItem={onSelectItem}
               onSelectGuild={onSelectGuild}
+              onSharePosition={onSharePosition}
             />
           ) : guild ? (
             <GuildDetails guild={guild} layers={layers} onSelectItem={onSelectItem} />
@@ -750,7 +755,8 @@ function ItemDetails({
   layers,
   manualChecklist,
   onSelectItem,
-  onSelectGuild
+  onSelectGuild,
+  onSharePosition
 }: {
   item: MapItem
   items: MapItem[]
@@ -758,7 +764,11 @@ function ItemDetails({
   manualChecklist: ManualChecklistDetails
   onSelectItem: (item: MapItem, focus: HTMLElement) => void
   onSelectGuild: (guildId: string, focus: HTMLElement) => void
+  onSharePosition: (item: MapItem) => Promise<SharePositionResult>
 }) {
+  const [shareResult, setShareResult] = useState<SharePositionResult | null>(null)
+  const [sharing, setSharing] = useState(false)
+  const shareStatusId = useId()
   const relationships = buildRelationships(item, items)
   const { base, owner, guildKey, guildName, guildMembers, guildBases, guildPals, relatedPals } = relationships
 
@@ -808,6 +818,47 @@ function ItemDetails({
       {journalPreview ? <JournalPreview preview={journalPreview} /> : null}
       <LandmarkRewards rewards={rewards} />
       {isChecklistItem(item) ? <ManualChecklistControl item={item} checklist={manualChecklist} /> : null}
+      <section className="grid gap-2">
+        <button
+          type="button"
+          className="pal-glass-inset pal-interactive flex min-h-11 w-full cursor-pointer items-center justify-center gap-2 px-3 py-2 text-xs font-medium text-[#e8fbfd] focus-visible:outline-none disabled:cursor-wait disabled:opacity-70"
+          aria-describedby={sharing || shareResult ? shareStatusId : undefined}
+          disabled={sharing}
+          onClick={async () => {
+            setSharing(true)
+            setShareResult(null)
+            try {
+              setShareResult(await onSharePosition(item))
+            } finally {
+              setSharing(false)
+            }
+          }}
+        >
+          <IconLink className="size-4 text-[#69d3e1]" aria-hidden="true" focusable="false" />
+          Share position
+        </button>
+        {sharing ? (
+          <p id={shareStatusId} className="m-0 text-xs text-[#9fb0b5]" role="status" aria-live="polite">
+            Preparing position link…
+          </p>
+        ) : shareResult ? (
+          <div id={shareStatusId} className="grid gap-1.5" role="status" aria-live="polite">
+            <p className="m-0 text-xs text-[#9fcbd1]">
+              {shareResult.copied ? 'Position link copied.' : 'Automatic copy unavailable. Copy this link:'}
+            </p>
+            {!shareResult.copied ? (
+              <input
+                className="pal-glass-inset min-h-11 w-full px-2.5 text-xs text-[#e8fbfd] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#8cecf7]"
+                aria-label="Position link for manual copy"
+                readOnly
+                value={shareResult.url}
+                onClick={(event) => event.currentTarget.select()}
+                onFocus={(event) => event.currentTarget.select()}
+              />
+            ) : null}
+          </div>
+        ) : null}
+      </section>
       {hasGuildRelationships ? (
         <section>
           <SectionTitle>Guild</SectionTitle>

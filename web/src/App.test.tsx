@@ -84,8 +84,10 @@ function mockAPI(resolve: (path: string) => unknown = (path) => responses[path])
 afterEach(() => {
   cleanup()
   window.localStorage.clear()
+  window.history.replaceState({}, '', '/')
   vi.restoreAllMocks()
   vi.unstubAllGlobals()
+  Object.defineProperty(document, 'execCommand', { configurable: true, value: undefined })
 })
 
 describe('App', () => {
@@ -302,6 +304,81 @@ describe('App', () => {
     await waitFor(() => expect(detailsTitle).toHaveFocus())
     expect(screen.getByText(/X 10\s+Y 20/)).toBeInTheDocument()
     expect(screen.getByText('No guild membership is known for this player.')).toBeVisible()
+  })
+
+  it('shares fixed player and landmark coordinates with an accessible manual-copy fallback', async () => {
+    mockAPI((path) => {
+      if (path === '/assets/test-world-catalogue.json') {
+        return {
+          ...(responses[path] as Record<string, unknown>),
+          locations: [
+            {
+              id: 'waypoint-share-test',
+              kind: 'waypoints',
+              name: 'Small Settlement',
+              x: 15,
+              y: 25,
+              map: 'palpagos'
+            }
+          ]
+        }
+      }
+      return responses[path]
+    })
+    const user = userEvent.setup()
+    vi.stubGlobal('navigator', { ...navigator, clipboard: undefined })
+    Object.defineProperty(document, 'execCommand', { configurable: true, value: undefined })
+    render(<App />)
+
+    const explorer = await screen.findByRole('complementary', { name: 'Map filters' })
+    await user.click(await within(explorer).findByRole('button', { name: 'View Luke · Lv 55' }))
+    let inspector = screen.getByRole('dialog', { name: 'Luke' })
+    const sharePlayer = within(inspector).getByRole('button', { name: 'Share position' })
+    expect(sharePlayer.querySelector('svg')).toHaveAttribute('aria-hidden', 'true')
+    await user.click(sharePlayer)
+
+    let manualLink = await within(inspector).findByRole('textbox', { name: 'Position link for manual copy' })
+    let sharedUrl = new URL((manualLink as HTMLInputElement).value)
+    expect(sharedUrl.searchParams.get('share')).toBe('position')
+    expect(sharedUrl.searchParams.get('region')).toBe('palpagos')
+    expect(sharedUrl.searchParams.get('x')).toBe('10')
+    expect(sharedUrl.searchParams.get('y')).toBe('20')
+    expect(sharedUrl.searchParams.get('zoom')).toBe('8')
+    expect(sharedUrl.toString()).not.toContain('player-luke')
+    expect(within(inspector).getByRole('status')).toHaveTextContent('Automatic copy unavailable. Copy this link:')
+
+    await user.click(within(inspector).getByRole('button', { name: 'Close details' }))
+    await user.click(within(explorer).getByRole('button', { name: 'Expand Waypoints section' }))
+    await user.click(await within(explorer).findByRole('button', { name: 'View Small Settlement' }))
+    inspector = screen.getByRole('dialog', { name: 'Small Settlement' })
+    await user.click(within(inspector).getByRole('button', { name: 'Share position' }))
+
+    manualLink = await within(inspector).findByRole('textbox', { name: 'Position link for manual copy' })
+    sharedUrl = new URL((manualLink as HTMLInputElement).value)
+    expect(sharedUrl.searchParams.get('x')).toBe('15')
+    expect(sharedUrl.searchParams.get('y')).toBe('25')
+    expect(sharedUrl.toString()).not.toContain('waypoint-share-test')
+  })
+
+  it('opens a shared URL on its encoded region and fixed position', async () => {
+    window.history.replaceState({}, '', '/?share=position&region=world-tree&x=250&y=350&zoom=12')
+    mockAPI((path) =>
+      path === '/api/config'
+        ? {
+            ...(responses[path] as Record<string, unknown>),
+            layers: [
+              { id: 'palpagos', name: 'Palpagos Islands', bounds: [100, 100, -100, -100] },
+              { id: 'world-tree', name: 'World Tree', bounds: [400, 500, 200, 300] }
+            ]
+          }
+        : responses[path]
+    )
+
+    render(<App />)
+
+    expect(await screen.findByRole('application', { name: /World Tree interactive world map/ })).toBeVisible()
+    expect(screen.getByRole('img', { name: 'Shared position at X 250, Y 350' })).toHaveTextContent('Shared position')
+    await waitFor(() => expect(document.querySelector<HTMLElement>('.map-scene')?.style.transform).not.toBe(''))
   })
 
   it('shows save-game progress when available and omits unknown fields', async () => {
