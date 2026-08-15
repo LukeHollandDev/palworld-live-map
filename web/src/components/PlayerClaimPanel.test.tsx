@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   PLAYER_CLAIM_RECOVERY_STORAGE_KEY,
+  PlayerClaimIdentityChooser,
   PlayerClaimPanel,
   PlayerClaimProvider,
   PlayerClaimSessionControl,
@@ -138,6 +139,58 @@ afterEach(() => {
 })
 
 describe('PlayerClaimPanel', () => {
+  it('offers both online and offline roster characters for verification', async () => {
+    const requests: Array<{ path: string; init?: RequestInit }> = []
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
+        const path = pathOf(input)
+        requests.push({ path, init })
+        if (path === '/api/me') return jsonResponse({ error: 'authentication_required' }, 401)
+        if (path === '/api/player-claims') return jsonResponse(startResponse(), 201)
+        return new Response(null, { status: 404 })
+      })
+    )
+    const players = [
+      {
+        id: 'online-player',
+        kind: 'players' as const,
+        name: 'Online Player',
+        level: 20,
+        online: true,
+        x: 1,
+        y: 2,
+        map: 'palpagos'
+      },
+      {
+        id: 'offline-player',
+        kind: 'players' as const,
+        name: 'Offline Player',
+        level: 40,
+        online: false,
+        x: 3,
+        y: 4,
+        map: 'palpagos'
+      }
+    ]
+    const user = userEvent.setup()
+    render(
+      <PlayerClaimProvider enabled>
+        <PlayerClaimIdentityChooser players={players} />
+      </PlayerClaimProvider>
+    )
+
+    const roster = await screen.findByRole('list', { name: 'Characters' })
+    expect(within(roster).getByText('Online · Level 20')).toBeVisible()
+    const offlineRow = within(roster).getByText('Offline Player').closest('li')
+    expect(offlineRow).not.toBeNull()
+    expect(within(offlineRow as HTMLElement).getByText('Offline · Level 40')).toBeVisible()
+    await user.click(within(offlineRow as HTMLElement).getByRole('button', { name: 'This is me' }))
+
+    const start = requests.find((request) => request.path === '/api/player-claims')
+    expect(JSON.parse(String(start?.init?.body))).toEqual({ playerId: 'offline-player' })
+  })
+
   it('arms privately before revealing the ordered server sequence and never leaks the bearer', async () => {
     window.history.replaceState({}, '', '/map?focus=player-public#details')
     const originalURL = window.location.href

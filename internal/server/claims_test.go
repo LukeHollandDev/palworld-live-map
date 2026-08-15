@@ -414,52 +414,17 @@ func TestPublicConfigExposesOnlyPlayerClaimCapability(t *testing.T) {
 	}
 }
 
-func TestClaimsModePublicProjectionExcludesSavedRosterAndProgress(t *testing.T) {
-	captures := int64(9001)
-	paldeck := 150
-	updated := claimTestNow.Add(-time.Minute)
-	players := []palworld.Player{
-		{ID: "save-guild", Name: "Save Guild", Online: true, GuildKey: "guild:save", GuildName: "Private Save Guild", Level: 55, X: 10, Y: 20, Map: "palpagos", LastSeenAt: updated, CaptureTotal: &captures, PaldeckUnlocked: &paldeck},
-		{ID: "live-guild", Name: "Live Guild", Online: true, GuildKey: "guild:live", GuildName: "Current Live Guild", GuildFromLive: true, Level: 55, X: 12, Y: 22, Map: "palpagos"},
-		{ID: "offline", Name: "Offline Save", Online: false, Level: 60, X: 30, Y: 40, Map: "palpagos", LastSeenAt: updated, CaptureTotal: &captures, PaldeckUnlocked: &paldeck},
-	}
-	projected := publicPlayerSnapshot(palworld.PlayerSnapshot{
-		Players: players, SaveEnabled: true, SaveAvailable: true, SaveStale: true,
-		SaveUpdatedAt: updated, SaveSnapshotAt: updated, SaveLastError: "private decoder detail",
-	})
-	if len(projected.Players) != 2 || projected.Players[0].ID != "save-guild" || projected.Players[1].ID != "live-guild" {
-		t.Fatalf("public players = %+v", projected.Players)
-	}
-	player := projected.Players[0]
-	if player.GuildKey != "" || player.GuildName != "" || !player.LastSeenAt.IsZero() || player.CaptureTotal != nil || player.PaldeckUnlocked != nil ||
-		projected.SaveEnabled || projected.SaveAvailable || projected.SaveStale ||
-		!projected.SaveUpdatedAt.IsZero() || !projected.SaveSnapshotAt.IsZero() || projected.SaveLastError != "" {
-		t.Fatalf("public projection retained saved data: player=%+v snapshot=%+v", player, projected)
-	}
-	if live := projected.Players[1]; live.GuildKey != "guild:live" || live.GuildName != "Current Live Guild" || !live.GuildFromLive {
-		t.Fatalf("public projection removed live guild evidence: %+v", live)
-	}
-	encoded, err := json.Marshal(projected)
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, forbidden := range []string{"Offline Save", "Private Save Guild", "guild:save", "private decoder detail", "captureTotal", "paldeckUnlocked", "lastSeenAt"} {
-		if strings.Contains(string(encoded), forbidden) {
-			t.Errorf("public projection exposed %q: %s", forbidden, encoded)
-		}
-	}
-}
-
-func TestClaimsModePublicEndpointsCannotBypassSavedDataBoundary(t *testing.T) {
+func TestClaimsModeDoesNotChangeExistingPublicPlayerFeatures(t *testing.T) {
 	captures := int64(42)
+	paldeck := 150
 	lastSeen := claimTestNow.Add(-time.Hour)
 	server, _ := newClaimHTTPServer(t, nil, nil)
 	server.source = fixedSnapshot{value: palworld.Snapshot{
 		SaveEnabled: true, SaveAvailable: true, SaveStale: true, SaveLastError: "private save failure",
 		SaveUpdatedAt: lastSeen, SaveSnapshotAt: lastSeen,
 		Players: []palworld.Player{
-			{ID: "online", Name: "Online", Online: true, Level: 10, X: 1, Y: 2, Map: "palpagos", CaptureTotal: &captures, LastSeenAt: lastSeen},
-			{ID: "offline", Name: "Offline Secret", Online: false, Level: 60, X: 3, Y: 4, Map: "palpagos", CaptureTotal: &captures, LastSeenAt: lastSeen},
+			{ID: "online", Name: "Online", Online: true, GuildKey: "guild:online", GuildName: "Online Guild", Level: 10, X: 1, Y: 2, Map: "palpagos", CaptureTotal: &captures, PaldeckUnlocked: &paldeck, LastSeenAt: lastSeen},
+			{ID: "offline", Name: "Offline Save", Online: false, GuildKey: "guild:save", GuildName: "Saved Guild", Level: 60, X: 3, Y: 4, Map: "palpagos", CaptureTotal: &captures, PaldeckUnlocked: &paldeck, LastSeenAt: lastSeen},
 		},
 	}}
 	for _, endpoint := range []string{"/api/players", "/api/state"} {
@@ -468,18 +433,25 @@ func TestClaimsModePublicEndpointsCannotBypassSavedDataBoundary(t *testing.T) {
 			t.Fatalf("%s = status %d, body %s", endpoint, response.Code, response.Body.String())
 		}
 		body := response.Body.String()
-		if !strings.Contains(body, `"id":"online"`) {
-			t.Fatalf("%s omitted live player: %s", endpoint, body)
+		for _, existingPublicValue := range []string{
+			`"id":"online"`, `"id":"offline"`, "Offline Save", "Saved Guild", `"level":60`,
+			`"captureTotal":42`, `"paldeckUnlocked":150`, `"lastSeenAt":`,
+		} {
+			if !strings.Contains(body, existingPublicValue) {
+				t.Errorf("%s omitted existing public value %q: %s", endpoint, existingPublicValue, body)
+			}
 		}
-		for _, forbidden := range []string{"Offline Secret", "private save failure", "captureTotal", "lastSeenAt", `"saveAvailable":true`, `"saveEnabled":true`} {
-			if strings.Contains(body, forbidden) {
-				t.Errorf("%s exposed %q: %s", endpoint, forbidden, body)
+		if endpoint == "/api/state" {
+			for _, saveStatus := range []string{`"saveAvailable":true`, `"saveEnabled":true`, "private save failure"} {
+				if !strings.Contains(body, saveStatus) {
+					t.Errorf("%s omitted existing save status %q: %s", endpoint, saveStatus, body)
+				}
 			}
 		}
 	}
 }
 
-func TestPrivateSaveOnlyChangeDoesNotChangePublicPlayersETag(t *testing.T) {
+func TestExistingPublicSaveChangeStillChangesPlayersETagInClaimsMode(t *testing.T) {
 	firstCaptures, secondCaptures := int64(10), int64(11)
 	source := &mutableClaimSnapshotSource{revision: 1, players: palworld.PlayerSnapshot{
 		Players:     []palworld.Player{{ID: "online", Name: "Online", Online: true, X: 1, Y: 2, Map: "palpagos", CaptureTotal: &firstCaptures}},
@@ -498,8 +470,8 @@ func TestPrivateSaveOnlyChangeDoesNotChangePublicPlayersETag(t *testing.T) {
 	request := httptest.NewRequest(http.MethodGet, "/api/players", nil)
 	request.Header.Set("If-None-Match", etag)
 	second := serveClaim(t, server, request)
-	if second.Code != http.StatusNotModified || second.Header().Get("ETag") != etag || second.Body.Len() != 0 {
-		t.Fatalf("private-only update = status %d, etag %q, body %s", second.Code, second.Header().Get("ETag"), second.Body.String())
+	if second.Code != http.StatusOK || second.Header().Get("ETag") == etag || !strings.Contains(second.Body.String(), `"captureTotal":11`) {
+		t.Fatalf("public save update = status %d, etag %q, body %s", second.Code, second.Header().Get("ETag"), second.Body.String())
 	}
 }
 
@@ -635,7 +607,6 @@ func TestUnknownClaimTargetHasGenericUnavailableResponse(t *testing.T) {
 		wantPrepare int
 	}{
 		{name: "unknown", playerID: "unknown-player", wantPrepare: 0},
-		{name: "offline", playerID: "offline-player", wantPrepare: 0},
 		{name: "live unavailable", playerID: "public-player", prepareErr: playerclaim.ErrUnavailable, wantPrepare: 1},
 		{name: "live decoder detail", playerID: "public-player", prepareErr: errors.New("private decoder detail: player does not exist"), wantPrepare: 1},
 	}
@@ -665,6 +636,22 @@ func TestUnknownClaimTargetHasGenericUnavailableResponse(t *testing.T) {
 			}
 			assertPrivateClaimResponse(t, response)
 		})
+	}
+}
+
+func TestOfflinePublicPlayerCanStartClaim(t *testing.T) {
+	prover := &claimHTTPProver{}
+	server, _ := newClaimHTTPServer(t, prover, nil)
+	body, err := json.Marshal(map[string]string{"playerId": "offline-player"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	response := serveClaim(t, server, newClaimMutation(http.MethodPost, "/api/player-claims", string(body)))
+	if response.Code != http.StatusCreated || !strings.Contains(response.Body.String(), `"status":"arming"`) {
+		t.Fatalf("offline claim = status %d, body %s", response.Code, response.Body.String())
+	}
+	if prepare, _ := prover.calls(); prepare != 1 {
+		t.Fatalf("Prover.Prepare calls = %d, want 1", prepare)
 	}
 }
 

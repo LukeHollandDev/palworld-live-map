@@ -21,10 +21,11 @@ player identities, item data, and save progress must never be persisted there.
 That recovery record is cleared only after verified completion or explicit
 inventory-recovery acknowledgement.
 
-With claims enabled, public player endpoints are live-only and omit saved
-progress, offline players, last-seen values, and saved locations. Authenticated
-completion responses are self-only, no-store, and project private save keys to
-already-public catalogue IDs. Configure the exact browser-facing HTTP or HTTPS
+Enabling claims does not change the existing public player endpoints: their
+online and offline rosters, saved positions, levels, guild relationships,
+last-seen values, and aggregate progression remain public. Only the new exact
+per-landmark completion response is authenticated, self-only, no-store, and
+projects private save keys to already-public catalogue IDs. Configure the exact browser-facing HTTP or HTTPS
 origin. HTTPS is strongly recommended on public or untrusted networks because
 HTTP cannot prevent interception of a player's session and self-private
 completion progress. HTTP uses a separate non-`Secure` cookie; it does not make

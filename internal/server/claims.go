@@ -73,10 +73,9 @@ func (s *Server) startPlayerClaim(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, r, http.StatusBadRequest, claimErrorResponse{Error: "invalid_request"})
 		return
 	}
-	if !s.isPublicLivePlayer(request.PlayerID) {
-		// Claims mode intentionally keeps offline save records private. Requiring
-		// the target to be in the same live projection already visible to this
-		// caller prevents this endpoint becoming an offline-roster oracle.
+	if !s.isPublicPlayer(request.PlayerID) {
+		// Only accept targets already present in the public roster. This keeps the
+		// endpoint from becoming an oracle for records outside that projection.
 		s.writeStartClaimError(w, r, playerclaim.ErrUnavailable)
 		return
 	}
@@ -93,10 +92,10 @@ func (s *Server) startPlayerClaim(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, r, http.StatusCreated, challenge)
 }
 
-func (s *Server) isPublicLivePlayer(publicPlayerID string) bool {
+func (s *Server) isPublicPlayer(publicPlayerID string) bool {
 	players, _, _ := s.source.PlayerSnapshotSince(0)
 	for _, player := range players.Players {
-		if player.Online && player.ID == publicPlayerID {
+		if player.ID == publicPlayerID {
 			return true
 		}
 	}

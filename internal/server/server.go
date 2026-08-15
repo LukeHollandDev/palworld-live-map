@@ -421,9 +421,6 @@ func (s *Server) players(w http.ResponseWriter, r *http.Request) {
 	s.playersResponse.mu.Lock()
 	snapshot, revision, changed := s.source.PlayerSnapshotSince(s.playersResponse.revision)
 	if changed || !s.playersResponse.initialized {
-		if s.settings.playerClaimsEnabled {
-			snapshot = publicPlayerSnapshot(snapshot)
-		}
 		s.playersResponse.update(revision, snapshot)
 	}
 	response := s.playersResponse.snapshot()
@@ -454,56 +451,7 @@ func (s *Server) objects(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) state(w http.ResponseWriter, r *http.Request) {
 	snapshot := s.source.Snapshot()
-	if s.settings.playerClaimsEnabled {
-		snapshot = publicStateSnapshot(snapshot)
-	}
 	writeJSON(w, r, http.StatusOK, snapshot)
-}
-
-func publicPlayerSnapshot(snapshot palworld.PlayerSnapshot) palworld.PlayerSnapshot {
-	snapshot.Players = publicLivePlayers(snapshot.Players)
-	snapshot.SaveEnabled = false
-	snapshot.SaveAvailable = false
-	snapshot.SaveStale = false
-	snapshot.SaveUpdatedAt = time.Time{}
-	snapshot.SaveSnapshotAt = time.Time{}
-	snapshot.SaveLastError = ""
-	return snapshot
-}
-
-func publicStateSnapshot(snapshot palworld.Snapshot) palworld.Snapshot {
-	snapshot.Players = publicLivePlayers(snapshot.Players)
-	snapshot.SaveEnabled = false
-	snapshot.SaveAvailable = false
-	snapshot.SaveStale = false
-	snapshot.SaveUpdatedAt = time.Time{}
-	snapshot.SaveSnapshotAt = time.Time{}
-	snapshot.SaveLastError = ""
-	return snapshot
-}
-
-func publicLivePlayers(players []palworld.Player) []palworld.Player {
-	result := make([]palworld.Player, 0, len(players))
-	for _, player := range players {
-		if !player.Online {
-			continue
-		}
-		if !player.GuildFromLive {
-			player.GuildKey = ""
-			player.GuildName = ""
-		}
-		player.LastSeenAt = time.Time{}
-		player.CaptureTotal = nil
-		player.UniquePalsCaptured = nil
-		player.PaldeckUnlocked = nil
-		player.ArenaRankPoints = nil
-		player.FastTravelUnlocked = nil
-		player.AreasDiscovered = nil
-		player.BossDefeats = nil
-		player.TowerDefeats = nil
-		result = append(result, player)
-	}
-	return result
 }
 
 func (s *Server) index(w http.ResponseWriter, r *http.Request) {

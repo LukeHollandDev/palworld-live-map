@@ -1011,7 +1011,7 @@ export function PlayerClaimIdentityChooser({ players }: { players: readonly MapI
     )
   }
 
-  const onlinePlayers = players.filter((item) => item.kind === 'players' && item.online !== false)
+  const rosterPlayers = players.filter((item) => item.kind === 'players')
   return (
     <section className="pal-glass-inset mx-3.5 mb-3 grid gap-2 px-3 py-2.5" aria-labelledby={headingId}>
       <div>
@@ -1023,9 +1023,9 @@ export function PlayerClaimIdentityChooser({ players }: { players: readonly MapI
           progress just by choosing your name.
         </p>
       </div>
-      {onlinePlayers.length > 0 ? (
-        <ul className="m-0 grid list-none gap-1.5 p-0" aria-label="Online characters">
-          {onlinePlayers.map((player) => (
+      {rosterPlayers.length > 0 ? (
+        <ul className="m-0 grid list-none gap-1.5 p-0" aria-label="Characters">
+          {rosterPlayers.map((player) => (
             <li
               key={player.id}
               className="flex min-w-0 items-center justify-between gap-2 border border-[#8bb7bd]/20 bg-[#182329]/65 px-2.5 py-2"
@@ -1033,6 +1033,7 @@ export function PlayerClaimIdentityChooser({ players }: { players: readonly MapI
               <div className="min-w-0">
                 <p className="m-0 truncate text-xs font-medium text-[#e6f5f7]">{player.name}</p>
                 <p className="m-0 truncate text-[10px] text-[#78949a]">
+                  {player.online === false ? 'Offline · ' : 'Online · '}
                   {player.guildName ? `${player.guildName} · ` : ''}Level {player.level ?? '?'}
                 </p>
               </div>
@@ -1048,9 +1049,7 @@ export function PlayerClaimIdentityChooser({ players }: { players: readonly MapI
           ))}
         </ul>
       ) : (
-        <p className="m-0 text-[11px] leading-5 text-[#859da2]">
-          Join the server so your character appears here, then return to connect it.
-        </p>
+        <p className="m-0 text-[11px] leading-5 text-[#859da2]">No saved characters are available yet.</p>
       )}
       {claim.notice ? <ClaimNotice notice={claim.notice} /> : null}
     </section>
