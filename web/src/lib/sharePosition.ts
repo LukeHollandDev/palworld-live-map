@@ -1,4 +1,4 @@
-import type { MapLayer } from '../types'
+import type { MapCameraPosition, MapLayer } from '../types'
 
 const SHARE_KIND_PARAM = 'share'
 const SHARE_KIND_VALUE = 'position'
@@ -8,13 +8,6 @@ const Y_PARAM = 'y'
 const ZOOM_PARAM = 'zoom'
 
 export const SHARE_POSITION_MIN_ZOOM = 8
-
-export interface SharedPosition {
-  region: string
-  x: number
-  y: number
-  zoom: number
-}
 
 export interface SharePositionResult {
   copied: boolean
@@ -32,7 +25,7 @@ function containsPosition(layer: MapLayer, x: number, y: number): boolean {
   return x >= minX && x <= maxX && y >= minY && y <= maxY
 }
 
-export function parseSharedPosition(url: string | URL, layers: readonly MapLayer[]): SharedPosition | null {
+export function parseSharedPosition(url: string | URL, layers: readonly MapLayer[]): MapCameraPosition | null {
   try {
     const parsed = new URL(url, window.location.href)
     if (parsed.searchParams.get(SHARE_KIND_PARAM) !== SHARE_KIND_VALUE) return null
@@ -54,7 +47,7 @@ function compactNumber(value: number, decimals: number): string {
   return String(Number(value.toFixed(decimals)))
 }
 
-export function buildSharedPositionUrl(position: SharedPosition, currentUrl = window.location.href): string {
+export function buildSharedPositionUrl(position: MapCameraPosition, currentUrl = window.location.href): string {
   const url = new URL(currentUrl)
   url.searchParams.set(SHARE_KIND_PARAM, SHARE_KIND_VALUE)
   url.searchParams.set(REGION_PARAM, position.region)

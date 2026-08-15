@@ -373,7 +373,21 @@ describe('App', () => {
     expect(sharedUrl.toString()).not.toContain('waypoint-share-test')
   })
 
-  it('opens a shared URL on its encoded region and fixed position', async () => {
+  it('opens a shared URL on its encoded region and restores only the camera', async () => {
+    const viewportWidth = 1200
+    const viewportHeight = 600
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(
+      () => new DOMRect(0, 0, viewportWidth, viewportHeight)
+    )
+    vi.stubGlobal('devicePixelRatio', 1)
+    vi.stubGlobal(
+      'requestAnimationFrame',
+      vi.fn((callback: FrameRequestCallback) => {
+        callback(0)
+        return 1
+      })
+    )
+    vi.stubGlobal('cancelAnimationFrame', vi.fn())
     window.history.replaceState({}, '', '/?share=position&region=world-tree&x=250&y=350&zoom=12')
     mockAPI((path) =>
       path === '/api/config'
@@ -390,8 +404,19 @@ describe('App', () => {
     render(<App />)
 
     expect(await screen.findByRole('application', { name: /World Tree interactive world map/ })).toBeVisible()
-    expect(screen.getByRole('img', { name: 'Shared position at X 250, Y 350' })).toHaveTextContent('Shared position')
-    await waitFor(() => expect(document.querySelector<HTMLElement>('.map-scene')?.style.transform).not.toBe(''))
+    expect(screen.queryByRole('img', { name: /Shared position/ })).not.toBeInTheDocument()
+    const scene = document.querySelector<HTMLElement>('.map-scene')
+    if (!scene) throw new Error('Expected map scene')
+    await waitFor(() => {
+      const match = scene.style.transform.match(/^translate\(([-\d.]+)px, ([-\d.]+)px\) scale\(([-\d.]+)\)$/)
+      if (!match) throw new Error(`Unexpected map transform: ${scene.style.transform}`)
+      const view = { x: Number(match[1]), y: Number(match[2]), scale: Number(match[3]) }
+      const fitScale = (viewportHeight - 128) / 8192
+      expect(2048 * view.scale + view.x).toBeCloseTo(viewportWidth / 2)
+      expect(6144 * view.scale + view.y).toBeCloseTo(viewportHeight / 2)
+      expect(view.scale / fitScale).toBeCloseTo(12)
+    })
+    expect(screen.queryByRole('img', { name: /Shared position/ })).not.toBeInTheDocument()
   })
 
   it('shows save-game progress when available and omits unknown fields', async () => {
@@ -1278,7 +1303,7 @@ describe('App', () => {
     let explorer = screen.getByRole('complementary', { name: 'Map filters' })
     await waitFor(() => expect(within(explorer).getByRole('checkbox', { name: 'Show Guilds' })).toBeChecked())
 
-    const uncheckAll = within(explorer).getByRole('button', { name: 'Uncheck all' })
+    const uncheckAll = within(explorer).getByRole('button', { name: 'Hide all' })
     await user.click(uncheckAll)
     for (const checkbox of within(explorer).getAllByRole('checkbox')) expect(checkbox).not.toBeChecked()
     expect(uncheckAll).toBeDisabled()
@@ -1320,9 +1345,9 @@ describe('App', () => {
     const playerVisibility = within(explorer).getByRole('checkbox', { name: 'Show Luke · Lv 55' })
     const siblingVisibility = within(explorer).getByRole('checkbox', { name: 'Show Anne · Lv 20' })
     const categoryVisibility = within(explorer).getByRole('checkbox', { name: 'Show Online Players' })
-    const checkAll = within(explorer).getByRole('button', { name: 'Check all' })
+    const checkAll = within(explorer).getByRole('button', { name: 'Show all' })
 
-    await user.click(within(explorer).getByRole('button', { name: 'Uncheck all' }))
+    await user.click(within(explorer).getByRole('button', { name: 'Hide all' }))
     expect(checkAll).toBeEnabled()
     expect(playerVisibility).toBeEnabled()
     expect(playerVisibility).not.toBeChecked()
@@ -1365,7 +1390,7 @@ describe('App', () => {
     render(<App />)
     await screen.findByRole('heading', { name: 'Test Realm' })
     const restoredExplorer = screen.getByRole('complementary', { name: 'Map filters' })
-    expect(within(restoredExplorer).getByRole('button', { name: 'Check all' })).toBeDisabled()
+    expect(within(restoredExplorer).getByRole('button', { name: 'Show all' })).toBeDisabled()
     expect(within(restoredExplorer).getByRole('checkbox', { name: 'Show Online Players' })).toBeChecked()
     expect(within(restoredExplorer).getByRole('checkbox', { name: 'Show Luke · Lv 55' })).toBeChecked()
     expect(within(restoredExplorer).getByRole('checkbox', { name: 'Show Anne · Lv 20' })).toBeChecked()
@@ -1867,7 +1892,8 @@ describe('App', () => {
     const view = render(<App />)
     await screen.findByRole('heading', { name: 'Test Realm' })
     const explorer = screen.getByRole('complementary', { name: 'Map filters' })
-    expect(within(explorer).getByRole('heading', { name: 'What am I missing?' })).toBeVisible()
+    expect(within(explorer).getByRole('heading', { name: 'Exploration progress' })).toBeVisible()
+    await user.click(within(explorer).getByRole('button', { name: 'Expand exploration progress details' }))
     expect(await within(explorer).findByText('0 of 2 landmarks complete in Palpagos Islands')).toBeVisible()
     expect(within(explorer).getByText('My checklist · manual only')).toBeVisible()
 
@@ -1937,6 +1963,7 @@ describe('App', () => {
     render(<App />)
     await screen.findByRole('heading', { name: 'Test Realm' })
     const restoredExplorer = screen.getByRole('complementary', { name: 'Map filters' })
+    await user.click(within(restoredExplorer).getByRole('button', { name: 'Expand exploration progress details' }))
     expect(await within(restoredExplorer).findByText('1 missing in Palpagos Islands')).toBeVisible()
     expect(within(restoredExplorer).getByRole('checkbox', { name: 'Show only missing' })).toBeChecked()
     expect(within(restoredExplorer).queryByRole('button', { name: /View First Effigy/ })).not.toBeInTheDocument()

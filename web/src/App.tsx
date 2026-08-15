@@ -191,10 +191,10 @@ function LiveMap({
   const objectState = objects.data || { ...EMPTY_OBJECT_STATE, enabled: config.worldDataEnabled }
   const initialPreferences = useMemo(loadFilterPreferences, [])
   const [localCompletion, setLocalCompletion] = useState(loadLocalCompletionState)
-  const [sharedPosition] = useState(() => parseSharedPosition(window.location.href, config.layers))
+  const [initialSharedPosition] = useState(() => parseSharedPosition(window.location.href, config.layers))
   const [activeLayer, setActiveLayer] = useState<MapLayer>(
     () =>
-      config.layers.find((layer) => layer.id === sharedPosition?.region) ||
+      config.layers.find((layer) => layer.id === initialSharedPosition?.region) ||
       config.layers.find((layer) => layer.id === initialPreferences.activeLayerId) ||
       config.layers[0]
   )
@@ -213,7 +213,7 @@ function LiveMap({
   const [detail, setDetail] = useState<Detail | null>(null)
   const [returnFocus, setReturnFocus] = useState<HTMLElement | null>(null)
   const mapRef = useRef<MapViewportHandle>(null)
-  const sharedPositionPendingRef = useRef(Boolean(sharedPosition))
+  const sharedPositionPendingRef = useRef(Boolean(initialSharedPosition))
   const pendingFocusRef = useRef<{ itemId: string; returnFocus: HTMLElement } | null>(null)
   const searchRef = useRef<HTMLInputElement>(null)
   const filterButtonRef = useRef<HTMLButtonElement>(null)
@@ -226,14 +226,14 @@ function LiveMap({
   useEffect(() => saveLocalCompletionState(localCompletion), [localCompletion])
 
   useEffect(() => {
-    if (!sharedPositionPendingRef.current || sharedPosition?.region !== activeLayer.id) return
+    if (!sharedPositionPendingRef.current || initialSharedPosition?.region !== activeLayer.id) return
     const frame = window.requestAnimationFrame(() => {
       if (!mapRef.current || !sharedPositionPendingRef.current) return
       sharedPositionPendingRef.current = false
-      mapRef.current.focusPosition(sharedPosition)
+      mapRef.current.focusPosition(initialSharedPosition)
     })
     return () => window.cancelAnimationFrame(frame)
-  }, [activeLayer.id, sharedPosition])
+  }, [activeLayer.id, initialSharedPosition])
   const items = useMemo<MapItem[]>(() => {
     const combined: MapItem[] = [
       ...(config.landmarks || []),
@@ -701,7 +701,6 @@ function LiveMap({
             search={search}
             onShowItem={showItem}
             inspectorOpen={Boolean(detail)}
-            sharedPosition={sharedPosition}
           >
             <ProjectLinks hidden={Boolean(detail && detail.kind !== 'leaderboard')} />
             <DetailsDialog

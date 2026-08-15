@@ -30,6 +30,13 @@ export interface MapLayer {
   bounds: [number, number, number, number]
 }
 
+export interface MapCameraPosition {
+  region: string
+  x: number
+  y: number
+  zoom: number
+}
+
 export interface PublicConfig {
   pollIntervalMs: number
   worldPollIntervalMs: number

@@ -119,65 +119,41 @@ function CompletionChecklistSummary({
   layerName: string
 }) {
   const titleId = useId()
+  const detailsId = useId()
   const remainingDescriptionId = useId()
+  const saveProgressStatusId = useId()
+  const [expanded, setExpanded] = useState(false)
   const progress = checklist.saveProgress
+  const layerProgress = checklist.remainingOnly
+    ? `${checklist.remaining} missing in ${layerName}`
+    : `${checklist.completed} of ${checklist.total} landmarks complete in ${layerName}`
   return (
-    <section className="pal-glass-inset mx-3.5 mb-2 grid gap-2 px-3 py-2.5 text-xs" aria-labelledby={titleId}>
-      <div className="flex min-w-0 items-start justify-between gap-3">
-        <div className="min-w-0">
-          <h3 id={titleId} className="m-0 text-xs font-semibold text-[#edf9fb]">
-            What am I missing?
-          </h3>
-          <p className="m-0 mt-0.5 truncate text-[10px] tracking-[.08em] text-[#77b9c2] uppercase">
-            {progress.phase === 'available'
-              ? `${checklist.profileName} + private save`
-              : progress.phase === 'loading'
-                ? `${checklist.profileName} · loading private save`
-                : progress.phase === 'inactive'
-                  ? `${checklist.profileName} · manual only`
-                  : `${checklist.profileName} · manual only`}
-          </p>
-        </div>
-        <strong className="shrink-0 font-medium text-[#9de4c1] tabular-nums">
-          {checklist.completed}/{checklist.total}
-        </strong>
-      </div>
-      <p aria-live="polite" aria-atomic="true" className="m-0 text-[11px] text-[#a8b9bd]">
-        {checklist.remainingOnly
-          ? `${checklist.remaining} missing in ${layerName}`
-          : `${checklist.completed} of ${checklist.total} landmarks complete in ${layerName}`}
-      </p>
-      <p
-        aria-live="polite"
-        aria-atomic="true"
-        className={`m-0 text-[10px] leading-4 ${progress.phase === 'unavailable' || (progress.phase === 'available' && (progress.stale || progress.refreshFailed)) ? 'text-[#d8bc83]' : 'text-[#78949a]'}`}
+    <section className="pal-glass-inset mx-3.5 mb-2 text-xs" aria-labelledby={titleId}>
+      <button
+        type="button"
+        className="pal-interactive group flex min-h-10 w-full cursor-pointer items-center gap-2 border-0 bg-transparent px-3 py-1.5 text-left text-[#edf9fb]"
+        aria-label={`${expanded ? 'Collapse' : 'Expand'} exploration progress details`}
+        aria-describedby={saveProgressStatusId}
+        aria-expanded={expanded}
+        aria-controls={detailsId}
+        onClick={() => setExpanded((current) => !current)}
       >
-        {saveProgressDescription(progress)}
-      </p>
-      <p className="m-0 text-[10px] leading-4 text-[#78949a]">
-        Private saves confirm waypoints and journals only; every other category uses manual marks.
-      </p>
-      {progress.phase === 'available' ? (
-        <time className="sr-only" dateTime={progress.snapshot.snapshotAt}>
-          Save snapshot {progress.snapshot.snapshotAt}
-        </time>
-      ) : null}
-      {(progress.phase === 'unavailable' && progress.reason === 'request') ||
-      (progress.phase === 'available' && (progress.stale || progress.refreshFailed)) ? (
-        <button
-          type="button"
-          className="pal-interactive min-h-7 justify-self-start border border-[#8bb7bd]/25 bg-[#26363b]/55 px-2.5 text-[11px] text-[#d7e8ea]"
-          disabled={progress.phase === 'available' && progress.refreshing}
-          onClick={checklist.onRetrySaveProgress}
+        <h3 id={titleId} className="m-0 min-w-0 flex-1 text-xs font-semibold">
+          Exploration progress
+        </h3>
+        <strong
+          aria-live="polite"
+          aria-atomic="true"
+          className="shrink-0 text-[11px] font-medium text-[#9de4c1] tabular-nums"
         >
-          {progress.phase === 'unavailable'
-            ? 'Retry save progress'
-            : progress.refreshing
-              ? 'Refreshing save progress…'
-              : 'Refresh save progress'}
-        </button>
-      ) : null}
-      <label className="flex min-h-7 cursor-pointer items-center gap-2 text-[11px] text-[#d6e7e9]">
+          {checklist.completed}/{checklist.total}
+          <span className="ml-1 font-normal text-[#83a0a5]"> · {checklist.remaining} missing</span>
+        </strong>
+        <span className="grid size-7 shrink-0 place-items-center text-[#929da1] group-hover:text-white">
+          <Chevron expanded={expanded} />
+        </span>
+      </button>
+      <label className="flex min-h-9 cursor-pointer items-center gap-2 border-t border-[#caeaef]/15 px-3 py-1.5 text-[11px] text-[#d6e7e9]">
         <input
           type="checkbox"
           className="size-3.5 shrink-0 accent-[#6cb4dd]"
@@ -190,6 +166,48 @@ function CompletionChecklistSummary({
       <p id={remainingDescriptionId} className="sr-only">
         Hide landmarks completed manually or confirmed by the connected save from the map and map filter.
       </p>
+      <p id={saveProgressStatusId} aria-live="polite" aria-atomic="true" className="sr-only">
+        {saveProgressDescription(progress)}
+      </p>
+      <div id={detailsId} className="grid gap-2 border-t border-[#caeaef]/15 px-3 py-2.5" hidden={!expanded}>
+        <p className="m-0 truncate text-[10px] tracking-[.08em] text-[#77b9c2] uppercase">
+          {progress.phase === 'available'
+            ? `${checklist.profileName} + private save`
+            : progress.phase === 'loading'
+              ? `${checklist.profileName} · loading private save`
+              : `${checklist.profileName} · manual only`}
+        </p>
+        <p className="m-0 text-[11px] text-[#a8b9bd]">{layerProgress}</p>
+        <p
+          aria-hidden="true"
+          className={`m-0 text-[10px] leading-4 ${progress.phase === 'unavailable' || (progress.phase === 'available' && (progress.stale || progress.refreshFailed)) ? 'text-[#d8bc83]' : 'text-[#78949a]'}`}
+        >
+          {saveProgressDescription(progress)}
+        </p>
+        <p className="m-0 text-[10px] leading-4 text-[#78949a]">
+          Private saves confirm waypoints and journals only; every other category uses manual marks.
+        </p>
+        {progress.phase === 'available' ? (
+          <time className="sr-only" dateTime={progress.snapshot.snapshotAt}>
+            Save snapshot {progress.snapshot.snapshotAt}
+          </time>
+        ) : null}
+        {(progress.phase === 'unavailable' && progress.reason === 'request') ||
+        (progress.phase === 'available' && (progress.stale || progress.refreshFailed)) ? (
+          <button
+            type="button"
+            className="pal-interactive min-h-7 justify-self-start border border-[#8bb7bd]/25 bg-[#26363b]/55 px-2.5 text-[11px] text-[#d7e8ea]"
+            disabled={progress.phase === 'available' && progress.refreshing}
+            onClick={checklist.onRetrySaveProgress}
+          >
+            {progress.phase === 'unavailable'
+              ? 'Retry save progress'
+              : progress.refreshing
+                ? 'Refreshing save progress…'
+                : 'Refresh save progress'}
+          </button>
+        ) : null}
+      </div>
     </section>
   )
 }
@@ -790,7 +808,7 @@ export function Explorer(props: ExplorerProps) {
                 disabled={allFiltersChecked}
                 onClick={props.onCheckAll}
               >
-                Check all
+                Show all
               </button>
               <button
                 type="button"
@@ -798,7 +816,7 @@ export function Explorer(props: ExplorerProps) {
                 disabled={props.enabledKinds.size === 0 && props.enabledPlayerStatuses.size === 0}
                 onClick={props.onUncheckAll}
               >
-                Uncheck all
+                Hide all
               </button>
             </div>
 

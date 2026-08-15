@@ -497,36 +497,6 @@
     opacity: 1;
   }
 
-  .shared-position-marker {
-    position: absolute;
-    z-index: 130;
-    display: grid;
-    width: 44px;
-    height: 44px;
-    translate: -50% -50%;
-    transform: scale(var(--marker-scale));
-    transform-origin: center;
-    place-items: center;
-    border-radius: 9999px;
-    background: rgb(7 25 31 / 72%);
-    box-shadow:
-      0 0 0 2px rgb(181 249 255 / 88%),
-      0 0 0 6px rgb(31 184 207 / 28%),
-      0 0 18px rgb(62 226 246 / 72%);
-    color: #d9fcff;
-    pointer-events: none;
-  }
-
-  .shared-position-marker > svg {
-    width: 24px;
-    height: 24px;
-    stroke-width: 1.8;
-  }
-
-  .shared-position-marker .marker-label {
-    opacity: 1;
-  }
-
   @keyframes inspector-in {
     from {
       opacity: 0;

@@ -30,13 +30,12 @@ import {
 } from '../lib/map'
 import { loadZoomRatio, saveZoomRatio } from '../lib/preferences'
 import { completionSource, completionSourceLabel } from '../lib/saveProgress'
-import type { SharedPosition } from '../lib/sharePosition'
-import type { ItemKind, MapItem, MapLayer, PlayerStatus } from '../types'
+import type { ItemKind, MapCameraPosition, MapItem, MapLayer, PlayerStatus } from '../types'
 import { MarkerGlyph } from './MarkerGlyph'
 
 export interface MapViewportHandle {
   focusItem: (item: MapItem, returnFocus: HTMLElement) => void
-  focusPosition: (position: SharedPosition) => void
+  focusPosition: (position: MapCameraPosition) => void
   getZoomRatio: () => number
   clearSelection: () => void
 }
@@ -52,7 +51,6 @@ interface MapViewportProps {
   search: string
   onShowItem: (item: MapItem, returnFocus: HTMLElement) => void
   inspectorOpen: boolean
-  sharedPosition?: SharedPosition | null
   children: React.ReactNode
 }
 
@@ -259,7 +257,6 @@ export const MapViewport = forwardRef<MapViewportHandle, MapViewportProps>(funct
     search,
     onShowItem,
     inspectorOpen,
-    sharedPosition,
     children
   },
   ref
@@ -387,14 +384,6 @@ export const MapViewport = forwardRef<MapViewportHandle, MapViewportProps>(funct
       byId: new Map(entries.map((entry) => [entry.value.id, entry]))
     }
   }, [activeLayer, size, visibleItems])
-  const projectedSharedPosition = useMemo(
-    () =>
-      sharedPosition?.region === activeLayer.id
-        ? toScene({ x: sharedPosition.x, y: sharedPosition.y }, activeLayer, size)
-        : null,
-    [activeLayer, sharedPosition, size]
-  )
-
   const renderMarkers = useMemo<RenderMarker[]>(() => {
     const bounds = sceneViewportBounds(
       renderViewport.view,
@@ -656,7 +645,7 @@ export const MapViewport = forwardRef<MapViewportHandle, MapViewportProps>(funct
     return Math.max(1, viewRef.current.scale / fitScale(rect.width, rect.height, size))
   }
 
-  const focusPosition = (position: SharedPosition) => {
+  const focusPosition = (position: MapCameraPosition) => {
     const viewport = viewportRef.current
     if (!viewport || position.region !== activeLayer.id) return
     const scenePosition = toScene(position, activeLayer, size)
@@ -1012,18 +1001,6 @@ export const MapViewport = forwardRef<MapViewportHandle, MapViewportProps>(funct
               </button>
             )
           })}
-          {projectedSharedPosition ? (
-            <div
-              className="shared-position-marker"
-              style={{ left: projectedSharedPosition.x, top: projectedSharedPosition.y }}
-              role="img"
-              aria-label={`Shared position at X ${Math.round(sharedPosition?.x || 0)}, Y ${Math.round(sharedPosition?.y || 0)}`}
-              data-shared-position
-            >
-              <IconCrosshair aria-hidden="true" focusable="false" />
-              <span className="marker-label">Shared position</span>
-            </div>
-          ) : null}
         </div>
       </div>
 
