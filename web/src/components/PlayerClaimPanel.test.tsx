@@ -2,6 +2,7 @@ import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testi
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
+  PLAYER_CLAIM_RECOVERY_STORAGE_KEY,
   PlayerClaimPanel,
   PlayerClaimProvider,
   PlayerClaimSessionControl,
@@ -60,6 +61,16 @@ function readyResponse(phase: 'prove' | 'restore', expiresInMs = 90 * 60_000) {
   }
 }
 
+function recoverySnapshot(phase: 'prove' | 'restore', completedCount: number) {
+  const pairs = phase === 'prove' ? provePairs : restorePairs
+  return {
+    kind: 'inventory_swap_sequence',
+    phase,
+    pairs,
+    completed: pairs.map((_, index) => index < completedCount)
+  }
+}
+
 function deferred<T>() {
   let resolve!: (value: T) => void
   const promise = new Promise<T>((resolvePromise) => {
@@ -82,10 +93,31 @@ function renderPanel(playerId = 'player-public') {
 }
 
 function storedBrowserData() {
-  return Array.from({ length: window.localStorage.length }, (_, index) => {
-    const key = window.localStorage.key(index) || ''
-    return `${key}:${window.localStorage.getItem(key) || ''}`
-  }).join('|')
+  return [window.localStorage, window.sessionStorage]
+    .flatMap((storage) =>
+      Array.from({ length: storage.length }, (_, index) => {
+        const key = storage.key(index) || ''
+        return `${key}:${storage.getItem(key) || ''}`
+      })
+    )
+    .join('|')
+}
+
+function completeCurrentSequence() {
+  for (let index = 1; index <= provePairs.length; index++) {
+    fireEvent.click(screen.getByRole('checkbox', { name: `I performed swap ${index} of ${provePairs.length}` }))
+  }
+}
+
+function completeEmergencyRecoveryActions() {
+  for (let remaining = provePairs.length; remaining > 0; remaining--) {
+    const recovery = screen.getByRole('list', { name: 'Emergency recovery remaining inventory swaps' })
+    const next = within(recovery)
+      .getAllByRole('checkbox')
+      .find((checkbox) => !checkbox.hasAttribute('disabled'))
+    if (!next) throw new Error('Expected an enabled emergency recovery action')
+    fireEvent.click(next)
+  }
 }
 
 async function flushRequests() {
@@ -99,6 +131,7 @@ afterEach(() => {
   cleanup()
   vi.useRealTimers()
   window.localStorage.clear()
+  window.sessionStorage.clear()
   window.history.replaceState({}, '', '/')
   vi.restoreAllMocks()
   vi.unstubAllGlobals()
@@ -152,7 +185,18 @@ describe('PlayerClaimPanel', () => {
     expect(within(swaps).getAllByRole('listitem')[0]).toHaveTextContent('slot 3 with slot 8')
     expect(within(swaps).getAllByRole('listitem')[6]).toHaveTextContent('slot 3 with slot 10')
     expect(document.body).not.toHaveTextContent('ClaimSecretWood')
+    const recoveryRaw = window.sessionStorage.getItem(PLAYER_CLAIM_RECOVERY_STORAGE_KEY) || ''
+    expect(JSON.parse(recoveryRaw)).toEqual({
+      kind: 'inventory_swap_sequence',
+      phase: 'prove',
+      pairs: provePairs,
+      completed: provePairs.map(() => false)
+    })
+    expect(recoveryRaw).not.toMatch(
+      /private-challenge|player-public|private-world-subject|raw-save-player-id|ClaimSecret|snapshotAt|expiresAt|saveProgress/
+    )
 
+    completeCurrentSequence()
     await user.click(screen.getByRole('button', { name: 'I completed all 7 swaps' }))
     expect(await screen.findByRole('status')).toHaveTextContent(/no safe backup contains the full sequence yet/i)
     const verifies = requests.filter((request) => request.path === '/api/player-claims/verify')
@@ -164,7 +208,8 @@ describe('PlayerClaimPanel', () => {
     }
 
     expect(window.location.href).toBe(originalURL)
-    expect(storedBrowserData()).toBe('existing-preference:keep-me')
+    expect(window.localStorage.getItem('existing-preference')).toBe('keep-me')
+    expect(window.sessionStorage.getItem(PLAYER_CLAIM_RECOVERY_STORAGE_KEY)).not.toBeNull()
     expect(document.body).not.toHaveTextContent(challengeToken)
     expect(storedBrowserData()).not.toContain(challengeToken)
     expect(requests.every((request) => !request.path.includes(challengeToken))).toBe(true)
@@ -228,6 +273,7 @@ describe('PlayerClaimPanel', () => {
     })
     expect(verifyRequests).toBe(2)
 
+    completeCurrentSequence()
     fireEvent.click(screen.getByRole('button', { name: 'I completed all 7 swaps' }))
     await flushRequests()
     expect(verifyRequests).toBe(3)
@@ -242,6 +288,7 @@ describe('PlayerClaimPanel', () => {
     expect(within(restore).getAllByRole('listitem')[0]).toHaveTextContent('slot 3 with slot 10')
     expect(within(restore).getAllByRole('listitem')[6]).toHaveTextContent('slot 3 with slot 8')
 
+    completeCurrentSequence()
     fireEvent.click(screen.getByRole('button', { name: 'I completed all 7 swaps' }))
     await flushRequests()
     expect(verifyRequests).toBe(5)
@@ -251,6 +298,7 @@ describe('PlayerClaimPanel', () => {
     expect(verifyRequests).toBe(6)
     expect(meRequests).toBe(2)
     expect(screen.getByRole('status')).toHaveTextContent('Private save connected for player player-public.')
+    expect(window.sessionStorage.getItem(PLAYER_CLAIM_RECOVERY_STORAGE_KEY)).toBeNull()
     expect(document.body).not.toHaveTextContent(challengeToken)
   })
 
@@ -284,6 +332,7 @@ describe('PlayerClaimPanel', () => {
     expect(await screen.findByText('Step 1 of 2 · Prove control')).toBeVisible()
     expect(screen.getByRole('button', { name: 'I completed all 7 swaps' })).toBeVisible()
 
+    completeCurrentSequence()
     await user.click(screen.getByRole('button', { name: 'I completed all 7 swaps' }))
     expect(await screen.findByRole('status')).toHaveTextContent(
       /saved-game check for step 1 is temporarily unavailable/i
@@ -371,6 +420,7 @@ describe('PlayerClaimPanel', () => {
     await user.click(await screen.findByRole('button', { name: 'This is me' }))
     await user.click(screen.getByRole('button', { name: 'Check baseline now' }))
     await screen.findByText('Step 1 of 2 · Prove control')
+    completeCurrentSequence()
     await user.click(screen.getByRole('button', { name: 'I completed all 7 swaps' }))
 
     expect(await screen.findByRole('status')).toHaveTextContent(
@@ -497,28 +547,144 @@ describe('PlayerClaimPanel', () => {
     await flushRequests()
     fireEvent.click(screen.getByRole('button', { name: 'Check baseline now' }))
     await flushRequests()
+    completeCurrentSequence()
     fireEvent.click(screen.getByRole('button', { name: 'I completed all 7 swaps' }))
     await flushRequests()
 
     await act(async () => {
       await vi.advanceTimersByTimeAsync(1_000)
     })
-    expect(screen.getByRole('heading', { name: 'Restore inventory before restarting' })).toBeVisible()
-    const recovery = screen.getByRole('list', { name: 'Emergency restore ordered inventory swaps' })
+    expect(screen.getByRole('heading', { name: 'Emergency inventory recovery' })).toBeVisible()
+    expect(screen.getByRole('combobox', { name: 'Actual completed swap count' })).toHaveValue('7')
+    fireEvent.click(screen.getByRole('button', { name: 'Use this completed-swap count' }))
+    const recovery = screen.getByRole('list', { name: 'Emergency recovery remaining inventory swaps' })
     expect(within(recovery).getAllByRole('listitem')[0]).toHaveTextContent('slot 3 with slot 10')
     expect(within(recovery).getAllByRole('listitem')[6]).toHaveTextContent('slot 3 with slot 8')
-    const restart = screen.getByRole('button', { name: 'Start a new check' })
-    expect(restart).toBeDisabled()
-    expect(screen.getByRole('status')).toHaveTextContent(/restore the original inventory layout/i)
+    const confirm = screen.getByRole('button', { name: 'Confirm inventory is restored' })
+    expect(confirm).toBeDisabled()
 
-    fireEvent.click(
-      screen.getByRole('checkbox', {
-        name: /I restored the original inventory layout, or I did not perform any of the expired proof swaps/i
+    completeEmergencyRecoveryActions()
+    expect(confirm).toBeEnabled()
+    fireEvent.click(confirm)
+    expect(screen.getByRole('button', { name: 'This is me' })).toBeVisible()
+    expect(window.sessionStorage.getItem(PLAYER_CLAIM_RECOVERY_STORAGE_KEY)).toBeNull()
+    expect(storedBrowserData()).not.toContain(challengeToken)
+  })
+
+  it('recovers a corrected partial prove sequence after reload without resuming the claim or trusting a cookie', async () => {
+    const requestPaths: string[] = []
+    let meRequests = 0
+    let verifyRequests = 0
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: string | URL | Request) => {
+        const path = pathOf(input)
+        requestPaths.push(path)
+        if (path === '/api/me') {
+          meRequests++
+          return meRequests === 1
+            ? jsonResponse({ error: 'authentication_required' }, 401)
+            : jsonResponse(authenticatedSession('unrelated-connected-cookie'))
+        }
+        if (path === '/api/player-claims') return jsonResponse(startResponse(), 201)
+        if (path === '/api/player-claims/verify') {
+          verifyRequests++
+          return jsonResponse(readyResponse('prove'), 202)
+        }
+        return new Response(null, { status: 404 })
       })
     )
-    expect(restart).toBeEnabled()
-    expect(screen.getByRole('status')).toHaveTextContent(/recovery confirmed/i)
-    expect(storedBrowserData()).not.toContain(challengeToken)
+    const user = userEvent.setup()
+    const firstView = renderPanel()
+    await user.click(await screen.findByRole('button', { name: 'This is me' }))
+    await user.click(screen.getByRole('button', { name: 'Check baseline now' }))
+    await screen.findByText('Step 1 of 2 · Prove control')
+    fireEvent.click(screen.getByRole('checkbox', { name: 'I performed swap 1 of 7' }))
+    fireEvent.click(screen.getByRole('checkbox', { name: 'I performed swap 2 of 7' }))
+    expect(JSON.parse(window.sessionStorage.getItem(PLAYER_CLAIM_RECOVERY_STORAGE_KEY) || '{}')).toEqual(
+      recoverySnapshot('prove', 2)
+    )
+
+    firstView.unmount()
+    renderPanel()
+    expect(await screen.findByRole('heading', { name: 'Emergency inventory recovery' })).toBeVisible()
+    await flushRequests()
+    expect(screen.queryByRole('button', { name: 'This is me' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Disconnect' })).not.toBeInTheDocument()
+    expect(verifyRequests).toBe(1)
+    expect(requestPaths.filter((path) => path === '/api/player-claims')).toHaveLength(1)
+    expect(window.sessionStorage.getItem(PLAYER_CLAIM_RECOVERY_STORAGE_KEY)).not.toBeNull()
+
+    const unload = new Event('beforeunload', { cancelable: true })
+    window.dispatchEvent(unload)
+    expect(unload.defaultPrevented).toBe(true)
+
+    const completedCount = screen.getByRole('combobox', { name: 'Actual completed swap count' })
+    expect(completedCount).toHaveValue('2')
+    await user.selectOptions(completedCount, '3')
+    expect(JSON.parse(window.sessionStorage.getItem(PLAYER_CLAIM_RECOVERY_STORAGE_KEY) || '{}')).toEqual(
+      recoverySnapshot('prove', 3)
+    )
+    await user.click(screen.getByRole('button', { name: 'Use this completed-swap count' }))
+    let recovery = screen.getByRole('list', { name: 'Emergency recovery remaining inventory swaps' })
+    expect(within(recovery).getAllByRole('listitem')).toHaveLength(3)
+    expect(within(recovery).getAllByRole('listitem')[0]).toHaveTextContent('slot 3 with slot 4')
+    expect(within(recovery).getAllByRole('listitem')[2]).toHaveTextContent('slot 3 with slot 8')
+
+    for (let remaining = 3; remaining > 0; remaining--) {
+      recovery = screen.getByRole('list', { name: 'Emergency recovery remaining inventory swaps' })
+      const next = within(recovery)
+        .getAllByRole('checkbox')
+        .find((checkbox) => !checkbox.hasAttribute('disabled'))
+      if (!next) throw new Error('Expected the next prove recovery action')
+      await user.click(next)
+    }
+    const confirm = screen.getByRole('button', { name: 'Confirm inventory is restored' })
+    expect(confirm).toBeEnabled()
+    expect(window.sessionStorage.getItem(PLAYER_CLAIM_RECOVERY_STORAGE_KEY)).not.toBeNull()
+    await user.click(confirm)
+    expect(window.sessionStorage.getItem(PLAYER_CLAIM_RECOVERY_STORAGE_KEY)).toBeNull()
+    const afterRecoveryUnload = new Event('beforeunload', { cancelable: true })
+    window.dispatchEvent(afterRecoveryUnload)
+    expect(afterRecoveryUnload.defaultPrevented).toBe(false)
+  })
+
+  it('shows disabled-config recovery and lets the user correct restore progress by one swap', async () => {
+    window.sessionStorage.setItem(PLAYER_CLAIM_RECOVERY_STORAGE_KEY, JSON.stringify(recoverySnapshot('restore', 2)))
+    const fetchMock = vi.fn()
+    vi.stubGlobal('fetch', fetchMock)
+    const user = userEvent.setup()
+    render(
+      <PlayerClaimProvider enabled={false}>
+        <PlayerClaimSessionControl />
+      </PlayerClaimProvider>
+    )
+
+    expect(screen.getByRole('heading', { name: 'Emergency inventory recovery' })).toBeVisible()
+    const completedCount = screen.getByRole('combobox', { name: 'Actual completed swap count' })
+    expect(completedCount).toHaveValue('2')
+    await user.selectOptions(completedCount, '1')
+    await user.click(screen.getByRole('button', { name: 'Use this completed-swap count' }))
+    const recovery = screen.getByRole('list', { name: 'Emergency recovery remaining inventory swaps' })
+    expect(within(recovery).getAllByRole('listitem')).toHaveLength(6)
+    expect(within(recovery).getAllByRole('listitem')[0]).toHaveTextContent('slot 3 with slot 13')
+    expect(within(recovery).getAllByRole('listitem')[5]).toHaveTextContent('slot 3 with slot 8')
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it('discards recovery storage containing private or unvalidated fields', () => {
+    window.sessionStorage.setItem(
+      PLAYER_CLAIM_RECOVERY_STORAGE_KEY,
+      JSON.stringify({ ...recoverySnapshot('prove', 2), challengeToken, playerId: 'private-player' })
+    )
+    render(
+      <PlayerClaimProvider enabled={false}>
+        <PlayerClaimSessionControl />
+      </PlayerClaimProvider>
+    )
+
+    expect(screen.queryByRole('heading', { name: 'Emergency inventory recovery' })).not.toBeInTheDocument()
+    expect(window.sessionStorage.getItem(PLAYER_CLAIM_RECOVERY_STORAGE_KEY)).toBeNull()
   })
 
   it('increments the private session epoch when the same player reconnects', async () => {
@@ -653,14 +819,57 @@ describe('PlayerClaimPanel', () => {
     renderPanel()
     await user.click(await screen.findByRole('button', { name: 'This is me' }))
     await user.click(screen.getByRole('button', { name: 'Check baseline now' }))
+    completeCurrentSequence()
     await user.click(await screen.findByRole('button', { name: 'I completed all 7 swaps' }))
     expect(await screen.findByText('Step 2 of 2 · Restore inventory')).toBeVisible()
+    completeCurrentSequence()
     await user.click(screen.getByRole('button', { name: 'I completed all 7 swaps' }))
 
     expect(await screen.findByRole('button', { name: 'This is me' })).toBeVisible()
     expect(screen.queryByRole('heading', { name: 'Active private identity check' })).not.toBeInTheDocument()
     expect(screen.queryByText(/Both ordered sequences passed/)).not.toBeInTheDocument()
     expect(meRequests).toBe(2)
+  })
+
+  it('clears a matching proof-passed challenge when a failed session confirmation later succeeds', async () => {
+    let meRequests = 0
+    let verifyRequests = 0
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: string | URL | Request) => {
+        const path = pathOf(input)
+        if (path === '/api/me') {
+          meRequests++
+          if (meRequests === 1) return jsonResponse({ error: 'authentication_required' }, 401)
+          if (meRequests === 2) return jsonResponse({ error: 'temporarily_unavailable' }, 503)
+          return jsonResponse(authenticatedSession('player-public'))
+        }
+        if (path === '/api/player-claims') return jsonResponse(startResponse(), 201)
+        if (path === '/api/player-claims/verify') {
+          verifyRequests++
+          if (verifyRequests === 1) return jsonResponse(readyResponse('prove'), 202)
+          if (verifyRequests === 2) return jsonResponse(readyResponse('restore'), 202)
+          return jsonResponse({ status: 'verified' })
+        }
+        return new Response(null, { status: 404 })
+      })
+    )
+    const user = userEvent.setup()
+    renderPanel()
+    await user.click(await screen.findByRole('button', { name: 'This is me' }))
+    await user.click(screen.getByRole('button', { name: 'Check baseline now' }))
+    completeCurrentSequence()
+    await user.click(screen.getByRole('button', { name: 'I completed all 7 swaps' }))
+    expect(await screen.findByText('Step 2 of 2 · Restore inventory')).toBeVisible()
+    completeCurrentSequence()
+    await user.click(screen.getByRole('button', { name: 'I completed all 7 swaps' }))
+
+    expect(await screen.findByRole('button', { name: 'Check session again' })).toBeVisible()
+    expect(window.sessionStorage.getItem(PLAYER_CLAIM_RECOVERY_STORAGE_KEY)).toBeNull()
+    await user.click(screen.getByRole('button', { name: 'Check session again' }))
+    expect(await screen.findByRole('heading', { name: 'Connected private save' })).toBeVisible()
+    expect(screen.queryByRole('heading', { name: 'Active private identity check' })).not.toBeInTheDocument()
+    expect(meRequests).toBe(3)
   })
 
   it('recovers a lost terminal verify response by probing the session before showing expiry recovery', async () => {
@@ -690,8 +899,10 @@ describe('PlayerClaimPanel', () => {
     renderPanel()
     await user.click(await screen.findByRole('button', { name: 'This is me' }))
     await user.click(screen.getByRole('button', { name: 'Check baseline now' }))
+    completeCurrentSequence()
     await user.click(await screen.findByRole('button', { name: 'I completed all 7 swaps' }))
     expect(await screen.findByText('Step 2 of 2 · Restore inventory')).toBeVisible()
+    completeCurrentSequence()
     await user.click(screen.getByRole('button', { name: 'I completed all 7 swaps' }))
 
     expect(await screen.findByRole('heading', { name: 'Connected private save' })).toBeVisible()

@@ -15,6 +15,11 @@ installation secret, bounded hash-at-rest challenges and sessions, and Secure,
 HttpOnly, SameSite=Strict cookies. Exact inventory contents, Pal instance IDs,
 raw save identifiers, proof evidence, completion state keys, and the
 installation secret must never be returned by an API or written to logs.
+For reload recovery, the browser may retain only validated slot pairs, the
+proof phase, and advisory per-swap progress in `sessionStorage`; bearer tokens,
+player identities, item data, and save progress must never be persisted there.
+That recovery record is cleared only after verified completion or explicit
+inventory-recovery acknowledgement.
 
 With claims enabled, public player endpoints are live-only and omit saved
 progress, offline players, last-seen values, and saved locations. Authenticated

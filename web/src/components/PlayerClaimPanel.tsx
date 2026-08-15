@@ -14,7 +14,9 @@ const CLAIM_POLL_INTERVAL_MS = 30_000
 const SESSION_REVALIDATE_INTERVAL_MS = 30_000
 const CLAIM_HEADER = 'X-Palworld-Live-Map'
 const CLAIM_PAIR_COUNT = 7
+const CLAIM_COMPLETED_COUNTS = [0, 1, 2, 3, 4, 5, 6, 7] as const
 export const PLAYER_CLAIM_GLOBAL_CONTROL_ID = 'private-player-claim-control'
+export const PLAYER_CLAIM_RECOVERY_STORAGE_KEY = 'palworld-live-map.claim-recovery.v1'
 
 interface ClaimPair {
   slotA: number
@@ -27,6 +29,13 @@ interface ClaimInstructions {
   step: 1 | 2
   totalSteps: 2
   pairs: ClaimPair[]
+}
+
+interface RecoverySnapshot {
+  kind: 'inventory_swap_sequence'
+  phase: 'prove' | 'restore'
+  pairs: ClaimPair[]
+  completed: boolean[]
 }
 
 type ChallengePhase = 'arming' | 'ready' | 'checking' | 'pending' | 'unavailable' | 'expired' | 'proof-passed'
@@ -51,6 +60,7 @@ interface PlayerClaimContextValue {
   enabled: boolean
   session: PlayerClaimSessionState
   challenge: ChallengeState | null
+  recovery: RecoverySnapshot | null
   notice: Notice
   starting: boolean
   disconnecting: boolean
@@ -60,6 +70,8 @@ interface PlayerClaimContextValue {
   invalidateSession: () => void
   disconnect: () => Promise<void>
   acknowledgeRecovery: () => void
+  updateRecoveryPair: (index: number, completed: boolean) => void
+  updateRecoveryCount: (completedCount: number) => void
 }
 
 const PlayerClaimContext = createContext<PlayerClaimContextValue | null>(null)
@@ -70,6 +82,33 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function positiveInteger(value: unknown): value is number {
   return Number.isInteger(value) && Number(value) > 0
+}
+
+function exactKeys(value: Record<string, unknown>, expected: readonly string[]) {
+  const keys = Object.keys(value).sort()
+  return keys.length === expected.length && keys.every((key, index) => key === expected[index])
+}
+
+function parsePairs(value: unknown): ClaimPair[] | null {
+  if (!Array.isArray(value) || value.length !== CLAIM_PAIR_COUNT) return null
+  const pairs: ClaimPair[] = []
+  const outerSlots = new Set<number>()
+  let anchor: number | null = null
+  for (const rawPair of value) {
+    if (
+      !isRecord(rawPair) ||
+      !exactKeys(rawPair, ['slotA', 'slotB']) ||
+      !positiveInteger(rawPair.slotA) ||
+      !positiveInteger(rawPair.slotB)
+    )
+      return null
+    if (rawPair.slotA === rawPair.slotB) return null
+    if (anchor === null) anchor = rawPair.slotA
+    if (rawPair.slotA !== anchor || outerSlots.has(rawPair.slotB) || rawPair.slotB === anchor) return null
+    outerSlots.add(rawPair.slotB)
+    pairs.push({ slotA: rawPair.slotA, slotB: rawPair.slotB })
+  }
+  return pairs
 }
 
 function parseSessionExpiry(value: Record<string, unknown>, now = Date.now()): number | null {
@@ -86,20 +125,9 @@ function parseInstructions(value: unknown): ClaimInstructions | null {
   if (value.phase !== 'prove' && value.phase !== 'restore') return null
   if (value.totalSteps !== 2 || (value.step !== 1 && value.step !== 2)) return null
   if ((value.phase === 'prove' && value.step !== 1) || (value.phase === 'restore' && value.step !== 2)) return null
-  if (!Array.isArray(value.pairs) || value.pairs.length !== CLAIM_PAIR_COUNT) return null
   if (typeof value.snapshotAt !== 'string' || !Number.isFinite(Date.parse(value.snapshotAt))) return null
-
-  const pairs: ClaimPair[] = []
-  const outerSlots = new Set<number>()
-  let anchor: number | null = null
-  for (const rawPair of value.pairs) {
-    if (!isRecord(rawPair) || !positiveInteger(rawPair.slotA) || !positiveInteger(rawPair.slotB)) return null
-    if (rawPair.slotA === rawPair.slotB) return null
-    if (anchor === null) anchor = rawPair.slotA
-    if (rawPair.slotA !== anchor || outerSlots.has(rawPair.slotB) || rawPair.slotB === anchor) return null
-    outerSlots.add(rawPair.slotB)
-    pairs.push({ slotA: rawPair.slotA, slotB: rawPair.slotB })
-  }
+  const pairs = parsePairs(value.pairs)
+  if (!pairs) return null
   return {
     kind: 'inventory_swap_sequence',
     phase: value.phase,
@@ -107,6 +135,57 @@ function parseInstructions(value: unknown): ClaimInstructions | null {
     totalSteps: 2,
     pairs
   }
+}
+
+function parseRecoverySnapshot(value: unknown): RecoverySnapshot | null {
+  if (!isRecord(value) || !exactKeys(value, ['completed', 'kind', 'pairs', 'phase'])) return null
+  if (value.kind !== 'inventory_swap_sequence' || (value.phase !== 'prove' && value.phase !== 'restore')) return null
+  const pairs = parsePairs(value.pairs)
+  if (!pairs || !Array.isArray(value.completed) || value.completed.length !== pairs.length) return null
+  if (!value.completed.every((completed): completed is boolean => typeof completed === 'boolean')) return null
+  let incompleteSeen = false
+  for (const completed of value.completed) {
+    if (!completed) incompleteSeen = true
+    else if (incompleteSeen) return null
+  }
+  return { kind: 'inventory_swap_sequence', phase: value.phase, pairs, completed: [...value.completed] }
+}
+
+function loadRecoverySnapshot(): RecoverySnapshot | null {
+  try {
+    const raw = window.sessionStorage.getItem(PLAYER_CLAIM_RECOVERY_STORAGE_KEY)
+    if (!raw) return null
+    const snapshot = parseRecoverySnapshot(JSON.parse(raw))
+    if (snapshot) return snapshot
+    window.sessionStorage.removeItem(PLAYER_CLAIM_RECOVERY_STORAGE_KEY)
+  } catch {
+    try {
+      window.sessionStorage.removeItem(PLAYER_CLAIM_RECOVERY_STORAGE_KEY)
+    } catch {
+      // Session storage can be unavailable in restricted browser contexts.
+    }
+  }
+  return null
+}
+
+function persistRecoverySnapshot(snapshot: RecoverySnapshot | null) {
+  try {
+    if (snapshot) window.sessionStorage.setItem(PLAYER_CLAIM_RECOVERY_STORAGE_KEY, JSON.stringify(snapshot))
+    else window.sessionStorage.removeItem(PLAYER_CLAIM_RECOVERY_STORAGE_KEY)
+    return true
+  } catch {
+    return false
+  }
+}
+
+function recoveryMatchesInstructions(snapshot: RecoverySnapshot, instructions: ClaimInstructions) {
+  return (
+    snapshot.phase === instructions.phase &&
+    snapshot.pairs.length === instructions.pairs.length &&
+    snapshot.pairs.every(
+      (pair, index) => pair.slotA === instructions.pairs[index].slotA && pair.slotB === instructions.pairs[index].slotB
+    )
+  )
 }
 
 function reverses(prove: ClaimInstructions, restore: ClaimInstructions) {
@@ -171,10 +250,12 @@ function statusClass(tone: 'normal' | 'success' | 'warning' = 'normal') {
 export function PlayerClaimProvider({ enabled, children }: { enabled: boolean; children: ReactNode }) {
   const [session, setSession] = useState<PlayerClaimSessionState>({ phase: enabled ? 'loading' : 'anonymous' })
   const [challenge, setChallenge] = useState<ChallengeState | null>(null)
+  const [recovery, setRecovery] = useState<RecoverySnapshot | null>(loadRecoverySnapshot)
   const [notice, setNotice] = useState<Notice>(null)
   const [starting, setStarting] = useState(false)
   const [disconnecting, setDisconnecting] = useState(false)
   const challengeRef = useRef<ChallengeState | null>(null)
+  const recoveryRef = useRef<RecoverySnapshot | null>(recovery)
   const challengeTokenRef = useRef<string | null>(null)
   const challengeEpochRef = useRef(0)
   const verifyControllerRef = useRef<AbortController | null>(null)
@@ -206,6 +287,55 @@ export function PlayerClaimProvider({ enabled, children }: { enabled: boolean; c
       commitChallenge(updater(challengeRef.current))
     },
     [commitChallenge]
+  )
+
+  const commitRecovery = useCallback((next: RecoverySnapshot | null) => {
+    const persisted = persistRecoverySnapshot(next)
+    if (next && !persisted) return false
+    recoveryRef.current = next
+    setRecovery(next)
+    return persisted
+  }, [])
+
+  const updateRecoveryPair = useCallback(
+    (index: number, completed: boolean) => {
+      const current = recoveryRef.current
+      if (!current || !Number.isInteger(index) || index < 0 || index >= current.completed.length) return
+      if (current.completed[index] === completed) return
+      const boundary = completed ? current.completed.indexOf(false) : current.completed.lastIndexOf(true)
+      if (index !== boundary) return
+      const next = { ...current, completed: [...current.completed] }
+      next.completed[index] = completed
+      commitRecovery(next)
+    },
+    [commitRecovery]
+  )
+
+  const updateRecoveryCount = useCallback(
+    (completedCount: number) => {
+      const current = recoveryRef.current
+      if (!current || !Number.isInteger(completedCount) || completedCount < 0 || completedCount > current.pairs.length)
+        return
+      commitRecovery({
+        ...current,
+        completed: current.pairs.map((_, index) => index < completedCount)
+      })
+    },
+    [commitRecovery]
+  )
+
+  const ensureRecoveryForInstructions = useCallback(
+    (instructions: ClaimInstructions) => {
+      const current = recoveryRef.current
+      if (current && recoveryMatchesInstructions(current, instructions)) return true
+      return commitRecovery({
+        kind: 'inventory_swap_sequence',
+        phase: instructions.phase,
+        pairs: instructions.pairs.map((pair) => ({ ...pair })),
+        completed: instructions.pairs.map(() => false)
+      })
+    },
+    [commitRecovery]
   )
 
   const resetProofPassedChallenge = useCallback(() => {
@@ -288,6 +418,11 @@ export function PlayerClaimProvider({ enabled, children }: { enabled: boolean; c
       setNotice(null)
       const next = { phase: 'connected', playerId: body.playerId, sessionEpoch, expiresAt } as const
       commitSession(next)
+      if (challengeRef.current?.phase === 'proof-passed' && challengeRef.current.playerId === body.playerId) {
+        challengeEpochRef.current++
+        challengeTokenRef.current = null
+        commitChallenge(null)
+      }
       return next
     } catch {
       if (isCurrent()) {
@@ -300,7 +435,15 @@ export function PlayerClaimProvider({ enabled, children }: { enabled: boolean; c
       if (sessionRequestRef.current?.controller === requestController) sessionRequestRef.current = null
       releaseController(requestController)
     }
-  }, [cancelSessionLoad, commitSession, controller, enabled, releaseController, resetProofPassedChallenge])
+  }, [
+    cancelSessionLoad,
+    commitChallenge,
+    commitSession,
+    controller,
+    enabled,
+    releaseController,
+    resetProofPassedChallenge
+  ])
 
   useEffect(() => {
     mountedRef.current = true
@@ -317,6 +460,22 @@ export function PlayerClaimProvider({ enabled, children }: { enabled: boolean; c
       controllersRef.current.clear()
     }
   }, [])
+
+  useEffect(() => {
+    const instructions = challenge?.instructions
+    if (!instructions) return
+    ensureRecoveryForInstructions(instructions)
+  }, [challenge?.instructions, ensureRecoveryForInstructions])
+
+  useEffect(() => {
+    if (!recovery) return
+    const protectRecovery = (event: BeforeUnloadEvent) => {
+      event.preventDefault()
+      event.returnValue = ''
+    }
+    window.addEventListener('beforeunload', protectRecovery)
+    return () => window.removeEventListener('beforeunload', protectRecovery)
+  }, [recovery])
 
   useEffect(() => {
     if (enabled) {
@@ -372,6 +531,7 @@ export function PlayerClaimProvider({ enabled, children }: { enabled: boolean; c
     async (playerId: string) => {
       if (
         !enabled ||
+        recoveryRef.current ||
         startControllerRef.current ||
         (challenge?.phase === 'expired' && challenge.instructions && !challenge.recoveryAcknowledged)
       )
@@ -444,6 +604,15 @@ export function PlayerClaimProvider({ enabled, children }: { enabled: boolean; c
       expireChallenge()
       return
     }
+    if (challenge.instructions) {
+      const currentRecovery = recoveryRef.current
+      if (
+        !currentRecovery ||
+        !recoveryMatchesInstructions(currentRecovery, challenge.instructions) ||
+        !currentRecovery.completed.every(Boolean)
+      )
+        return
+    }
     const requestEpoch = challengeEpochRef.current
     updateChallenge((current) => (current ? { ...current, phase: 'checking' } : current))
     const requestController = controller()
@@ -468,6 +637,7 @@ export function PlayerClaimProvider({ enabled, children }: { enabled: boolean; c
           if (recoveredSession?.phase === 'connected' && recoveredSession.playerId === challenge.playerId) {
             challengeEpochRef.current++
             challengeTokenRef.current = null
+            commitRecovery(null)
             updateChallenge(() => null)
             return
           }
@@ -499,6 +669,11 @@ export function PlayerClaimProvider({ enabled, children }: { enabled: boolean; c
           transition !== null
         if (!validTransition || !nextInstructions) {
           updateChallenge((current) => (current ? { ...current, phase: 'unavailable' } : current))
+          return
+        }
+        if (!ensureRecoveryForInstructions(nextInstructions)) {
+          if (recoveryRef.current) expireChallenge()
+          else updateChallenge((current) => (current ? { ...current, phase: 'unavailable' } : current))
           return
         }
         updateChallenge((current) =>
@@ -540,6 +715,11 @@ export function PlayerClaimProvider({ enabled, children }: { enabled: boolean; c
           updateChallenge((current) => (current ? { ...current, phase: 'unavailable' } : current))
           return
         }
+        if (!ensureRecoveryForInstructions(replayedInstructions)) {
+          if (recoveryRef.current) expireChallenge()
+          else updateChallenge((current) => (current ? { ...current, phase: 'unavailable' } : current))
+          return
+        }
         updateChallenge((current) =>
           current
             ? {
@@ -563,6 +743,7 @@ export function PlayerClaimProvider({ enabled, children }: { enabled: boolean; c
       }
 
       challengeTokenRef.current = null
+      commitRecovery(null)
       updateChallenge((current) => (current ? { ...current, phase: 'proof-passed' } : current))
       const establishedSession = await loadSession()
       if (
@@ -581,7 +762,16 @@ export function PlayerClaimProvider({ enabled, children }: { enabled: boolean; c
       if (verifyControllerRef.current === requestController) verifyControllerRef.current = null
       releaseController(requestController)
     }
-  }, [challenge, controller, expireChallenge, loadSession, releaseController, updateChallenge])
+  }, [
+    challenge,
+    commitRecovery,
+    controller,
+    ensureRecoveryForInstructions,
+    expireChallenge,
+    loadSession,
+    releaseController,
+    updateChallenge
+  ])
 
   useEffect(() => {
     if (challenge?.phase !== 'arming' && challenge?.phase !== 'pending') return
@@ -619,16 +809,27 @@ export function PlayerClaimProvider({ enabled, children }: { enabled: boolean; c
   }, [cancelSessionLoad, commitChallenge, commitSession, controller, disconnecting, enabled, releaseController])
 
   const acknowledgeRecovery = useCallback(() => {
-    updateChallenge((current) =>
-      current?.phase === 'expired' && current.instructions ? { ...current, recoveryAcknowledged: true } : current
-    )
-  }, [updateChallenge])
+    const current = recoveryRef.current
+    if (!current) return
+    const restored =
+      current.phase === 'prove' ? current.completed.every((completed) => !completed) : current.completed.every(Boolean)
+    if (!restored) return
+    challengeEpochRef.current++
+    challengeTokenRef.current = null
+    verifyControllerRef.current?.abort()
+    verifyControllerRef.current = null
+    startControllerRef.current?.abort()
+    startControllerRef.current = null
+    commitRecovery(null)
+    commitChallenge(null)
+  }, [commitChallenge, commitRecovery])
 
   const value = useMemo<PlayerClaimContextValue>(
     () => ({
       enabled,
       session,
       challenge,
+      recovery,
       notice,
       starting,
       disconnecting,
@@ -637,7 +838,9 @@ export function PlayerClaimProvider({ enabled, children }: { enabled: boolean; c
       loadSession,
       invalidateSession,
       disconnect,
-      acknowledgeRecovery
+      acknowledgeRecovery,
+      updateRecoveryPair,
+      updateRecoveryCount
     }),
     [
       acknowledgeRecovery,
@@ -648,9 +851,12 @@ export function PlayerClaimProvider({ enabled, children }: { enabled: boolean; c
       invalidateSession,
       loadSession,
       notice,
+      recovery,
       session,
       startClaim,
       starting,
+      updateRecoveryPair,
+      updateRecoveryCount,
       verifyClaim
     ]
   )
@@ -673,11 +879,34 @@ export function usePlayerClaimSession() {
 export function PlayerClaimSessionControl() {
   const headingId = useId()
   const claim = useContext(PlayerClaimContext)
-  if (!claim?.enabled) return null
+  if (!claim) return null
   const session =
     claim.session.phase === 'connected' && claim.session.expiresAt <= Date.now()
       ? ({ phase: 'anonymous' } as const)
       : claim.session
+
+  if (claim.recovery && (!claim.challenge || claim.challenge.phase === 'expired')) {
+    return (
+      <section
+        id={PLAYER_CLAIM_GLOBAL_CONTROL_ID}
+        tabIndex={-1}
+        className="pal-glass-inset mx-3.5 mb-2 grid gap-3 px-3 py-2.5 text-xs outline-none focus-visible:ring-2 focus-visible:ring-[#72d7e5]"
+        aria-labelledby={headingId}
+      >
+        <h3 id={headingId} className="m-0 text-xs font-semibold text-[#f1d39a]">
+          Emergency inventory recovery
+        </h3>
+        <RecoverySnapshotControl
+          snapshot={claim.recovery}
+          onUpdatePair={claim.updateRecoveryPair}
+          onUpdateCount={claim.updateRecoveryCount}
+          onAcknowledge={claim.acknowledgeRecovery}
+        />
+      </section>
+    )
+  }
+
+  if (!claim.enabled) return null
 
   if (claim.challenge) {
     return (
@@ -697,12 +926,14 @@ export function PlayerClaimSessionControl() {
         </div>
         <ActiveChallenge
           challenge={claim.challenge}
+          recovery={claim.recovery}
           session={session}
           starting={claim.starting}
           onStart={claim.startClaim}
           onVerify={claim.verifyClaim}
           onLoadSession={claim.loadSession}
           onAcknowledgeRecovery={claim.acknowledgeRecovery}
+          onUpdateRecoveryPair={claim.updateRecoveryPair}
         />
       </section>
     )
@@ -775,7 +1006,13 @@ export function PlayerClaimPanel({
         Private progress
       </h3>
       <div className="pal-glass-inset grid gap-3 p-3">
-        {challenge ? (
+        {claim.recovery && (!challenge || challenge.phase === 'expired') ? (
+          <GlobalControlPointer
+            message="Inventory recovery must be completed before another private identity check can start."
+            buttonLabel="Open emergency recovery in Map filters"
+            onShow={showGlobalControl}
+          />
+        ) : challenge ? (
           <GlobalControlPointer
             message={
               challenge.playerId === playerId
@@ -855,29 +1092,41 @@ function GlobalControlPointer({
 
 function ActiveChallenge({
   challenge,
+  recovery,
   session,
   starting,
   onStart,
   onVerify,
   onLoadSession,
-  onAcknowledgeRecovery
+  onAcknowledgeRecovery,
+  onUpdateRecoveryPair
 }: {
   challenge: ChallengeState
+  recovery: RecoverySnapshot | null
   session: PlayerClaimSessionState
   starting: boolean
   onStart: (playerId: string) => Promise<void>
   onVerify: () => Promise<void>
   onLoadSession: () => Promise<PlayerClaimSessionState | null>
   onAcknowledgeRecovery: () => void
+  onUpdateRecoveryPair: (index: number, completed: boolean) => void
 }) {
   const instructions = challenge.instructions
   const recoveryRequired = challenge.phase === 'expired' && instructions !== null && !challenge.recoveryAcknowledged
+  const sequenceComplete = Boolean(
+    instructions && recovery && recoveryMatchesInstructions(recovery, instructions) && recovery.completed.every(Boolean)
+  )
   return (
     <>
       {challenge.phase === 'expired' && instructions ? (
         <EmergencyRecovery instructions={instructions} />
       ) : instructions ? (
-        <InstructionSequence instructions={instructions} phase={challenge.phase} />
+        <InstructionSequence
+          instructions={instructions}
+          phase={challenge.phase}
+          recovery={recovery}
+          onUpdateRecoveryPair={onUpdateRecoveryPair}
+        />
       ) : (
         <BaselineCopy />
       )}
@@ -898,7 +1147,7 @@ function ActiveChallenge({
         <button
           type="button"
           className={buttonClass()}
-          disabled={challenge.phase === 'checking'}
+          disabled={challenge.phase === 'checking' || (challenge.phase === 'ready' && !sequenceComplete)}
           onClick={() => void onVerify()}
         >
           {challenge.phase === 'checking'
@@ -966,6 +1215,109 @@ function BaselineCopy() {
   )
 }
 
+function RecoverySnapshotControl({
+  snapshot,
+  onUpdatePair,
+  onUpdateCount,
+  onAcknowledge
+}: {
+  snapshot: RecoverySnapshot
+  onUpdatePair: (index: number, completed: boolean) => void
+  onUpdateCount: (completedCount: number) => void
+  onAcknowledge: () => void
+}) {
+  const [assessmentConfirmed, setAssessmentConfirmed] = useState(false)
+  const proving = snapshot.phase === 'prove'
+  const completedCount = snapshot.completed.filter(Boolean).length
+  const remainingIndexes = snapshot.completed
+    .map((completed, index) => ({ completed, index }))
+    .filter(({ completed }) => (proving ? completed : !completed))
+    .map(({ index }) => index)
+  if (proving) remainingIndexes.reverse()
+  const restored = remainingIndexes.length === 0
+  return (
+    <div className="grid gap-3 border border-[#d8a95f]/45 bg-[#5a3d20]/20 p-2.5">
+      <p className="m-0 text-[11px] leading-5 text-[#e4d2b4]">
+        A previous identity check may have left inventory swaps unfinished. This recovery screen cannot resume or verify
+        that claim. Browser tracking is only an estimate because a reload can happen between a physical swap and its
+        checkbox.
+      </p>
+      {!assessmentConfirmed ? (
+        <>
+          <label className="grid gap-1 text-[11px] leading-5 text-[#f4dfbc]">
+            <span>How many swaps from this ordered sequence are currently applied?</span>
+            <select
+              className="pal-glass-inset min-h-11 px-2 text-xs text-[#fff0d3]"
+              aria-label="Actual completed swap count"
+              value={completedCount}
+              onChange={(event) => onUpdateCount(Number(event.currentTarget.value))}
+            >
+              {CLAIM_COMPLETED_COUNTS.map((count) => (
+                <option key={count} value={count}>
+                  {count}
+                </option>
+              ))}
+            </select>
+          </label>
+          <ol aria-label="Original ordered inventory swaps" className="m-0 grid gap-1.5 pl-6">
+            {snapshot.pairs.map((pair, index) => (
+              <li
+                key={`${pair.slotA}:${pair.slotB}`}
+                className="border-l-2 border-[#d8a95f]/60 bg-[#563d25]/25 px-2 py-1.5 text-xs leading-5 text-[#fff0d3] marker:text-[#efc779]"
+              >
+                Swap common-inventory slot {pair.slotA} with slot {pair.slotB}.{' '}
+                <span className="text-[10px] text-[#d8bc83]">
+                  {index < completedCount ? 'Counted as applied' : 'Not counted as applied'}
+                </span>
+              </li>
+            ))}
+          </ol>
+          <button type="button" className={buttonClass(true)} onClick={() => setAssessmentConfirmed(true)}>
+            Use this completed-swap count
+          </button>
+        </>
+      ) : remainingIndexes.length > 0 ? (
+        <ol aria-label="Emergency recovery remaining inventory swaps" className="m-0 grid gap-1.5 pl-6">
+          {remainingIndexes.map((index, position) => {
+            const pair = snapshot.pairs[index]
+            return (
+              <li
+                key={`${pair.slotA}:${pair.slotB}`}
+                className="border-l-2 border-[#d8a95f]/60 bg-[#563d25]/25 px-2 py-1.5 text-xs leading-5 text-[#fff0d3] marker:text-[#efc779]"
+              >
+                <span className="block">
+                  Swap common-inventory slot {pair.slotA} with slot {pair.slotB}.
+                </span>
+                <label className="mt-1 flex min-h-7 cursor-pointer items-center gap-2 text-[11px] text-[#f4dfbc]">
+                  <input
+                    type="checkbox"
+                    className="size-3.5 shrink-0 accent-[#d8a95f]"
+                    disabled={position !== 0}
+                    aria-label={`${proving ? 'I undid' : 'I completed'} recovery swap ${position + 1} of ${remainingIndexes.length}`}
+                    onChange={(event) => {
+                      if (event.currentTarget.checked) onUpdatePair(index, !proving)
+                    }}
+                  />
+                  <span>{proving ? 'I undid this applied proof swap' : 'I completed this restore swap'}</span>
+                </label>
+              </li>
+            )
+          })}
+        </ol>
+      ) : (
+        <p role="status" aria-live="polite" aria-atomic="true" className={statusClass('success')}>
+          No recovery swaps remain. Confirm the inventory layout before continuing.
+        </p>
+      )}
+      {assessmentConfirmed ? (
+        <button type="button" className={buttonClass(true)} disabled={!restored} onClick={onAcknowledge}>
+          Confirm inventory is restored
+        </button>
+      ) : null}
+    </div>
+  )
+}
+
 function EmergencyRecovery({ instructions }: { instructions: ClaimInstructions }) {
   const proving = instructions.phase === 'prove'
   const recoveryPairs = proving ? [...instructions.pairs].reverse() : instructions.pairs
@@ -996,8 +1348,22 @@ function EmergencyRecovery({ instructions }: { instructions: ClaimInstructions }
   )
 }
 
-function InstructionSequence({ instructions, phase }: { instructions: ClaimInstructions; phase: ChallengePhase }) {
+function InstructionSequence({
+  instructions,
+  phase,
+  recovery,
+  onUpdateRecoveryPair
+}: {
+  instructions: ClaimInstructions
+  phase: ChallengePhase
+  recovery: RecoverySnapshot | null
+  onUpdateRecoveryPair: (index: number, completed: boolean) => void
+}) {
   const restoring = instructions.phase === 'restore'
+  const tracked = recovery && recoveryMatchesInstructions(recovery, instructions) ? recovery.completed : null
+  const completed = tracked || instructions.pairs.map(() => false)
+  const firstIncomplete = completed.indexOf(false)
+  const lastCompleted = completed.lastIndexOf(true)
   return (
     <>
       <div className="grid gap-1">
@@ -1012,12 +1378,25 @@ function InstructionSequence({ instructions, phase }: { instructions: ClaimInstr
         </p>
       </div>
       <ol aria-label={`Step ${instructions.step} ordered inventory swaps`} className="m-0 grid gap-1.5 pl-6">
-        {instructions.pairs.map((pair) => (
+        {instructions.pairs.map((pair, index) => (
           <li
             key={`${pair.slotA}:${pair.slotB}`}
             className="border-l-2 border-[#79dceb]/60 bg-[#29454a]/35 px-2 py-1.5 text-xs leading-5 text-[#edf9fa] marker:text-[#8fd7df]"
           >
-            Swap common-inventory slot {pair.slotA} with slot {pair.slotB}.
+            <span className="block">
+              Swap common-inventory slot {pair.slotA} with slot {pair.slotB}.
+            </span>
+            <label className="mt-1 flex min-h-7 cursor-pointer items-center gap-2 text-[11px] text-[#a9d7dc]">
+              <input
+                type="checkbox"
+                className="size-3.5 shrink-0 accent-[#63c9d8]"
+                checked={completed[index]}
+                disabled={phase !== 'ready' || (completed[index] ? index !== lastCompleted : index !== firstIncomplete)}
+                aria-label={`I performed swap ${index + 1} of ${instructions.pairs.length}`}
+                onChange={(event) => onUpdateRecoveryPair(index, event.currentTarget.checked)}
+              />
+              <span>{completed[index] ? 'Recorded as performed' : 'Mark after performing this swap'}</span>
+            </label>
           </li>
         ))}
       </ol>

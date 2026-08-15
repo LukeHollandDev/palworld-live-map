@@ -152,6 +152,12 @@ selection at the minimum candidate count and every phase must appear in a new
 safe generation. The browser receives slot numbers only—never item names,
 counts, instance IDs, or raw save identifiers.
 
+For reload safety, the browser keeps only the recovery slot pairs, proof phase,
+and advisory per-swap progress in `sessionStorage`. It never stores the claim
+bearer, player identity, item data, or save progress there, and clears the
+recovery record after verified completion or explicit inventory-recovery
+acknowledgement.
+
 Create a dedicated installation secret; do not reuse the Palworld admin
 password:
 
