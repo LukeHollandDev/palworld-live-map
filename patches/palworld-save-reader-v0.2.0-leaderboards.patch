@@ -1,8 +1,8 @@
 diff --git a/internal/resolve/document.go b/internal/resolve/document.go
-index 22a7671..7eddc72 100644
+index 20ad914..717cd3f 100644
 --- a/internal/resolve/document.go
 +++ b/internal/resolve/document.go
-@@ -19,19 +19,24 @@ import (
+@@ -19,19 +19,25 @@ import (
  //
  // Version 2 added the guild document and gave a player's guild a name and a
  // member count, which version 1 could not supply because GroupSaveDataMap was
@@ -10,9 +10,10 @@ index 22a7671..7eddc72 100644
 -// "does a player's guild have a name" needs a number to branch on.
 -const Version = 2
 +// not decoded. Version 3 adds the compact roster progress counters and arena
-+// rank points. These changes only add fields, but a consumer that branches on
++// rank points. Version 4 adds exact private progress keys to a single-player
++// document. These changes only add fields, but a consumer that branches on
 +// their presence needs a number to branch on.
-+const Version = 3
++const Version = 4
  
  // Roster is the compact player identity document used by integrations that do
  // not need inventories or owned Pals. It deliberately shares the stable player
@@ -34,7 +35,34 @@ index 22a7671..7eddc72 100644
  }
  
  // Player is one resolved player: their own save joined to the world save.
-@@ -68,9 +73,10 @@ type Player struct {
+@@ -48,6 +54,7 @@ type Player struct {
+ 	LastOnline       *Timestamp `json:"lastOnline,omitempty"`
+ 	Position         *Position  `json:"position,omitempty"`
+ 	TechnologyPoints *int32     `json:"technologyPoints,omitempty"`
++	Progress         Progress   `json:"progress"`
+ 
+ 	Character *Character `json:"character,omitempty"`
+ 	Guild     *GuildRef  `json:"guild,omitempty"`
+@@ -61,6 +68,18 @@ type Player struct {
+ 	Warnings []string `json:"warnings,omitempty"`
+ }
+ 
++// Progress contains exact save keys for self-only completion matching. A
++// non-nil empty slice means the map decoded successfully and has no set flags;
++// nil means that domain could not be decoded and must be treated as unknown.
++// Consumers must never publish these keys as another player's public data.
++type Progress struct {
++	FastTravel   []string `json:"fastTravel"`
++	Areas        []string `json:"areas"`
++	Notes        []string `json:"notes"`
++	NormalBosses []string `json:"normalBosses"`
++	TowerBosses  []string `json:"towerBosses"`
++}
++
+ // Character is the part of a player that lives in the world save's
+ // CharacterSaveParameterMap rather than in their own save.
+ //
+@@ -68,9 +87,10 @@ type Player struct {
  // all -- every string in it is a GUID, an enum, or an asset name -- so the only
  // way to reach one is through this record.
  type Character struct {
@@ -49,26 +77,27 @@ index 22a7671..7eddc72 100644
  	// constant this tool does not know, so it is reported unconverted rather
  	// than divided by a guess.
 diff --git a/internal/resolve/document_test.go b/internal/resolve/document_test.go
-index 5d2866b..c455379 100644
+index 5d2866b..da18d80 100644
 --- a/internal/resolve/document_test.go
 +++ b/internal/resolve/document_test.go
-@@ -128,9 +128,9 @@ func TestPlayerJSONShapeIsStable(t *testing.T) {
+@@ -128,9 +128,10 @@ func TestPlayerJSONShapeIsStable(t *testing.T) {
  //
  // It went from 1 to 2 when the guild document arrived: GroupSaveDataMap became
  // readable, so a player's guild gained a name and a member count, and "guild"
 -// became a kind of its own.
-+// became a kind of its own. Version 3 added roster progress and arena RP.
++// became a kind of its own. Version 3 added roster progress and arena RP;
++// version 4 added exact self-progress keys to single-player documents.
  func TestVersionIsTheShapesOwn(t *testing.T) {
 -	if Version != 2 {
-+	if Version != 3 {
++	if Version != 4 {
  		t.Errorf("Version = %d; changing it is a deliberate break, so update this test with the reason", Version)
  	}
  }
 diff --git a/internal/resolve/player.go b/internal/resolve/player.go
-index 6d6e31f..5e133b2 100644
+index 6d6e31f..8dc6cd4 100644
 --- a/internal/resolve/player.go
 +++ b/internal/resolve/player.go
-@@ -22,6 +22,10 @@ const (
+@@ -22,6 +22,11 @@ const (
  	playerLastOnlinePath = playerRoot + ".LastOnlineDateTime"
  	playerPositionPath   = playerRoot + ".LastTransform.Translation"
  	playerTechnologyPath = playerRoot + ".TechnologyPoint"
@@ -76,10 +105,11 @@ index 6d6e31f..5e133b2 100644
 +	playerAreaPath       = playerRoot + ".RecordData.FindAreaFlagMap"
 +	playerBossPath       = playerRoot + ".RecordData.NormalBossDefeatFlag"
 +	playerTowerPath      = playerRoot + ".RecordData.TowerBossDefeatFlag"
++	playerNotePath       = playerRoot + ".RecordData.NoteObtainForInstanceFlag"
  	playerPartyPath      = playerRoot + ".OtomoCharacterContainerId.ID"
  	playerStoragePath    = playerRoot + ".PalStorageContainerId.ID"
  	inventoryRoot        = playerRoot + ".InventoryInfo"
-@@ -39,6 +43,7 @@ const (
+@@ -39,6 +44,7 @@ const (
  	recordHP        = "Hp.Value"
  	recordStomach   = "FullStomach"
  	recordPassives  = "PassiveSkillList"
@@ -87,7 +117,15 @@ index 6d6e31f..5e133b2 100644
  	recordTalentHP  = "Talent_HP"
  	recordTalentSho = "Talent_Shot"
  	recordTalentDef = "Talent_Defense"
-@@ -548,6 +553,9 @@ func (p *playerScan) readRecord(instance gvas.GUID, character palworld.Character
+@@ -267,6 +273,7 @@ func newPlayerScan(properties gvas.Properties, uid gvas.GUID) *playerScan {
+ 		Pals: []Pal{},
+ 	}
+ 	player := &playerScan{document: document}
++	readPlayerProgress(properties, document)
+ 
+ 	if instance, ok := guid(properties, playerInstancePath); ok && !instance.IsZero() {
+ 		player.instance = instance
+@@ -548,6 +555,9 @@ func (p *playerScan) readRecord(instance gvas.GUID, character palworld.Character
  	record.Exp, _ = value[int64](parameters, recordExp)
  	record.HP, _ = value[int64](parameters, recordHP)
  	record.FullStomach, _ = value[float32](parameters, recordStomach)
@@ -97,8 +135,41 @@ index 6d6e31f..5e133b2 100644
  	document.Character = record
  
  	if !character.GroupID.IsZero() {
+diff --git a/internal/resolve/player_progress.go b/internal/resolve/player_progress.go
+new file mode 100644
+index 0000000..86296b2
+--- /dev/null
++++ b/internal/resolve/player_progress.go
+@@ -0,0 +1,27 @@
++// Copyright (C) 2026 Luke Holland
++// SPDX-License-Identifier: GPL-3.0-or-later
++
++package resolve
++
++import "github.com/LukeHollandDev/palworld-save-reader/internal/gvas"
++
++func readPlayerProgress(properties gvas.Properties, player *Player) {
++	domains := []struct {
++		path        string
++		destination *[]string
++	}{
++		{playerFastTravelPath, &player.Progress.FastTravel},
++		{playerAreaPath, &player.Progress.Areas},
++		{playerNotePath, &player.Progress.Notes},
++		{playerBossPath, &player.Progress.NormalBosses},
++		{playerTowerPath, &player.Progress.TowerBosses},
++	}
++	for _, domain := range domains {
++		keys, err := trueFlagKeys(properties, domain.path)
++		if err != nil {
++			player.Warnings = append(player.Warnings, err.Error())
++			continue
++		}
++		*domain.destination = keys
++	}
++}
 diff --git a/internal/resolve/resolve_test.go b/internal/resolve/resolve_test.go
-index f7487cd..3abe494 100644
+index f7487cd..736d6c9 100644
 --- a/internal/resolve/resolve_test.go
 +++ b/internal/resolve/resolve_test.go
 @@ -42,6 +42,7 @@ const (
@@ -109,7 +180,7 @@ index f7487cd..3abe494 100644
  	one := playerFixture{
  		uid:        id(oneUID),
  		instance:   id(oneInstance),
-@@ -50,22 +51,27 @@ func testWorld() worldFixture {
+@@ -50,22 +51,28 @@ func testWorld() worldFixture {
  		technology: 48,
  		position:   gvas.Vector{X: 1.5, Y: -2.5, Z: 3.5},
  		// 2026-07-24T11:58:10Z, so the conversion is checked against a real date.
@@ -150,10 +221,29 @@ index f7487cd..3abe494 100644
 +		areas:           []flagFixture{{"area-1", true}, {"area-2", true}, {"area-3", true}},
 +		bosses:          []flagFixture{{"boss-1", true}, {"boss-2", false}},
 +		towers:          []flagFixture{{"tower-1", true}, {"tower-2", true}},
++		notes:           []flagFixture{{"Day0", true}, {"Day1", false}, {"Day2", true}},
  	}
  	two := playerFixture{
  		uid:      id(twoUID),
-@@ -310,9 +316,60 @@ func TestRosterOmitsPlayerOwnedCollections(t *testing.T) {
+@@ -195,6 +202,17 @@ func TestResolvePlayersJoinsBothHalves(t *testing.T) {
+ 	if one.LastOnline == nil || one.LastOnline.UTC != "2026-07-24T11:58:10Z" {
+ 		t.Errorf("lastOnline = %v", one.LastOnline)
+ 	}
++	if strings.Join(one.Progress.FastTravel, ",") != "ft-1,ft-2" ||
++		strings.Join(one.Progress.Areas, ",") != "area-1,area-2,area-3" ||
++		strings.Join(one.Progress.Notes, ",") != "day0,day2" ||
++		strings.Join(one.Progress.NormalBosses, ",") != "boss-1" ||
++		strings.Join(one.Progress.TowerBosses, ",") != "tower-1,tower-2" {
++		t.Errorf("progress = %#v", one.Progress)
++	}
++	if two.Progress.FastTravel == nil || two.Progress.Areas == nil || two.Progress.Notes == nil ||
++		two.Progress.NormalBosses == nil || two.Progress.TowerBosses == nil {
++		t.Errorf("zero progress domains are unavailable: %#v", two.Progress)
++	}
+ 
+ 	// The world-save half. A name is the thing a player.sav cannot answer.
+ 	if one.Character == nil {
+@@ -310,9 +328,60 @@ func TestRosterOmitsPlayerOwnedCollections(t *testing.T) {
  	if roster[0].Guild == nil || roster[0].Guild.ID != id(90) {
  		t.Errorf("first roster guild = %#v", roster[0].Guild)
  	}
@@ -215,7 +305,7 @@ index f7487cd..3abe494 100644
  
  // TestResolveReportsUnresolvedJoins is the other half of the contract: a join that
 diff --git a/internal/resolve/roster.go b/internal/resolve/roster.go
-index 5a4c78c..7365062 100644
+index 5a4c78c..c268d96 100644
 --- a/internal/resolve/roster.go
 +++ b/internal/resolve/roster.go
 @@ -10,9 +10,9 @@ import (
@@ -254,10 +344,10 @@ index 5a4c78c..7365062 100644
  		}
 diff --git a/internal/resolve/roster_progress.go b/internal/resolve/roster_progress.go
 new file mode 100644
-index 0000000..af72777
+index 0000000..bc8cff7
 --- /dev/null
 +++ b/internal/resolve/roster_progress.go
-@@ -0,0 +1,73 @@
+@@ -0,0 +1,80 @@
 +// Copyright (C) 2026 Luke Holland
 +// SPDX-License-Identifier: GPL-3.0-or-later
 +
@@ -265,6 +355,7 @@ index 0000000..af72777
 +
 +import (
 +	"fmt"
++	"sort"
 +	"strings"
 +
 +	"github.com/LukeHollandDev/palworld-save-reader/internal/gvas"
@@ -296,43 +387,49 @@ index 0000000..af72777
 +}
 +
 +func countTrueFlags(properties gvas.Properties, path string) (int, error) {
++	keys, err := trueFlagKeys(properties, path)
++	return len(keys), err
++}
++
++func trueFlagKeys(properties gvas.Properties, path string) ([]string, error) {
 +	raw := field(properties, path)
 +	if raw == nil {
-+		return 0, nil
++		return []string{}, nil
 +	}
 +	flags, ok := raw.(*gvas.MapValue)
 +	if !ok {
-+		return 0, fmt.Errorf("%s is not a map", path)
++		return nil, fmt.Errorf("%s is not a map", path)
 +	}
 +	seen := make(map[string]struct{}, flags.Count)
-+	count := 0
++	keys := make([]string, 0, flags.Count)
 +	iterator := flags.Iterator()
 +	for iterator.Next() {
 +		entry := iterator.Entry()
 +		key, ok := entry.Key.(string)
 +		if !ok || strings.TrimSpace(key) == "" {
-+			return 0, fmt.Errorf("%s has a non-name or empty key", path)
++			return nil, fmt.Errorf("%s has a non-name or empty key", path)
 +		}
 +		key = strings.ToLower(strings.TrimSpace(key))
 +		if _, duplicate := seen[key]; duplicate {
-+			return 0, fmt.Errorf("%s repeats key %q", path, key)
++			return nil, fmt.Errorf("%s repeats key %q", path, key)
 +		}
 +		seen[key] = struct{}{}
 +		set, ok := entry.Value.(bool)
 +		if !ok {
-+			return 0, fmt.Errorf("%s[%q] is not a boolean", path, key)
++			return nil, fmt.Errorf("%s[%q] is not a boolean", path, key)
 +		}
 +		if set {
-+			count++
++			keys = append(keys, key)
 +		}
 +	}
 +	if err := iterator.Err(); err != nil {
-+		return 0, fmt.Errorf("read %s: %w", path, err)
++		return nil, fmt.Errorf("read %s: %w", path, err)
 +	}
-+	return count, nil
++	sort.Strings(keys)
++	return keys, nil
 +}
 diff --git a/internal/resolve/savebuilder_test.go b/internal/resolve/savebuilder_test.go
-index 0f2fe97..0251ede 100644
+index 0f2fe97..0fcfb41 100644
 --- a/internal/resolve/savebuilder_test.go
 +++ b/internal/resolve/savebuilder_test.go
 @@ -254,6 +254,26 @@ func (b *builder) mapProperty(name, keyType, valueType string, entries []mapEntr
@@ -362,7 +459,7 @@ index 0f2fe97..0251ede 100644
  // bareList is a property list with no tag in front of it, which is how a hinted
  // StructProperty map key or value is written.
  func bareList(inner func(*builder)) []byte {
-@@ -383,6 +403,12 @@ type playerFixture struct {
+@@ -383,6 +403,13 @@ type playerFixture struct {
  
  	// isPlayer omits the IsPlayer flag when false, which must be reported.
  	isPlayer bool
@@ -372,14 +469,15 @@ index 0f2fe97..0251ede 100644
 +	areas           []flagFixture
 +	bosses          []flagFixture
 +	towers          []flagFixture
++	notes           []flagFixture
  }
  
  // save writes the player's own .sav file.
-@@ -423,6 +449,22 @@ func (player playerFixture) save() []byte {
+@@ -423,6 +450,25 @@ func (player playerFixture) save() []byte {
  		if player.platform != "" {
  			save.enum("PlayerPlatform", "EPalPlayerPlatform", "EPalPlayerPlatform::"+player.platform)
  		}
-+		if len(player.fastTravel)+len(player.areas)+len(player.bosses)+len(player.towers) != 0 {
++		if len(player.fastTravel)+len(player.areas)+len(player.bosses)+len(player.towers)+len(player.notes) != 0 {
 +			save.list("RecordData", "PalPlayerRecordData", func(record *builder) {
 +				if len(player.fastTravel) != 0 {
 +					record.flagMap("FastTravelPointUnlockFlag", player.fastTravel)
@@ -393,12 +491,15 @@ index 0f2fe97..0251ede 100644
 +				if len(player.towers) != 0 {
 +					record.flagMap("TowerBossDefeatFlag", player.towers)
 +				}
++				if len(player.notes) != 0 {
++					record.flagMap("NoteObtainForInstanceFlag", player.notes)
++				}
 +			})
 +		}
  	})
  	properties.none()
  	return archive("/Script/Pal.PalWorldPlayerSaveGame", properties.bytes())
-@@ -445,6 +487,9 @@ func (player playerFixture) record() []byte {
+@@ -445,6 +491,9 @@ func (player playerFixture) record() []byte {
  		if player.isPlayer {
  			inner.boolean("IsPlayer", true)
  		}

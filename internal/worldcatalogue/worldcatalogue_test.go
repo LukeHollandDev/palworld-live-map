@@ -14,6 +14,10 @@ import (
 
 func TestLoadProjectsCompleteModularCatalogue(t *testing.T) {
 	files := validCatalogueFS(t)
+	privateStateKey := "PRIVATE-COMPLETION-KEY"
+	editDataset(t, files, "navigation", func(value *dataset) {
+		value.Locations[1].StateKey = &privateStateKey
+	})
 	catalogue, err := Load(files)
 	if err != nil {
 		t.Fatalf("Load() error = %v", err)
@@ -54,6 +58,9 @@ func TestLoadProjectsCompleteModularCatalogue(t *testing.T) {
 	if !regexp.MustCompile(`^[0-9a-f]{64}$`).MatchString(catalogue.ContentHash) {
 		t.Fatalf("content hash = %q", catalogue.ContentHash)
 	}
+	if len(catalogue.Completion) == 0 {
+		t.Fatal("completion join is empty")
+	}
 
 	again, err := Load(files)
 	if err != nil {
@@ -82,10 +89,18 @@ func TestLoadProjectsCompleteModularCatalogue(t *testing.T) {
 		strings.Contains(string(encoded), "sourcePackage") ||
 		strings.Contains(string(encoded), "sourceObject") ||
 		strings.Contains(string(encoded), "stateKey") ||
+		strings.Contains(string(encoded), catalogue.Completion[0].StateKey) ||
 		strings.Contains(string(encoded), "itemId") ||
 		strings.Contains(string(encoded), "iconSource") ||
 		strings.Contains(string(encoded), "nameSource") {
 		t.Fatalf("public catalogue JSON = %s", encoded)
+	}
+	privateRecord, err := json.Marshal(catalogue.Completion[0])
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(privateRecord) != "{}" {
+		t.Fatalf("private completion record JSON = %s", privateRecord)
 	}
 }
 

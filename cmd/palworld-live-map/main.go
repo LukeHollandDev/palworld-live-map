@@ -17,6 +17,7 @@ import (
 
 	"github.com/LukeHollandDev/palworld-live-map/internal/config"
 	"github.com/LukeHollandDev/palworld-live-map/internal/palworld"
+	"github.com/LukeHollandDev/palworld-live-map/internal/playerclaim"
 	"github.com/LukeHollandDev/palworld-live-map/internal/saveroster"
 	"github.com/LukeHollandDev/palworld-live-map/internal/savesidecar"
 	webserver "github.com/LukeHollandDev/palworld-live-map/internal/server"
@@ -42,13 +43,22 @@ func main() {
 
 	var source palworld.Source
 	var roster palworld.RosterSource
+	var claimService *playerclaim.Service
 	if cfg.DemoMode {
 		demo := palworld.NewDemoSource()
 		source = demo
 		roster = demo
 		logger.Info("demo mode enabled; no Palworld server will be contacted")
 	} else {
-		client, clientErr := palworld.NewClient(cfg.RESTURL, cfg.AdminPassword, cfg.UpstreamTimeout, cfg.WorldTimeout)
+		var client *palworld.Client
+		var clientErr error
+		if cfg.PlayerClaimsEnabled {
+			client, clientErr = palworld.NewClientWithPublicIdentitySecret(
+				cfg.RESTURL, cfg.AdminPassword, cfg.UpstreamTimeout, cfg.WorldTimeout, cfg.PlayerClaimsSecret[:],
+			)
+		} else {
+			client, clientErr = palworld.NewClient(cfg.RESTURL, cfg.AdminPassword, cfg.UpstreamTimeout, cfg.WorldTimeout)
+		}
 		if clientErr != nil {
 			logger.Error("Palworld client configuration error", "error", clientErr)
 			os.Exit(1)
@@ -60,16 +70,28 @@ func main() {
 				logger.Error("save decoder setup failed", "error", readerErr)
 				os.Exit(1)
 			}
-			rosterSource, rosterErr := saveroster.New(saveroster.Options{
+			rosterOptions := saveroster.Options{
 				Root: cfg.SaveRoot, WorldID: cfg.SaveWorldID, Timeout: cfg.SaveTimeout, Reader: reader,
 				ProjectPlayerID: client.PublicPlayerID,
 				ProjectGuildKey: client.PublicGuildKey,
-			})
+			}
+			if cfg.PlayerClaimsEnabled {
+				rosterOptions.ClaimReader = reader
+				rosterOptions.ClaimSecret = cfg.PlayerClaimsSecret[:]
+			}
+			rosterSource, rosterErr := saveroster.New(rosterOptions)
 			if rosterErr != nil {
 				logger.Error("save roster setup failed", "error", rosterErr)
 				os.Exit(1)
 			}
 			roster = rosterSource
+			if cfg.PlayerClaimsEnabled {
+				claimService, err = playerclaim.NewService(rosterSource, playerclaim.Options{})
+				if err != nil {
+					logger.Error("player claim setup failed", "error", err)
+					os.Exit(1)
+				}
+			}
 			logger.Info(
 				"save-backed player enrichment enabled",
 				"pollInterval", cfg.SavePollInterval,
@@ -79,7 +101,7 @@ func main() {
 	poller := palworld.NewPollerWithRoster(
 		source, roster, cfg.PollInterval, cfg.WorldPollInterval, cfg.SavePollInterval, cfg.WorldDataEnabled, logger,
 	)
-	app, err := webserver.New(cfg, poller)
+	app, err := webserver.NewWithClaims(cfg, poller, claimService)
 	if err != nil {
 		logger.Error("web server setup failed", "error", err)
 		os.Exit(1)
@@ -89,12 +111,16 @@ func main() {
 	defer stop()
 	go poller.Run(ctx)
 
+	writeTimeout := 15 * time.Second
+	if cfg.PlayerClaimsEnabled && writeTimeout < cfg.SaveTimeout+5*time.Second {
+		writeTimeout = cfg.SaveTimeout + 5*time.Second
+	}
 	httpServer := &http.Server{
 		Addr:              cfg.Addr,
 		Handler:           app.Handler(),
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       10 * time.Second,
-		WriteTimeout:      15 * time.Second,
+		WriteTimeout:      writeTimeout,
 		IdleTimeout:       60 * time.Second,
 	}
 

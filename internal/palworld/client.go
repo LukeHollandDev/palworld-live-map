@@ -38,10 +38,15 @@ const (
 )
 
 type Player struct {
-	ID                 string    `json:"id"`
-	Name               string    `json:"name"`
-	GuildKey           string    `json:"guildKey,omitempty"`
-	GuildName          string    `json:"guildName,omitempty"`
+	ID        string `json:"id"`
+	Name      string `json:"name"`
+	GuildKey  string `json:"guildKey,omitempty"`
+	GuildName string `json:"guildName,omitempty"`
+	// GuildFromLive distinguishes current game-data guild evidence from fields
+	// filled by the optional save roster. It is server-only provenance used by
+	// claims mode's public projection.
+	GuildFromLive bool `json:"-"`
+
 	Level              int       `json:"level"`
 	Online             bool      `json:"online"`
 	LastSeenAt         time.Time `json:"lastSeenAt,omitzero"`
@@ -220,6 +225,20 @@ type worldResponse struct {
 }
 
 func NewClient(rawURL, adminPassword string, timeout, worldTimeout time.Duration) (*Client, error) {
+	return newClient(rawURL, adminPassword, timeout, worldTimeout, nil)
+}
+
+// NewClientWithPublicIdentitySecret decouples browser-visible opaque IDs from
+// the upstream URL and admin password. The secret must be a persistent random
+// installation value; it is domain-separated before use as an HMAC key.
+func NewClientWithPublicIdentitySecret(rawURL, adminPassword string, timeout, worldTimeout time.Duration, secret []byte) (*Client, error) {
+	if len(secret) != sha256.Size {
+		return nil, errors.New("public identity secret must contain exactly 32 bytes")
+	}
+	return newClient(rawURL, adminPassword, timeout, worldTimeout, secret)
+}
+
+func newClient(rawURL, adminPassword string, timeout, worldTimeout time.Duration, identitySecret []byte) (*Client, error) {
 	baseURL, err := url.Parse(rawURL)
 	if err != nil {
 		return nil, fmt.Errorf("parse Palworld REST URL: %w", err)
@@ -232,10 +251,16 @@ func NewClient(rawURL, adminPassword string, timeout, worldTimeout time.Duration
 	}
 
 	noRedirect := func(_ *http.Request, _ []*http.Request) error { return http.ErrUseLastResponse }
+	idKey := sha256.Sum256([]byte("palworld-live-map/public-id\x00" + baseURL.String() + "\x00" + adminPassword))
+	if len(identitySecret) == sha256.Size {
+		digest := hmac.New(sha256.New, identitySecret)
+		_, _ = digest.Write([]byte("palworld-live-map/public-id-key/v1"))
+		copy(idKey[:], digest.Sum(nil))
+	}
 	return &Client{
 		baseURL:         baseURL,
 		adminPassword:   adminPassword,
-		idKey:           sha256.Sum256([]byte("palworld-live-map/public-id\x00" + baseURL.String() + "\x00" + adminPassword)),
+		idKey:           idKey,
 		httpClient:      &http.Client{Timeout: timeout, CheckRedirect: noRedirect},
 		worldClient:     &http.Client{Timeout: worldTimeout, CheckRedirect: noRedirect},
 		playerRelations: make(map[string]playerRelation),
@@ -310,6 +335,7 @@ func (c *Client) Players(ctx context.Context) ([]Player, error) {
 		if linked {
 			player.GuildKey = relation.guildKey
 			player.GuildName = relation.guildName
+			player.GuildFromLive = true
 		}
 		candidates = append(candidates, parsedPlayer{identity: identity, player: player})
 	}

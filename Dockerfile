@@ -68,11 +68,11 @@ RUN git clone --branch "${SAVE_READER_VERSION}" --depth 1 \
     && make release-build \
       GOOS="${TARGETOS}" \
       GOARCH="${TARGETARCH}" \
-      VERSION="${SAVE_READER_VERSION}+live-map.1" \
+      VERSION="${SAVE_READER_VERSION}+live-map.2" \
       OUTPUT=/out/palworld-save-reader \
     && mkdir -p /out/licenses \
     && cp LICENSE NOTICE /out/licenses/ \
-    && cp /tmp/palworld-save-reader-leaderboards.patch /out/licenses/live-map-leaderboards.patch \
+    && cp /tmp/palworld-save-reader-leaderboards.patch /out/licenses/live-map-resolve-v4.patch \
     && mkdir -p /out/licenses/LICENSES \
     && cp LICENSES/Apache-2.0.txt /out/licenses/LICENSES/
 

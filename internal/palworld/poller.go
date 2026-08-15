@@ -309,7 +309,9 @@ func (p *Poller) refreshRoster(ctx context.Context) {
 			p.playerRevision++
 		}
 		p.mu.Unlock()
-		p.logger.Warn("Palworld save-roster refresh failed", "error", err)
+		// Save reader errors can contain filesystem paths and raw save-authored
+		// identifiers. The public state and logs expose only a stable category.
+		p.logger.Warn("Palworld save-roster refresh failed", "category", "refresh-failed")
 		return
 	}
 	now := time.Now().UTC()
@@ -333,7 +335,7 @@ func (p *Poller) refreshRoster(ctx context.Context) {
 	p.mu.Unlock()
 	switch {
 	case lastError == saveResolveFailed && previousError != saveResolveFailed:
-		p.logger.Warn("Palworld save-roster resolve failed; using partial enrichment", "error", roster.PartialError)
+		p.logger.Warn("Palworld save-roster resolve failed; using partial enrichment", "category", saveResolveFailed)
 	case lastError == "" && previousError == saveResolveFailed:
 		p.logger.Info("Palworld save-roster resolve recovered")
 	}
@@ -500,11 +502,16 @@ func mergePlayers(saved, online []Player) []Player {
 }
 
 func mergePersistedPlayer(player, persisted Player) Player {
-	if player.GuildKey == "" {
-		player.GuildKey = persisted.GuildKey
-	}
-	if player.GuildName == "" {
-		player.GuildName = persisted.GuildName
+	// A current world relation is authoritative even when it says the player is
+	// not in a guild. Otherwise save enrichment may fill the missing pair, while
+	// retaining false provenance so privacy projections can remove it again.
+	if !player.GuildFromLive {
+		if player.GuildKey == "" {
+			player.GuildKey = persisted.GuildKey
+		}
+		if player.GuildName == "" {
+			player.GuildName = persisted.GuildName
+		}
 	}
 	if player.LastSeenAt.IsZero() {
 		player.LastSeenAt = persisted.LastSeenAt

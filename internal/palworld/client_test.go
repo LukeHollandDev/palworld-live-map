@@ -1,7 +1,9 @@
 package palworld
 
 import (
+	"bytes"
 	"context"
+	"crypto/sha256"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -174,7 +176,7 @@ func TestClientLinksPlayersGuildsAndCompanionsWithOpaqueIDs(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(players) != 1 || players[0].GuildName != "The Chaos" || players[0].GuildKey == "" {
+	if len(players) != 1 || players[0].GuildName != "The Chaos" || players[0].GuildKey == "" || !players[0].GuildFromLive {
 		t.Fatalf("linked player = %#v", players)
 	}
 	var base, worker, companion *WorldObject
@@ -263,7 +265,7 @@ func TestClientUsesCanonicalOwnerIdentityWhenPlayersOmitsPlayerID(t *testing.T) 
 		t.Fatal("second WorldObjects() error = nil")
 	}
 	players, err = client.Players(context.Background())
-	if err != nil || len(players) != 1 || players[0].ID != linkedID || players[0].GuildKey != "" || players[0].GuildName != "" {
+	if err != nil || len(players) != 1 || players[0].ID != linkedID || players[0].GuildKey != "" || players[0].GuildName != "" || !players[0].GuildFromLive {
 		t.Fatalf("identity alias was not retained without stale guild data: players=%#v, err=%v", players, err)
 	}
 }
@@ -469,6 +471,36 @@ func TestClientPublicIDsAreKeyed(t *testing.T) {
 	}
 	if len(first) != 1 || len(second) != 1 || first[0].ID == second[0].ID {
 		t.Fatalf("public IDs are not deployment-keyed: first=%#v second=%#v", first, second)
+	}
+}
+
+func TestPersistentPublicIdentitySecretSurvivesCredentialAndURLChanges(t *testing.T) {
+	secret := bytes.Repeat([]byte{0x5a}, sha256.Size)
+	first, err := NewClientWithPublicIdentitySecret("http://first.example:8212", "first-password", time.Second, time.Second, secret)
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := NewClientWithPublicIdentitySecret("https://second.example:9443", "rotated-password", time.Second, time.Second, secret)
+	if err != nil {
+		t.Fatal(err)
+	}
+	firstID, firstOK := first.PublicPlayerID("00112233445566778899aabbccddeeff")
+	secondID, secondOK := second.PublicPlayerID("00112233445566778899aabbccddeeff")
+	if !firstOK || !secondOK || firstID != secondID {
+		t.Fatalf("stable IDs differ: %q != %q", firstID, secondID)
+	}
+	different, err := NewClientWithPublicIdentitySecret(
+		"http://first.example:8212", "first-password", time.Second, time.Second, bytes.Repeat([]byte{0x6b}, sha256.Size),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	differentID, _ := different.PublicPlayerID("00112233445566778899aabbccddeeff")
+	if differentID == firstID {
+		t.Fatal("different installation secrets produced the same public ID")
+	}
+	if _, err := NewClientWithPublicIdentitySecret("http://palworld:8212", "password", time.Second, time.Second, []byte("short")); err == nil {
+		t.Fatal("NewClientWithPublicIdentitySecret accepted a weak secret")
 	}
 }
 

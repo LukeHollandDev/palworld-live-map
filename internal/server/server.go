@@ -12,6 +12,7 @@ import (
 	"math"
 	"mime"
 	"net/http"
+	"net/netip"
 	"net/url"
 	"path"
 	"path/filepath"
@@ -25,6 +26,7 @@ import (
 	"github.com/LukeHollandDev/palworld-live-map/internal/landmarks"
 	"github.com/LukeHollandDev/palworld-live-map/internal/mapdata"
 	"github.com/LukeHollandDev/palworld-live-map/internal/palworld"
+	"github.com/LukeHollandDev/palworld-live-map/internal/playerclaim"
 	"github.com/LukeHollandDev/palworld-live-map/internal/worldcatalogue"
 	"github.com/LukeHollandDev/palworld-live-map/web"
 )
@@ -36,25 +38,32 @@ type snapshotSource interface {
 }
 
 type Server struct {
-	settings          serverSettings
-	source            snapshotSource
-	assets            fs.FS
-	maps              fs.FS
-	mapFiles          map[string]mapFile
-	layers            []mapLayer
-	landmarks         []palworld.WorldObject
-	landmarkCatalogue landmarks.Metadata
-	worldCatalogue    worldcatalogue.Catalogue
-	catalogueURL      string
-	handler           http.Handler
-	playersResponse   cachedJSONResponse
-	objectsResponse   cachedJSONResponse
+	settings           serverSettings
+	source             snapshotSource
+	assets             fs.FS
+	maps               fs.FS
+	mapFiles           map[string]mapFile
+	layers             []mapLayer
+	landmarks          []palworld.WorldObject
+	landmarkCatalogue  landmarks.Metadata
+	worldCatalogue     worldcatalogue.Catalogue
+	claims             *playerclaim.Service
+	claimStartLimiter  *claimRequestLimiter
+	claimVerifyLimiter *claimRequestLimiter
+	claimWork          chan struct{}
+	catalogueURL       string
+	handler            http.Handler
+	playersResponse    cachedJSONResponse
+	objectsResponse    cachedJSONResponse
 }
 
 type serverSettings struct {
-	pollInterval      time.Duration
-	worldPollInterval time.Duration
-	worldDataEnabled  bool
+	pollInterval               time.Duration
+	worldPollInterval          time.Duration
+	worldDataEnabled           bool
+	playerClaimsEnabled        bool
+	playerClaimsOrigin         string
+	playerClaimsTrustedProxies []netip.Prefix
 }
 
 type mapFile struct {
@@ -136,6 +145,15 @@ type objectState struct {
 }
 
 func New(cfg config.Config, source snapshotSource) (*Server, error) {
+	return NewWithClaims(cfg, source, nil)
+}
+
+// NewWithClaims enables the private claim endpoints only when the opt-in
+// configuration and an initialized claim service are both present.
+func NewWithClaims(cfg config.Config, source snapshotSource, claims *playerclaim.Service) (*Server, error) {
+	if cfg.PlayerClaimsEnabled != (claims != nil) {
+		return nil, fmt.Errorf("player claims configuration and service must be enabled together")
+	}
 	webAssets, err := fs.Sub(web.Assets, "dist")
 	if err != nil {
 		return nil, fmt.Errorf("open embedded web assets: %w", err)
@@ -160,12 +178,19 @@ func New(cfg config.Config, source snapshotSource) (*Server, error) {
 	s := &Server{
 		settings: serverSettings{
 			pollInterval: cfg.PollInterval, worldPollInterval: cfg.WorldPollInterval,
-			worldDataEnabled: cfg.WorldDataEnabled,
+			worldDataEnabled: cfg.WorldDataEnabled, playerClaimsEnabled: cfg.PlayerClaimsEnabled,
+			playerClaimsOrigin:         cfg.PlayerClaimsOrigin,
+			playerClaimsTrustedProxies: append([]netip.Prefix{}, cfg.PlayerClaimsTrustedProxies...),
 		},
 		source: source, assets: webAssets, maps: maps, mapFiles: mapFiles, layers: layers,
 		landmarks: landmarkCatalogue.Locations, landmarkCatalogue: landmarkCatalogue.Metadata,
-		worldCatalogue: worldCatalogue,
-		catalogueURL:   "/api/catalogue?v=" + worldCatalogue.ContentHash,
+		worldCatalogue: worldCatalogue, claims: claims,
+		catalogueURL: "/api/catalogue?v=" + worldCatalogue.ContentHash,
+	}
+	if claims != nil {
+		s.claimStartLimiter = newClaimRequestLimiter(5, 10*time.Minute, 100, time.Minute)
+		s.claimVerifyLimiter = newClaimRequestLimiter(60, 10*time.Minute, 600, time.Minute)
+		s.claimWork = make(chan struct{}, 1)
 	}
 	s.handler = s.securityHeaders(s.routes())
 	return s, nil
@@ -183,6 +208,13 @@ func (s *Server) routes() http.Handler {
 	mux.HandleFunc("GET /api/players", s.players)
 	mux.HandleFunc("GET /api/objects", s.objects)
 	mux.HandleFunc("GET /api/state", s.state)
+	if s.claims != nil {
+		mux.HandleFunc("POST /api/player-claims", s.startPlayerClaim)
+		mux.HandleFunc("POST /api/player-claims/verify", s.verifyPlayerClaim)
+		mux.HandleFunc("GET /api/me", s.claimSession)
+		mux.HandleFunc("GET /api/me/progress", s.claimProgress)
+		mux.HandleFunc("POST /api/logout", s.logoutClaimSession)
+	}
 	mux.HandleFunc("GET /", s.index)
 	mux.HandleFunc("GET /assets/{path...}", s.webAsset)
 	mux.HandleFunc("GET /assets/map/{file}", s.mapAsset)
@@ -199,6 +231,7 @@ func (s *Server) publicConfig(w http.ResponseWriter, r *http.Request) {
 		"pollIntervalMs":      s.settings.pollInterval.Milliseconds(),
 		"worldPollIntervalMs": s.settings.worldPollInterval.Milliseconds(),
 		"worldDataEnabled":    s.settings.worldDataEnabled,
+		"playerClaimsEnabled": s.settings.playerClaimsEnabled,
 		"layers":              s.layers,
 		"catalogueUrl":        s.catalogueURL,
 		"landmarks":           s.landmarks,
@@ -386,6 +419,9 @@ func (s *Server) players(w http.ResponseWriter, r *http.Request) {
 	s.playersResponse.mu.Lock()
 	snapshot, revision, changed := s.source.PlayerSnapshotSince(s.playersResponse.revision)
 	if changed || !s.playersResponse.initialized {
+		if s.settings.playerClaimsEnabled {
+			snapshot = publicPlayerSnapshot(snapshot)
+		}
 		s.playersResponse.update(revision, snapshot)
 	}
 	response := s.playersResponse.snapshot()
@@ -415,7 +451,57 @@ func (s *Server) objects(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) state(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, r, http.StatusOK, s.source.Snapshot())
+	snapshot := s.source.Snapshot()
+	if s.settings.playerClaimsEnabled {
+		snapshot = publicStateSnapshot(snapshot)
+	}
+	writeJSON(w, r, http.StatusOK, snapshot)
+}
+
+func publicPlayerSnapshot(snapshot palworld.PlayerSnapshot) palworld.PlayerSnapshot {
+	snapshot.Players = publicLivePlayers(snapshot.Players)
+	snapshot.SaveEnabled = false
+	snapshot.SaveAvailable = false
+	snapshot.SaveStale = false
+	snapshot.SaveUpdatedAt = time.Time{}
+	snapshot.SaveSnapshotAt = time.Time{}
+	snapshot.SaveLastError = ""
+	return snapshot
+}
+
+func publicStateSnapshot(snapshot palworld.Snapshot) palworld.Snapshot {
+	snapshot.Players = publicLivePlayers(snapshot.Players)
+	snapshot.SaveEnabled = false
+	snapshot.SaveAvailable = false
+	snapshot.SaveStale = false
+	snapshot.SaveUpdatedAt = time.Time{}
+	snapshot.SaveSnapshotAt = time.Time{}
+	snapshot.SaveLastError = ""
+	return snapshot
+}
+
+func publicLivePlayers(players []palworld.Player) []palworld.Player {
+	result := make([]palworld.Player, 0, len(players))
+	for _, player := range players {
+		if !player.Online {
+			continue
+		}
+		if !player.GuildFromLive {
+			player.GuildKey = ""
+			player.GuildName = ""
+		}
+		player.LastSeenAt = time.Time{}
+		player.CaptureTotal = nil
+		player.UniquePalsCaptured = nil
+		player.PaldeckUnlocked = nil
+		player.ArenaRankPoints = nil
+		player.FastTravelUnlocked = nil
+		player.AreasDiscovered = nil
+		player.BossDefeats = nil
+		player.TowerDefeats = nil
+		result = append(result, player)
+	}
+	return result
 }
 
 func (s *Server) index(w http.ResponseWriter, r *http.Request) {
@@ -557,7 +643,9 @@ func writeJSON(w http.ResponseWriter, r *http.Request, status int, value any) {
 
 func writeJSONWithCache(w http.ResponseWriter, r *http.Request, status int, value any, cacheControl string) {
 	w.Header().Set("Content-Type", "application/json")
-	w.Header().Set("Cache-Control", cacheControl)
+	if w.Header().Get("Cache-Control") == "" {
+		w.Header().Set("Cache-Control", cacheControl)
+	}
 	w.Header().Set("Vary", "Accept-Encoding")
 	var writer io.Writer = w
 	if acceptsGzip(r.Header.Get("Accept-Encoding")) {

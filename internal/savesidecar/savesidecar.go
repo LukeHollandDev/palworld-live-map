@@ -14,18 +14,25 @@ import (
 	"sort"
 	"strings"
 	"time"
+	"unicode"
+	"unicode/utf8"
 )
 
 const (
-	defaultBinaryName           = "palworld-save-reader"
-	playerPresetName            = "player-details"
-	resolveRosterKind           = "roster"
-	resolveVersion              = 3
-	maxPlayerFiles              = 10_000
-	maxOutputBytes              = 16 << 20
-	maxStderrBytes              = 8 << 10
-	presetProbeTimeout          = 5 * time.Second
-	unrealUnixEpochTicks uint64 = 621355968000000000
+	defaultBinaryName              = "palworld-save-reader"
+	playerPresetName               = "player-details"
+	resolvePlayerKind              = "player"
+	resolveRosterKind              = "roster"
+	resolveVersion                 = 4
+	maxPlayerFiles                 = 10_000
+	maxOutputBytes                 = 16 << 20
+	maxStderrBytes                 = 8 << 10
+	maxClaimInventoryStacks        = 256
+	maxClaimPartyPals              = 64
+	maxClaimSlot                   = 1023
+	maxClaimIdentifierBytes        = 256
+	presetProbeTimeout             = 5 * time.Second
+	unrealUnixEpochTicks    uint64 = 621355968000000000
 )
 
 // Options configures a Reader.
@@ -41,8 +48,9 @@ type Options struct {
 // Reader invokes the palworld-save-reader CLI once per immutable player save
 // and aggregates its player-details projections.
 type Reader struct {
-	binary    string
-	maxOutput int64
+	binary      string
+	maxOutput   int64
+	processGate chan struct{}
 }
 
 // NewReader resolves the executable and verifies both reader contracts needed
@@ -71,7 +79,7 @@ func NewReader(options Options) (*Reader, error) {
 	if maxOutput <= 0 {
 		maxOutput = maxOutputBytes
 	}
-	reader := &Reader{binary: binary, maxOutput: maxOutput}
+	reader := &Reader{binary: binary, maxOutput: maxOutput, processGate: make(chan struct{}, 1)}
 	ctx, cancel := context.WithTimeout(context.Background(), presetProbeTimeout)
 	defer cancel()
 	data, err := reader.run(ctx, "--list-presets")
@@ -102,12 +110,16 @@ func NewReader(options Options) (*Reader, error) {
 	if err := decodeSingleJSON(data, &resolvers); err != nil {
 		return nil, fmt.Errorf("decode save decoder resolvers: %w", err)
 	}
+	available := make(map[string]bool, len(resolvers))
 	for _, kind := range resolvers {
-		if kind == resolveRosterKind {
-			return reader, nil
+		available[kind] = true
+	}
+	for _, required := range []string{resolveRosterKind, resolvePlayerKind} {
+		if !available[required] {
+			return nil, fmt.Errorf("save decoder has no %s resolver", required)
 		}
 	}
-	return nil, fmt.Errorf("save decoder has no %s resolver", resolveRosterKind)
+	return reader, nil
 }
 
 func binaryNextToExecutable() (string, error) {
@@ -156,7 +168,7 @@ func (r *Reader) ReadSnapshot(ctx context.Context, dir string) (*Snapshot, error
 			continue
 		}
 		if entry.Type()&os.ModeSymlink != 0 {
-			return nil, fmt.Errorf("player save is a symlink: %s", name)
+			return nil, errors.New("player save is a symlink")
 		}
 		files = append(files, name)
 	}
@@ -176,7 +188,10 @@ func (r *Reader) ReadSnapshot(ctx context.Context, dir string) (*Snapshot, error
 		}
 		path := filepath.Join(playersPath, name)
 		if _, err := regularFileWithoutSymlink(path); err != nil {
-			return nil, fmt.Errorf("inspect player save %s: %w", name, err)
+			// Player save filenames are raw persistent GUIDs. Do not wrap the
+			// filesystem error: os.PathError would put that GUID into the loggable
+			// roster error returned to the poller.
+			return nil, errors.New("inspect player save failed")
 		}
 		snapshot.Stats.PlayerFiles++
 		data, err := r.run(
@@ -330,6 +345,160 @@ func (r *Reader) resolveRoster(ctx context.Context, dir string) (map[string]reso
 	return resolved, nil
 }
 
+// ReadClaimPlayer resolves private slot fingerprints for one canonical player
+// from an immutable generation. The result must only be used by the claim
+// verifier or authenticated progress source and must never be logged or
+// returned to a browser.
+func (r *Reader) ReadClaimPlayer(ctx context.Context, dir, playerID string) (ClaimPlayer, error) {
+	if ctx == nil {
+		return ClaimPlayer{}, errors.New("save claim decoder requires a context")
+	}
+	dir = filepath.Clean(strings.TrimSpace(dir))
+	if dir == "." || !filepath.IsAbs(dir) {
+		return ClaimPlayer{}, errors.New("save claim decoder requires an absolute snapshot directory")
+	}
+	requestedID := playerKey(playerID)
+	if len(requestedID) != 32 || !hexIdentifier(requestedID) {
+		return ClaimPlayer{}, errors.New("save claim decoder requires a canonical player GUID")
+	}
+	data, err := r.run(ctx, "--resolve", resolvePlayerKind, "--id", requestedID, "--saves", dir)
+	if err != nil {
+		return ClaimPlayer{}, fmt.Errorf("resolve claim player: %w", err)
+	}
+	var document resolvedPlayerDocument
+	if err := decodeSingleJSON(data, &document); err != nil {
+		return ClaimPlayer{}, fmt.Errorf("decode resolved claim player JSON: %w", err)
+	}
+	if document.ResolveVersion != resolveVersion {
+		return ClaimPlayer{}, fmt.Errorf("save decoder resolve version %d, want %d", document.ResolveVersion, resolveVersion)
+	}
+	if document.Kind != resolvePlayerKind || document.Player == nil {
+		return ClaimPlayer{}, fmt.Errorf("save decoder resolved %q without a player", document.Kind)
+	}
+	if playerKey(document.Player.PlayerUID) != requestedID {
+		return ClaimPlayer{}, errors.New("save decoder resolved a different claim player")
+	}
+
+	claim := ClaimPlayer{PlayerID: requestedID, Common: []ClaimStack{}, Party: []ClaimPal{}}
+	// Resolver warnings can describe unrelated collections or one unavailable
+	// progress domain. Inventory proof remains safe as long as the selected
+	// common stacks themselves validate. Exact progress is exposed separately
+	// only when every domain is complete and valid.
+	claim.Progress = claimProgress(document.Player.Progress)
+	if len(document.Player.Inventory.Common) > maxClaimInventoryStacks {
+		return ClaimPlayer{}, errors.New("resolved claim inventory contains too many stacks")
+	}
+	seenSlots := make(map[uint32]struct{}, len(document.Player.Inventory.Common))
+	for _, raw := range document.Player.Inventory.Common {
+		itemID := strings.TrimSpace(raw.ItemID)
+		if itemID == "" || len(itemID) > maxClaimIdentifierBytes || !utf8.ValidString(itemID) || raw.Count == 0 || raw.Slot > maxClaimSlot {
+			return ClaimPlayer{}, errors.New("resolved claim inventory contains an invalid stack")
+		}
+		if _, duplicate := seenSlots[raw.Slot]; duplicate {
+			return ClaimPlayer{}, errors.New("resolved claim inventory repeats a slot")
+		}
+		seenSlots[raw.Slot] = struct{}{}
+		dynamicID := ""
+		if raw.DynamicItemID != nil {
+			dynamicID = strings.TrimSpace(*raw.DynamicItemID)
+			if dynamicID == "" || len(dynamicID) > maxClaimIdentifierBytes || !utf8.ValidString(dynamicID) {
+				return ClaimPlayer{}, errors.New("resolved claim inventory contains an empty dynamic item ID")
+			}
+		}
+		claim.Common = append(claim.Common, ClaimStack{
+			Slot: raw.Slot, ItemID: itemID, Count: raw.Count, DynamicItemID: dynamicID,
+		})
+	}
+	sort.Slice(claim.Common, func(i, j int) bool { return claim.Common[i].Slot < claim.Common[j].Slot })
+
+	seenPartySlots := make(map[int32]struct{})
+	seenInstances := make(map[string]struct{})
+	for _, raw := range document.Player.Pals {
+		if raw.Location != "party" {
+			continue
+		}
+		if len(claim.Party) >= maxClaimPartyPals {
+			return ClaimPlayer{}, errors.New("resolved claim player contains too many party Pals")
+		}
+		instanceID := strings.TrimSpace(raw.InstanceID)
+		if instanceID == "" || len(instanceID) > maxClaimIdentifierBytes || !utf8.ValidString(instanceID) || raw.Slot < 0 || raw.Slot > maxClaimSlot {
+			return ClaimPlayer{}, errors.New("resolved claim party contains an invalid Pal")
+		}
+		if _, duplicate := seenPartySlots[raw.Slot]; duplicate {
+			return ClaimPlayer{}, errors.New("resolved claim party repeats a slot")
+		}
+		if _, duplicate := seenInstances[strings.ToLower(instanceID)]; duplicate {
+			return ClaimPlayer{}, errors.New("resolved claim party repeats a Pal")
+		}
+		seenPartySlots[raw.Slot] = struct{}{}
+		seenInstances[strings.ToLower(instanceID)] = struct{}{}
+		claim.Party = append(claim.Party, ClaimPal{Slot: raw.Slot, InstanceID: instanceID})
+	}
+	sort.Slice(claim.Party, func(i, j int) bool { return claim.Party[i].Slot < claim.Party[j].Slot })
+	return claim, nil
+}
+
+func claimProgress(raw *resolvedClaimProgress) ClaimProgress {
+	if raw == nil || raw.FastTravel == nil || raw.Areas == nil || raw.Notes == nil ||
+		raw.NormalBosses == nil || raw.TowerBosses == nil {
+		return ClaimProgress{}
+	}
+	progress := ClaimProgress{}
+	var err error
+	if progress.FastTravel, err = normalizedClaimKeys(raw.FastTravel); err != nil {
+		return ClaimProgress{}
+	}
+	if progress.Areas, err = normalizedClaimKeys(raw.Areas); err != nil {
+		return ClaimProgress{}
+	}
+	if progress.Notes, err = normalizedClaimKeys(raw.Notes); err != nil {
+		return ClaimProgress{}
+	}
+	if progress.NormalBosses, err = normalizedClaimKeys(raw.NormalBosses); err != nil {
+		return ClaimProgress{}
+	}
+	if progress.TowerBosses, err = normalizedClaimKeys(raw.TowerBosses); err != nil {
+		return ClaimProgress{}
+	}
+	progress.Available = true
+	return progress
+}
+
+func hexIdentifier(value string) bool {
+	for _, character := range []byte(value) {
+		if !((character >= '0' && character <= '9') || (character >= 'a' && character <= 'f')) {
+			return false
+		}
+	}
+	return true
+}
+
+func normalizedClaimKeys(values []string) ([]string, error) {
+	if len(values) > maxPlayerFiles {
+		return nil, errors.New("contains too many keys")
+	}
+	result := make([]string, 0, len(values))
+	seen := make(map[string]struct{}, len(values))
+	for _, value := range values {
+		value = strings.ToLower(strings.TrimSpace(value))
+		if value == "" || len(value) > 500 || !utf8.ValidString(value) {
+			return nil, errors.New("contains an invalid key")
+		}
+		for _, character := range value {
+			if unicode.IsControl(character) {
+				return nil, errors.New("contains an invalid key")
+			}
+		}
+		if _, duplicate := seen[value]; duplicate {
+			return nil, errors.New("contains a duplicate key")
+		}
+		seen[value] = struct{}{}
+		result = append(result, value)
+	}
+	sort.Strings(result)
+	return result, nil
+}
+
 // playerKey canonicalises a save GUID so the preset and resolve passes agree on
 // identity regardless of hyphenation or case.
 func playerKey(value string) string {
@@ -355,6 +524,21 @@ func decodeSingleJSON(data []byte, destination any) error {
 }
 
 func (r *Reader) run(ctx context.Context, arguments ...string) ([]byte, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	select {
+	case r.processGate <- struct{}{}:
+		defer func() { <-r.processGate }()
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	}
+	// Cancellation can race with acquiring the process slot. Do not launch a
+	// decoder for work whose caller stopped waiting while it was queued.
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+
 	cmd := exec.CommandContext(ctx, r.binary, arguments...)
 	stderr := &cappedBuffer{limit: maxStderrBytes}
 	cmd.Stderr = stderr

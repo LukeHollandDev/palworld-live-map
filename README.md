@@ -20,6 +20,9 @@ Give your Palworld community a live view of players, guilds, bases, Pals, in-gam
 - Optional save integration adds offline players, saved locations, levels,
   guilds, capture totals, Paldeck progress, Arena RP, fast-travel points,
   discovered areas, boss/tower clears, and last-seen times
+- Optional saved-character connection proves control with a nonce-selected,
+  reversible inventory sequence before granting self-only completion access;
+  inventory contents never leave the backend
 - Configurable refresh intervals and world-object layers
 - Demo mode with fictional moving players and world objects
 
@@ -119,6 +122,10 @@ Every supported environment option and timeout is listed below and documented in
 | `PALWORLD_SAVE_WORLD_ID`  | Exact world ID when automatic discovery is ambiguous                 | empty                  |
 | `SAVE_POLL_INTERVAL`      | Save enrichment interval; minimum `15s`                              | `30s`                  |
 | `SAVE_TIMEOUT`            | Whole-generation timeout; must be below `SAVE_POLL_INTERVAL`         | `20s`                  |
+| `PLAYER_CLAIMS_ENABLED`   | Enable save-backed “This is me” character connection                 | `false`                |
+| `PLAYER_CLAIMS_ORIGIN`    | Exact public HTTPS origin used for same-origin request validation     | required when enabled  |
+| `PLAYER_CLAIMS_SECRET_FILE` | Owner-only file containing a persistent 32-byte installation secret | required when enabled  |
+| `PLAYER_CLAIMS_TRUSTED_PROXIES` | Comma-separated proxy CIDRs trusted to supply `X-Forwarded-For` | empty                  |
 
 To enable save integration, mount the server's `SaveGames/0` directory read-only
 and set `SAVE_DATA_ENABLED=true`. The image includes the pinned
@@ -131,6 +138,58 @@ Save decoding can use substantial memory, so leave container headroom. A
 decoding problem does not interrupt the live map: online players and available
 progress remain visible, while the map reports that offline details are
 temporarily unavailable.
+
+### Connect a saved character privately
+
+Character connection is opt-in and requires save integration plus HTTPS. It
+does not ask a player to reveal an inventory item, party member, raw account ID,
+or server password. After establishing a fresh immutable baseline, the map
+selects an eight-slot inventory cycle from at least sixteen uniquely
+distinguishable stacks. The player performs seven ordered swaps, waits for that
+state to appear in a later immutable backup, then performs the reverse sequence
+so their inventory is restored. The cycle has more than 25 bits of random
+selection at the minimum candidate count and every phase must appear in a new
+safe generation. The browser receives slot numbers only—never item names,
+counts, instance IDs, or raw save identifiers.
+
+Create a dedicated installation secret; do not reuse the Palworld admin
+password:
+
+```bash
+umask 077
+openssl rand -hex 32 > player-claims.secret
+```
+
+Mount that file read-only in the map container, then set
+`PLAYER_CLAIMS_ENABLED=true`, `PLAYER_CLAIMS_ORIGIN` to the exact public origin
+(for example `https://map.example.com`), and `PLAYER_CLAIMS_SECRET_FILE` to its
+absolute container path. Keep it owner-only and readable by the container's
+non-root runtime user. The secret must survive restarts and be backed up: it
+keeps private character subjects and opaque public IDs stable even when the
+REST URL or admin password changes.
+Enabling claims on an existing deployment changes opaque player/guild IDs once
+as they move from credential-derived IDs to the installation-secret key.
+
+When an HTTPS reverse proxy connects to the map, configure its exact address
+range in `PLAYER_CLAIMS_TRUSTED_PROXIES` and have it append `X-Forwarded-For`.
+Forwarding headers from every other source are ignored. Apply request limits at
+the proxy as well as the map's built-in per-client and process-wide limits.
+
+Because roster safety deliberately reads the second-newest native backup, each
+of baseline, proof, and restore normally needs roughly two Palworld backup
+intervals plus save polling. Each phase has a 90-minute deadline. Sessions are
+held only in memory in this first release, use Secure, HttpOnly, SameSite=Strict
+cookies, and must be re-established after a map restart. Connected players can
+see exact save-confirmed waypoint and journal completion through
+`/api/me/progress` only;
+raw save state keys are projected to public catalogue location IDs. Manual
+checklist marks remain in that browser and are never copied into save evidence.
+
+When character connection is enabled, unauthenticated player APIs publish live
+players only and remove save-derived progress, offline roster entries, saved
+locations, and last-seen values. The feature still does not make live names and
+positions private; restrict access to the deployment separately if those are
+sensitive.
 
 ## License
 

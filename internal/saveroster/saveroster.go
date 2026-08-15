@@ -7,6 +7,9 @@ package saveroster
 
 import (
 	"context"
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
@@ -15,12 +18,14 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 	"unicode"
 	"unicode/utf8"
 
 	"github.com/LukeHollandDev/palworld-live-map/internal/mapdata"
 	"github.com/LukeHollandDev/palworld-live-map/internal/palworld"
+	"github.com/LukeHollandDev/palworld-live-map/internal/playerclaim"
 	"github.com/LukeHollandDev/palworld-live-map/internal/savesidecar"
 )
 
@@ -29,6 +34,10 @@ const (
 	maxGenerationEntries = 512
 	maxPublicIDBytes     = 256
 	maxNameBytes         = 96
+	claimCandidateFloor  = 16
+	claimCycleSlots      = 8
+	maxClaimPlayerCache  = 32
+	maxCachedPlayerBytes = 1 << 20
 )
 
 // SnapshotReader is the narrow part of the save decoder used by the adapter.
@@ -37,6 +46,12 @@ const (
 // decoder binary.
 type SnapshotReader interface {
 	ReadSnapshot(context.Context, string) (*savesidecar.Snapshot, error)
+}
+
+// ClaimReader is deliberately separate from SnapshotReader: enabling save
+// roster enrichment does not implicitly enable private per-player reads.
+type ClaimReader interface {
+	ReadClaimPlayer(context.Context, string, string) (savesidecar.ClaimPlayer, error)
 }
 
 // IDProjector turns a private persistent save GUID into an opaque public key.
@@ -65,6 +80,12 @@ type Options struct {
 	// REST path publishes, or save-derived members will form guilds parallel to
 	// the REST ones instead of joining them.
 	ProjectGuildKey IDProjector
+
+	// ClaimReader and ClaimSecret must either both be provided or both omitted.
+	// ClaimSecret is a dedicated persistent installation secret and must not be
+	// derived from the Palworld REST password.
+	ClaimReader ClaimReader
+	ClaimSecret []byte
 }
 
 // Source implements palworld.RosterSource.
@@ -75,11 +96,20 @@ type Source struct {
 	reader          SnapshotReader
 	projectPlayerID IDProjector
 	projectGuildKey IDProjector
+	claimReader     ClaimReader
+	claimSecret     [sha256.Size]byte
+	claimMu         sync.RWMutex
+	claimTargets    map[string]claimTarget
+	claimPlayers    map[string]claimPlayerCache
+	claimCacheClock uint64
 }
 
 var (
-	_ SnapshotReader        = (*savesidecar.Reader)(nil)
-	_ palworld.RosterSource = (*Source)(nil)
+	_ SnapshotReader             = (*savesidecar.Reader)(nil)
+	_ ClaimReader                = (*savesidecar.Reader)(nil)
+	_ palworld.RosterSource      = (*Source)(nil)
+	_ playerclaim.Prover         = (*Source)(nil)
+	_ playerclaim.ProgressSource = (*Source)(nil)
 )
 
 func New(options Options) (*Source, error) {
@@ -110,9 +140,19 @@ func New(options Options) (*Source, error) {
 	if options.ProjectGuildKey == nil {
 		return nil, errors.New("save roster requires a guild key projector")
 	}
+	if (options.ClaimReader == nil) != (len(options.ClaimSecret) == 0) {
+		return nil, errors.New("save roster claim reader and secret must be configured together")
+	}
+	if len(options.ClaimSecret) != 0 && len(options.ClaimSecret) != sha256.Size {
+		return nil, errors.New("save roster claim secret must be exactly 32 bytes")
+	}
+	var claimSecret [sha256.Size]byte
+	copy(claimSecret[:], options.ClaimSecret)
 	return &Source{
 		root: root, worldID: worldID, timeout: options.Timeout, reader: options.Reader,
 		projectPlayerID: options.ProjectPlayerID, projectGuildKey: options.ProjectGuildKey,
+		claimReader: options.ClaimReader, claimSecret: claimSecret, claimTargets: make(map[string]claimTarget),
+		claimPlayers: make(map[string]claimPlayerCache),
 	}, nil
 }
 
@@ -149,13 +189,26 @@ func (s *Source) Roster(ctx context.Context) (palworld.RosterSnapshot, error) {
 	if snapshotAt.IsZero() {
 		snapshotAt = generation.snapshotAt.UTC()
 	}
-	players := s.projectPlayers(ctx, snapshot.Players)
+	players, claimTargets := s.projectPlayers(ctx, generation.worldID, generation.worldPath, snapshot.Players)
 	if err := ctx.Err(); err != nil {
 		return palworld.RosterSnapshot{}, err
 	}
-	partialError := snapshot.Stats.ResolveError
-	if snapshot.Stats.ResolveFailed && partialError == nil {
-		partialError = errors.New("save decoder resolve failed without a diagnostic")
+	if s.claimReader != nil {
+		s.claimMu.Lock()
+		s.claimTargets = claimTargets
+		for subject := range s.claimPlayers {
+			if _, exists := s.claimTargetsForSubjectLocked(subject); !exists {
+				delete(s.claimPlayers, subject)
+			}
+		}
+		s.claimMu.Unlock()
+	}
+	var partialError error
+	if snapshot.Stats.ResolveFailed {
+		// ResolveError may contain decoder stderr, filesystem paths, or private
+		// save-authored identifiers. Only a stable category may cross the roster
+		// boundary into the poller.
+		partialError = errors.New("save decoder resolve failed")
 	}
 	return palworld.RosterSnapshot{
 		SnapshotAt:   snapshotAt,
@@ -167,6 +220,8 @@ func (s *Source) Roster(ctx context.Context) (palworld.RosterSnapshot, error) {
 type generation struct {
 	path       string
 	name       string
+	worldID    string
+	worldPath  string
 	snapshotAt time.Time
 	nameTime   bool
 }
@@ -176,6 +231,19 @@ type worldCandidate struct {
 }
 
 func (s *Source) selectGeneration(ctx context.Context) (generation, error) {
+	return s.selectGenerationWithPolicy(ctx, false)
+}
+
+// selectClaimGeneration is deliberately stricter than the public roster
+// selector. A complete generation is eligible for private claim decoding only
+// when another complete generation sorts strictly newer, making the selected
+// backup the safely lagged immutable one even when native retention removes
+// older generations.
+func (s *Source) selectClaimGeneration(ctx context.Context) (generation, error) {
+	return s.selectGenerationWithPolicy(ctx, true)
+}
+
+func (s *Source) selectGenerationWithPolicy(ctx context.Context, requireNewerComplete bool) (generation, error) {
 	entries, err := readDirectoryBounded(ctx, s.root, maxWorldEntries)
 	if err != nil {
 		return generation{}, fmt.Errorf("inspect save roster root: %w", err)
@@ -206,13 +274,15 @@ func (s *Source) selectGeneration(ctx context.Context) (generation, error) {
 		if err != nil {
 			return generation{}, fmt.Errorf("inspect save backup generations: %w", err)
 		}
-		if len(complete) == 0 {
+		if len(complete) == 0 || (requireNewerComplete && len(complete) < 2) {
 			continue
 		}
 		selected := complete[0]
 		if len(complete) >= 2 {
 			selected = complete[1]
 		}
+		selected.worldID = candidateID
+		selected.worldPath = worldPath
 		worlds = append(worlds, worldCandidate{generation: selected})
 	}
 
@@ -412,10 +482,18 @@ func canonicalWorldID(value string) (string, bool) {
 	return strings.ToLower(value), true
 }
 
-func (s *Source) projectPlayers(ctx context.Context, players []savesidecar.Player) []palworld.Player {
+type claimTarget struct {
+	playerID  string
+	worldID   string
+	worldPath string
+	subject   string
+}
+
+func (s *Source) projectPlayers(ctx context.Context, worldID, worldPath string, players []savesidecar.Player) ([]palworld.Player, map[string]claimTarget) {
 	type candidate struct {
 		id     string
 		player palworld.Player
+		target claimTarget
 	}
 	candidates := make([]candidate, 0, len(players))
 	idCounts := make(map[string]int, len(players))
@@ -427,6 +505,7 @@ func (s *Source) projectPlayers(ctx context.Context, players []savesidecar.Playe
 		if !ok {
 			continue
 		}
+		privateID, privateOK := canonicalPrivateGUID(raw.PlayerID)
 		player := palworld.Player{ID: id, Online: false, Name: cleanName(raw.Name)}
 		if raw.Level > 0 {
 			player.Level = raw.Level
@@ -454,18 +533,459 @@ func (s *Source) projectPlayers(ctx context.Context, players []savesidecar.Playe
 		player.BossDefeats = nonNegativeInt(raw.BossDefeats)
 		player.TowerDefeats = nonNegativeInt(raw.TowerDefeats)
 		idCounts[id]++
-		candidates = append(candidates, candidate{id: id, player: player})
+		target := claimTarget{}
+		if privateOK && s.claimReader != nil {
+			target = claimTarget{
+				playerID: privateID, worldID: worldID, worldPath: worldPath,
+				subject: s.claimSubject(worldID, privateID),
+			}
+		}
+		candidates = append(candidates, candidate{id: id, player: player, target: target})
 	}
 
 	result := make([]palworld.Player, 0, len(candidates))
+	targets := make(map[string]claimTarget, len(candidates))
 	for _, candidate := range candidates {
 		// A projector collision must not transfer identity, map position, or
 		// guild state between two private save records.
 		if idCounts[candidate.id] == 1 {
 			result = append(result, candidate.player)
+			if candidate.target.subject != "" {
+				targets[candidate.id] = candidate.target
+			}
 		}
 	}
-	return result
+	return result, targets
+}
+
+func (s *Source) claimSubject(worldID, playerID string) string {
+	digest := hmac.New(sha256.New, s.claimSecret[:])
+	_, _ = digest.Write([]byte("palworld-live-map/player-claim-subject/v1\x00"))
+	_, _ = digest.Write([]byte(worldID))
+	_, _ = digest.Write([]byte{0})
+	_, _ = digest.Write([]byte(playerID))
+	return hex.EncodeToString(digest.Sum(nil))
+}
+
+type claimEvidence struct {
+	target            claimTarget
+	issuedGenerations map[string]struct{}
+	selector          uint64
+	phase             claimPhase
+	inventory         []savesidecar.ClaimStack
+}
+
+type claimPhase uint8
+
+const (
+	claimArming claimPhase = iota
+	claimAwaitingProof
+	claimAwaitingRestore
+)
+
+// claimPlayerCache keeps one immutable decoded generation for a bounded set of
+// private subjects. It is never serialized or logged. Reusing this projection
+// prevents independent challenges for the same character from multiplying
+// sidecar work against an identical save generation.
+type claimPlayerCache struct {
+	generationPath string
+	player         savesidecar.ClaimPlayer
+	lastUsed       uint64
+}
+
+// Prepare records every generation visible at challenge start but deliberately
+// does not read a slot baseline or return instructions yet. Verify first waits
+// for a post-start safely immutable generation, then selects a nonce-rich
+// eight-slot cycle from at least sixteen distinct stacks. The claimant must
+// make the ordered cycle and later restore it across separate safe generations.
+func (s *Source) Prepare(ctx context.Context, publicPlayerID string, selector uint64) (playerclaim.Prepared, error) {
+	if ctx == nil {
+		return playerclaim.Prepared{}, errors.New("prepare save claim: context is required")
+	}
+	if s.claimReader == nil {
+		return playerclaim.Prepared{}, playerclaim.ErrUnavailable
+	}
+	if s.timeout > 0 {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, s.timeout)
+		defer cancel()
+	}
+
+	s.claimMu.RLock()
+	target, ok := s.claimTargets[strings.TrimSpace(publicPlayerID)]
+	s.claimMu.RUnlock()
+	if !ok {
+		return playerclaim.Prepared{}, playerclaim.ErrUnavailable
+	}
+	baseline, err := s.selectClaimGeneration(ctx)
+	if err != nil || baseline.worldID != target.worldID {
+		return playerclaim.Prepared{}, playerclaim.ErrUnavailable
+	}
+	issued, err := visibleGenerationPaths(ctx, baseline.worldPath)
+	if err != nil || len(issued) == 0 {
+		return playerclaim.Prepared{}, playerclaim.ErrUnavailable
+	}
+	return playerclaim.Prepared{
+		Subject: target.subject, PublicPlayerID: strings.TrimSpace(publicPlayerID),
+		Evidence: &claimEvidence{
+			target: target, issuedGenerations: issued, selector: selector, phase: claimArming,
+		},
+	}, nil
+}
+
+// Verify succeeds only when a safely selected immutable generation that did
+// not exist at issuance contains the exact requested swap. Unrelated inventory
+// activity does not invalidate the proof; it simply never becomes public.
+func (s *Source) Verify(ctx context.Context, prepared *playerclaim.Prepared) error {
+	if ctx == nil {
+		return errors.New("verify save claim: context is required")
+	}
+	if prepared == nil {
+		return playerclaim.ErrUnavailable
+	}
+	evidence, ok := prepared.Evidence.(*claimEvidence)
+	if !ok || evidence == nil || prepared.Subject == "" || prepared.Subject != evidence.target.subject {
+		return playerclaim.ErrUnavailable
+	}
+	if s.timeout > 0 {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, s.timeout)
+		defer cancel()
+	}
+	s.claimMu.RLock()
+	current, exists := s.claimTargetsForSubjectLocked(evidence.target.subject)
+	s.claimMu.RUnlock()
+	if !exists || current.playerID != evidence.target.playerID || current.worldID != evidence.target.worldID || current.worldPath != evidence.target.worldPath {
+		return playerclaim.ErrUnavailable
+	}
+	generation, err := s.selectClaimGeneration(ctx)
+	if err != nil || generation.worldID != evidence.target.worldID || generation.worldPath != evidence.target.worldPath {
+		return playerclaim.ErrPending
+	}
+	if _, existedAtIssue := evidence.issuedGenerations[generation.path]; existedAtIssue {
+		return playerclaim.ErrPending
+	}
+	player, err := s.readClaimPlayerCached(ctx, generation, evidence.target)
+	if err != nil || player.PlayerID != evidence.target.playerID {
+		return playerclaim.ErrPending
+	}
+	// A complete selected generation is immutable. Once it has decoded
+	// successfully, observing the same non-matching state again cannot advance
+	// this challenge and would only repeat expensive sidecar work on every poll.
+	evidence.issuedGenerations[generation.path] = struct{}{}
+	if evidence.phase == claimArming {
+		sequence, ok := selectInventorySequence(player.Common, evidence.selector)
+		if !ok {
+			return playerclaim.ErrUnavailable
+		}
+		visibleAfterRead, err := visibleGenerationPaths(ctx, generation.worldPath)
+		if err != nil {
+			return playerclaim.ErrUnavailable
+		}
+		evidence.issuedGenerations = visibleAfterRead
+		evidence.phase = claimAwaitingProof
+		evidence.inventory = sequence
+		prepared.Instructions = claimInstructions(sequence, playerclaim.ProofPhaseProve, generation.snapshotAt)
+		return playerclaim.ErrReady
+	}
+	if prepared.Instructions.Kind != playerclaim.InventorySwapSequence {
+		return playerclaim.ErrUnavailable
+	}
+	switch evidence.phase {
+	case claimAwaitingProof:
+		if !matchesClaimCycle(player.Common, evidence.inventory) {
+			return playerclaim.ErrPending
+		}
+		visibleAfterRead, err := visibleGenerationPaths(ctx, generation.worldPath)
+		if err != nil {
+			return playerclaim.ErrUnavailable
+		}
+		evidence.issuedGenerations = visibleAfterRead
+		evidence.phase = claimAwaitingRestore
+		prepared.Instructions = claimInstructions(evidence.inventory, playerclaim.ProofPhaseRestore, generation.snapshotAt)
+		return playerclaim.ErrReady
+	case claimAwaitingRestore:
+		if matchesClaimBaseline(player.Common, evidence.inventory) {
+			return nil
+		}
+		return playerclaim.ErrPending
+	default:
+		return playerclaim.ErrUnavailable
+	}
+}
+
+// Progress resolves exact keys for one already-authenticated private subject.
+// Results are cached by immutable generation path and never enter the public
+// roster snapshot.
+func (s *Source) Progress(ctx context.Context, subject string) (playerclaim.PrivateProgress, error) {
+	if ctx == nil {
+		return playerclaim.PrivateProgress{}, errors.New("read save claim progress: context is required")
+	}
+	if s.claimReader == nil || strings.TrimSpace(subject) == "" {
+		return playerclaim.PrivateProgress{}, playerclaim.ErrUnavailable
+	}
+	if s.timeout > 0 {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, s.timeout)
+		defer cancel()
+	}
+	s.claimMu.RLock()
+	target, exists := s.claimTargetsForSubjectLocked(subject)
+	s.claimMu.RUnlock()
+	if !exists {
+		return playerclaim.PrivateProgress{}, playerclaim.ErrUnavailable
+	}
+	generation, err := s.selectClaimGeneration(ctx)
+	if err != nil || generation.worldID != target.worldID || generation.worldPath != target.worldPath {
+		return playerclaim.PrivateProgress{}, playerclaim.ErrUnavailable
+	}
+	player, err := s.readClaimPlayerCached(ctx, generation, target)
+	if err != nil || player.PlayerID != target.playerID || !player.Progress.Available {
+		return playerclaim.PrivateProgress{}, playerclaim.ErrUnavailable
+	}
+	return privateProgress(generation.snapshotAt, player.Progress), nil
+}
+
+func (s *Source) readClaimPlayerCached(ctx context.Context, generation generation, target claimTarget) (savesidecar.ClaimPlayer, error) {
+	s.claimMu.Lock()
+	if cached, ok := s.claimPlayers[target.subject]; ok && cached.generationPath == generation.path {
+		s.claimCacheClock++
+		cached.lastUsed = s.claimCacheClock
+		s.claimPlayers[target.subject] = cached
+		player := cloneCachedClaimPlayer(cached.player)
+		s.claimMu.Unlock()
+		return player, nil
+	}
+	s.claimMu.Unlock()
+
+	player, err := s.claimReader.ReadClaimPlayer(ctx, generation.path, target.playerID)
+	if err != nil || player.PlayerID != target.playerID || !cacheableClaimPlayer(player) {
+		return player, err
+	}
+
+	s.claimMu.Lock()
+	if s.claimPlayers == nil {
+		s.claimPlayers = make(map[string]claimPlayerCache)
+	}
+	if _, exists := s.claimPlayers[target.subject]; !exists && len(s.claimPlayers) >= maxClaimPlayerCache {
+		victim := ""
+		var oldest uint64
+		for subject, cached := range s.claimPlayers {
+			if victim == "" || cached.lastUsed < oldest || (cached.lastUsed == oldest && subject < victim) {
+				victim, oldest = subject, cached.lastUsed
+			}
+		}
+		delete(s.claimPlayers, victim)
+	}
+	s.claimCacheClock++
+	s.claimPlayers[target.subject] = claimPlayerCache{
+		generationPath: generation.path,
+		player:         cloneCachedClaimPlayer(player),
+		lastUsed:       s.claimCacheClock,
+	}
+	s.claimMu.Unlock()
+	return player, nil
+}
+
+func cacheableClaimPlayer(player savesidecar.ClaimPlayer) bool {
+	size := len(player.PlayerID) + len(player.Common)*64 + len(player.Party)*32
+	for _, stack := range player.Common {
+		size += len(stack.ItemID) + len(stack.DynamicItemID)
+	}
+	for _, pal := range player.Party {
+		size += len(pal.InstanceID)
+	}
+	for _, keys := range [][]string{
+		player.Progress.FastTravel, player.Progress.Areas, player.Progress.Notes,
+		player.Progress.NormalBosses, player.Progress.TowerBosses,
+	} {
+		size += len(keys) * 16
+		for _, key := range keys {
+			size += len(key)
+		}
+	}
+	return size <= maxCachedPlayerBytes
+}
+
+func cloneCachedClaimPlayer(player savesidecar.ClaimPlayer) savesidecar.ClaimPlayer {
+	player.Common = append([]savesidecar.ClaimStack(nil), player.Common...)
+	player.Party = append([]savesidecar.ClaimPal(nil), player.Party...)
+	player.Progress.FastTravel = append([]string(nil), player.Progress.FastTravel...)
+	player.Progress.Areas = append([]string(nil), player.Progress.Areas...)
+	player.Progress.Notes = append([]string(nil), player.Progress.Notes...)
+	player.Progress.NormalBosses = append([]string(nil), player.Progress.NormalBosses...)
+	player.Progress.TowerBosses = append([]string(nil), player.Progress.TowerBosses...)
+	return player
+}
+
+func privateProgress(snapshotAt time.Time, progress savesidecar.ClaimProgress) playerclaim.PrivateProgress {
+	return playerclaim.PrivateProgress{
+		SnapshotAt:     snapshotAt.UTC(),
+		FastTravelKeys: append([]string{}, progress.FastTravel...),
+		AreaKeys:       append([]string{}, progress.Areas...),
+		NoteKeys:       append([]string{}, progress.Notes...),
+		NormalBossKeys: append([]string{}, progress.NormalBosses...),
+		TowerBossKeys:  append([]string{}, progress.TowerBosses...),
+	}
+}
+
+func visibleGenerationPaths(ctx context.Context, worldPath string) (map[string]struct{}, error) {
+	if ok, err := directoryWithoutSymlink(worldPath); err != nil || !ok {
+		return nil, err
+	}
+	generationsPath := filepath.Join(worldPath, "backup", "world")
+	if ok, err := directoryWithoutSymlink(generationsPath); err != nil || !ok {
+		return nil, err
+	}
+	entries, err := readDirectoryBounded(ctx, generationsPath, maxGenerationEntries)
+	if err != nil {
+		return nil, err
+	}
+	paths := make(map[string]struct{}, len(entries))
+	for _, entry := range entries {
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
+		isDirectory, err := directoryEntryWithoutSymlink(entry)
+		if err != nil {
+			return nil, err
+		}
+		if isDirectory {
+			paths[filepath.Join(generationsPath, entry.Name())] = struct{}{}
+		}
+	}
+	return paths, nil
+}
+
+func (s *Source) claimTargetsForSubjectLocked(subject string) (claimTarget, bool) {
+	var result claimTarget
+	found := false
+	for _, target := range s.claimTargets {
+		if target.subject != subject {
+			continue
+		}
+		if found {
+			return claimTarget{}, false
+		}
+		result, found = target, true
+	}
+	return result, found
+}
+
+// selectInventorySequence chooses an eight-slot cycle from at least sixteen
+// stacks whose complete save fingerprints are unique. There are more than
+// 2^25 possible labelled cycles at the minimum candidate count, so an unseen
+// pre-instruction inventory state has negligible chance of matching the
+// nonce-selected target. Selection is O(n), bounded by sidecar validation.
+func selectInventorySequence(stacks []savesidecar.ClaimStack, selector uint64) ([]savesidecar.ClaimStack, bool) {
+	counts := make(map[claimStackKey]int, len(stacks))
+	for _, stack := range stacks {
+		if validClaimStack(stack) {
+			counts[claimStackFingerprint(stack)]++
+		}
+	}
+	candidates := make([]savesidecar.ClaimStack, 0, len(stacks))
+	for _, stack := range stacks {
+		if validClaimStack(stack) && counts[claimStackFingerprint(stack)] == 1 {
+			candidates = append(candidates, stack)
+		}
+	}
+	if len(candidates) < claimCandidateFloor {
+		return nil, false
+	}
+	state := selector ^ 0x9e3779b97f4a7c15
+	for index := len(candidates) - 1; index > 0; index-- {
+		state = claimRandom(state)
+		other := int(state % uint64(index+1))
+		candidates[index], candidates[other] = candidates[other], candidates[index]
+	}
+	return append([]savesidecar.ClaimStack{}, candidates[:claimCycleSlots]...), true
+}
+
+func claimRandom(state uint64) uint64 {
+	state ^= state >> 12
+	state ^= state << 25
+	state ^= state >> 27
+	return state * 0x2545f4914f6cdd1d
+}
+
+func validClaimStack(stack savesidecar.ClaimStack) bool {
+	return stack.ItemID != "" && stack.Count > 0
+}
+
+type claimStackKey struct {
+	itemID        string
+	count         uint32
+	dynamicItemID string
+}
+
+func claimStackFingerprint(stack savesidecar.ClaimStack) claimStackKey {
+	return claimStackKey{itemID: stack.ItemID, count: stack.Count, dynamicItemID: stack.DynamicItemID}
+}
+
+func claimInstructions(sequence []savesidecar.ClaimStack, phase playerclaim.ProofPhase, snapshotAt time.Time) playerclaim.Instructions {
+	pairs := make([]playerclaim.SlotPair, 0, len(sequence)-1)
+	if len(sequence) == claimCycleSlots {
+		for index := 1; index < len(sequence); index++ {
+			pairs = append(pairs, playerclaim.SlotPair{SlotA: int(sequence[0].Slot) + 1, SlotB: int(sequence[index].Slot) + 1})
+		}
+		if phase == playerclaim.ProofPhaseRestore {
+			for left, right := 0, len(pairs)-1; left < right; left, right = left+1, right-1 {
+				pairs[left], pairs[right] = pairs[right], pairs[left]
+			}
+		}
+	}
+	step := 1
+	if phase == playerclaim.ProofPhaseRestore {
+		step = 2
+	}
+	return playerclaim.Instructions{
+		Kind: playerclaim.InventorySwapSequence, Phase: phase, Step: step, TotalSteps: 2,
+		Pairs: pairs, SnapshotAt: snapshotAt.UTC(),
+	}
+}
+
+func matchesClaimCycle(stacks, sequence []savesidecar.ClaimStack) bool {
+	if len(sequence) != claimCycleSlots {
+		return false
+	}
+	for index, original := range sequence {
+		want := sequence[len(sequence)-1]
+		if index > 0 {
+			want = sequence[index-1]
+		}
+		current, ok := claimStackAt(stacks, original.Slot)
+		if !ok || !sameStack(current, want) {
+			return false
+		}
+	}
+	return true
+}
+
+func matchesClaimBaseline(stacks, sequence []savesidecar.ClaimStack) bool {
+	if len(sequence) != claimCycleSlots {
+		return false
+	}
+	for _, original := range sequence {
+		current, ok := claimStackAt(stacks, original.Slot)
+		if !ok || !sameStack(current, original) {
+			return false
+		}
+	}
+	return true
+}
+
+func claimStackAt(stacks []savesidecar.ClaimStack, slot uint32) (savesidecar.ClaimStack, bool) {
+	for _, stack := range stacks {
+		if stack.Slot == slot {
+			return stack, true
+		}
+	}
+	return savesidecar.ClaimStack{}, false
+}
+
+func sameStack(left, right savesidecar.ClaimStack) bool {
+	return left.ItemID == right.ItemID && left.Count == right.Count && left.DynamicItemID == right.DynamicItemID
 }
 
 func nonNegativeInt64(value *int64) *int64 {
