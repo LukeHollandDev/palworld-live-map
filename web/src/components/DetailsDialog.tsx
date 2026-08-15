@@ -4,8 +4,8 @@ import { isChecklistItem } from '../lib/completion'
 import { buildGuildDetails, type GuildDetails as GuildDetailsModel } from '../lib/guilds'
 import { LEADERBOARDS, type LeaderboardId, leaderboardById } from '../lib/leaderboards'
 import { kindLabel } from '../lib/map'
-import type { ItemKind, LandmarkReward, MapItem, MapLayer } from '../types'
 import type { SharePositionResult } from '../lib/sharePosition'
+import type { ItemKind, LandmarkReward, MapItem, MapLayer } from '../types'
 import { MapPanelHeader, MapPanelShell } from './MapPanel'
 import { MarkerGlyph } from './MarkerGlyph'
 
@@ -41,12 +41,12 @@ interface DetailsDialogProps {
   layers: MapLayer[]
   returnFocus: HTMLElement | null
   fallbackFocus: HTMLElement | null
-  manualChecklist: ManualChecklistDetails
+  manualChecklist?: ManualChecklistDetails
   onClose: () => void
   onSelectItem: (item: MapItem, focus: HTMLElement) => void
   onSelectGuild: (guildId: string, focus: HTMLElement) => void
   onSelectLeaderboard: (leaderboardId: LeaderboardId) => void
-  onSharePosition: (item: MapItem) => Promise<SharePositionResult>
+  onSharePosition?: (item: MapItem) => Promise<SharePositionResult>
 }
 
 interface ManualChecklistDetails {
@@ -761,10 +761,10 @@ function ItemDetails({
   item: MapItem
   items: MapItem[]
   layers: MapLayer[]
-  manualChecklist: ManualChecklistDetails
+  manualChecklist?: ManualChecklistDetails
   onSelectItem: (item: MapItem, focus: HTMLElement) => void
   onSelectGuild: (guildId: string, focus: HTMLElement) => void
-  onSharePosition: (item: MapItem) => Promise<SharePositionResult>
+  onSharePosition?: (item: MapItem) => Promise<SharePositionResult>
 }) {
   const [shareResult, setShareResult] = useState<SharePositionResult | null>(null)
   const [sharing, setSharing] = useState(false)
@@ -817,48 +817,52 @@ function ItemDetails({
       <FactList entries={entries} />
       {journalPreview ? <JournalPreview preview={journalPreview} /> : null}
       <LandmarkRewards rewards={rewards} />
-      {isChecklistItem(item) ? <ManualChecklistControl item={item} checklist={manualChecklist} /> : null}
-      <section className="grid gap-2">
-        <button
-          type="button"
-          className="pal-glass-inset pal-interactive flex min-h-11 w-full cursor-pointer items-center justify-center gap-2 px-3 py-2 text-xs font-medium text-[#e8fbfd] focus-visible:outline-none disabled:cursor-wait disabled:opacity-70"
-          aria-describedby={sharing || shareResult ? shareStatusId : undefined}
-          disabled={sharing}
-          onClick={async () => {
-            setSharing(true)
-            setShareResult(null)
-            try {
-              setShareResult(await onSharePosition(item))
-            } finally {
-              setSharing(false)
-            }
-          }}
-        >
-          <IconLink className="size-4 text-[#69d3e1]" aria-hidden="true" focusable="false" />
-          Share position
-        </button>
-        {sharing ? (
-          <p id={shareStatusId} className="m-0 text-xs text-[#9fb0b5]" role="status" aria-live="polite">
-            Preparing position link…
-          </p>
-        ) : shareResult ? (
-          <div id={shareStatusId} className="grid gap-1.5" role="status" aria-live="polite">
-            <p className="m-0 text-xs text-[#9fcbd1]">
-              {shareResult.copied ? 'Position link copied.' : 'Automatic copy unavailable. Copy this link:'}
+      {manualChecklist && isChecklistItem(item) ? (
+        <ManualChecklistControl item={item} checklist={manualChecklist} />
+      ) : null}
+      {onSharePosition ? (
+        <section className="grid gap-2">
+          <button
+            type="button"
+            className="pal-glass-inset pal-interactive flex min-h-11 w-full cursor-pointer items-center justify-center gap-2 px-3 py-2 text-xs font-medium text-[#e8fbfd] focus-visible:outline-none disabled:cursor-wait disabled:opacity-70"
+            aria-describedby={sharing || shareResult ? shareStatusId : undefined}
+            disabled={sharing}
+            onClick={async () => {
+              setSharing(true)
+              setShareResult(null)
+              try {
+                setShareResult(await onSharePosition(item))
+              } finally {
+                setSharing(false)
+              }
+            }}
+          >
+            <IconLink className="size-4 text-[#69d3e1]" aria-hidden="true" focusable="false" />
+            Share position
+          </button>
+          {sharing ? (
+            <p id={shareStatusId} className="m-0 text-xs text-[#9fb0b5]" role="status" aria-live="polite">
+              Preparing position link…
             </p>
-            {!shareResult.copied ? (
-              <input
-                className="pal-glass-inset min-h-11 w-full px-2.5 text-xs text-[#e8fbfd] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#8cecf7]"
-                aria-label="Position link for manual copy"
-                readOnly
-                value={shareResult.url}
-                onClick={(event) => event.currentTarget.select()}
-                onFocus={(event) => event.currentTarget.select()}
-              />
-            ) : null}
-          </div>
-        ) : null}
-      </section>
+          ) : shareResult ? (
+            <div id={shareStatusId} className="grid gap-1.5" role="status" aria-live="polite">
+              <p className="m-0 text-xs text-[#9fcbd1]">
+                {shareResult.copied ? 'Position link copied.' : 'Automatic copy unavailable. Copy this link:'}
+              </p>
+              {!shareResult.copied ? (
+                <input
+                  className="pal-glass-inset min-h-11 w-full px-2.5 text-xs text-[#e8fbfd] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#8cecf7]"
+                  aria-label="Position link for manual copy"
+                  readOnly
+                  value={shareResult.url}
+                  onClick={(event) => event.currentTarget.select()}
+                  onFocus={(event) => event.currentTarget.select()}
+                />
+              ) : null}
+            </div>
+          ) : null}
+        </section>
+      ) : null}
       {hasGuildRelationships ? (
         <section>
           <SectionTitle>Guild</SectionTitle>
