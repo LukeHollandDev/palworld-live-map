@@ -275,6 +275,8 @@ func TestLoadValidatesPlayerClaimsOrigin(t *testing.T) {
 		"https://MAP.example.test",
 		"https://map.example.test:443",
 		"https://map.example.test:08443",
+		"https://127.1",
+		"https://2130706433",
 		"https://[2001:0db8:0:0::1]",
 		"https://mäp.example.test",
 		"https://user@map.example.test",
