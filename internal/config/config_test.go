@@ -14,6 +14,7 @@ func validEnvironment(t *testing.T) {
 	t.Setenv("PALWORLD_REST_URL", "http://palworld:8212/")
 	t.Setenv("PALWORLD_ADMIN_PASSWORD", "admin-secret")
 	t.Setenv("PLAYER_CLAIMS_ENABLED", "false")
+	t.Setenv("PLAYER_CLAIMS_ALLOW_INSECURE_LOOPBACK", "false")
 	t.Setenv("PLAYER_CLAIMS_ORIGIN", "")
 	t.Setenv("PLAYER_CLAIMS_SECRET_FILE", "")
 	t.Setenv("PLAYER_CLAIMS_TRUSTED_PROXIES", "")
@@ -41,7 +42,7 @@ func TestLoadDefaults(t *testing.T) {
 		cfg.SavePollInterval != 30*time.Second || cfg.SaveTimeout != 20*time.Second {
 		t.Fatalf("unexpected save defaults: enabled=%v root=%q interval=%s timeout=%s", cfg.SaveDataEnabled, cfg.SaveRoot, cfg.SavePollInterval, cfg.SaveTimeout)
 	}
-	if cfg.PlayerClaimsEnabled || cfg.PlayerClaimsOrigin != "" || cfg.PlayerClaimsSecret != [32]byte{} || len(cfg.PlayerClaimsTrustedProxies) != 0 {
+	if cfg.PlayerClaimsEnabled || cfg.PlayerClaimsInsecureLocal || cfg.PlayerClaimsOrigin != "" || cfg.PlayerClaimsSecret != [32]byte{} || len(cfg.PlayerClaimsTrustedProxies) != 0 {
 		t.Fatalf("unexpected player claim defaults: enabled=%v origin=%q", cfg.PlayerClaimsEnabled, cfg.PlayerClaimsOrigin)
 	}
 }
@@ -91,6 +92,7 @@ func TestLoadRejectsInvalidConfiguration(t *testing.T) {
 		{name: "world timeout", key: "WORLD_TIMEOUT", value: "20s", want: "shorter"},
 		{name: "save boolean", key: "SAVE_DATA_ENABLED", value: "sometimes", want: "SAVE_DATA_ENABLED"},
 		{name: "claim boolean", key: "PLAYER_CLAIMS_ENABLED", value: "sometimes", want: "PLAYER_CLAIMS_ENABLED"},
+		{name: "insecure claim boolean", key: "PLAYER_CLAIMS_ALLOW_INSECURE_LOOPBACK", value: "sometimes", want: "PLAYER_CLAIMS_ALLOW_INSECURE_LOOPBACK"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -275,6 +277,7 @@ func TestLoadValidatesPlayerClaimsOrigin(t *testing.T) {
 	tests := []string{
 		"",
 		"http://map.example.test",
+		"http://localhost:8080",
 		"HTTPS://map.example.test",
 		"https://MAP.example.test",
 		"https://map.example.test:443",
@@ -317,6 +320,52 @@ func TestLoadValidatesPlayerClaimsOrigin(t *testing.T) {
 			t.Setenv("PLAYER_CLAIMS_SECRET_FILE", path)
 			_, err := Load()
 			if err == nil || !strings.Contains(err.Error(), "PLAYER_CLAIMS_ORIGIN") {
+				t.Fatalf("Load() error = %v", err)
+			}
+		})
+	}
+}
+
+func TestLoadAllowsInsecureClaimsOnlyOnExplicitLoopback(t *testing.T) {
+	for _, value := range []string{
+		"http://localhost:8080",
+		"http://127.0.0.1:8080",
+		"http://[::1]:8080",
+	} {
+		t.Run("accept "+value, func(t *testing.T) {
+			validEnvironment(t)
+			path := writeClaimSecret(t, bytes.Repeat([]byte{1}, 32), 0o600)
+			t.Setenv("SAVE_DATA_ENABLED", "true")
+			t.Setenv("PLAYER_CLAIMS_ENABLED", "true")
+			t.Setenv("PLAYER_CLAIMS_ALLOW_INSECURE_LOOPBACK", "true")
+			t.Setenv("PLAYER_CLAIMS_ORIGIN", value)
+			t.Setenv("PLAYER_CLAIMS_SECRET_FILE", path)
+			cfg, err := Load()
+			if err != nil {
+				t.Fatalf("Load() error = %v", err)
+			}
+			if !cfg.PlayerClaimsInsecureLocal || cfg.PlayerClaimsOrigin != value {
+				t.Fatalf("insecure claims config = enabled=%v origin=%q", cfg.PlayerClaimsInsecureLocal, cfg.PlayerClaimsOrigin)
+			}
+		})
+	}
+
+	for _, value := range []string{
+		"http://map.example.test:8080",
+		"http://192.0.2.1:8080",
+		"http://127.1:8080",
+		"http://localhost:80",
+		"HTTP://localhost:8080",
+	} {
+		t.Run("reject "+value, func(t *testing.T) {
+			validEnvironment(t)
+			path := writeClaimSecret(t, bytes.Repeat([]byte{1}, 32), 0o600)
+			t.Setenv("SAVE_DATA_ENABLED", "true")
+			t.Setenv("PLAYER_CLAIMS_ENABLED", "true")
+			t.Setenv("PLAYER_CLAIMS_ALLOW_INSECURE_LOOPBACK", "true")
+			t.Setenv("PLAYER_CLAIMS_ORIGIN", value)
+			t.Setenv("PLAYER_CLAIMS_SECRET_FILE", path)
+			if _, err := Load(); err == nil || !strings.Contains(err.Error(), "PLAYER_CLAIMS") {
 				t.Fatalf("Load() error = %v", err)
 			}
 		})

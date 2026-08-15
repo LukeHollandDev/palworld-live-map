@@ -31,6 +31,7 @@ type Config struct {
 	SaveTimeout                time.Duration
 	PlayerClaimsEnabled        bool
 	PlayerClaimsOrigin         string
+	PlayerClaimsInsecureLocal  bool
 	PlayerClaimsSecret         [32]byte
 	PlayerClaimsTrustedProxies []netip.Prefix
 }
@@ -76,23 +77,28 @@ func Load() (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
+	playerClaimsInsecureLocal, err := boolean("PLAYER_CLAIMS_ALLOW_INSECURE_LOOPBACK", false)
+	if err != nil {
+		return Config{}, err
+	}
 
 	cfg := Config{
-		Addr:                envOr("ADDR", ":8080"),
-		RESTURL:             strings.TrimRight(os.Getenv("PALWORLD_REST_URL"), "/"),
-		AdminPassword:       os.Getenv("PALWORLD_ADMIN_PASSWORD"),
-		DemoMode:            demoMode,
-		PollInterval:        pollInterval,
-		UpstreamTimeout:     upstreamTimeout,
-		WorldPollInterval:   worldPollInterval,
-		WorldTimeout:        worldTimeout,
-		WorldDataEnabled:    worldDataEnabled,
-		SaveDataEnabled:     saveDataEnabled,
-		SaveRoot:            envOr("PALWORLD_SAVE_ROOT", "/data/palworld/saves"),
-		SaveWorldID:         strings.TrimSpace(os.Getenv("PALWORLD_SAVE_WORLD_ID")),
-		SavePollInterval:    savePollInterval,
-		SaveTimeout:         saveTimeout,
-		PlayerClaimsEnabled: playerClaimsEnabled,
+		Addr:                      envOr("ADDR", ":8080"),
+		RESTURL:                   strings.TrimRight(os.Getenv("PALWORLD_REST_URL"), "/"),
+		AdminPassword:             os.Getenv("PALWORLD_ADMIN_PASSWORD"),
+		DemoMode:                  demoMode,
+		PollInterval:              pollInterval,
+		UpstreamTimeout:           upstreamTimeout,
+		WorldPollInterval:         worldPollInterval,
+		WorldTimeout:              worldTimeout,
+		WorldDataEnabled:          worldDataEnabled,
+		SaveDataEnabled:           saveDataEnabled,
+		SaveRoot:                  envOr("PALWORLD_SAVE_ROOT", "/data/palworld/saves"),
+		SaveWorldID:               strings.TrimSpace(os.Getenv("PALWORLD_SAVE_WORLD_ID")),
+		SavePollInterval:          savePollInterval,
+		SaveTimeout:               saveTimeout,
+		PlayerClaimsEnabled:       playerClaimsEnabled,
+		PlayerClaimsInsecureLocal: playerClaimsInsecureLocal,
 	}
 
 	var missing []string
@@ -143,7 +149,7 @@ func Load() (Config, error) {
 			return Config{}, errors.New("PLAYER_CLAIMS_ENABLED requires SAVE_DATA_ENABLED")
 		}
 
-		origin, err := claimsOrigin(os.Getenv("PLAYER_CLAIMS_ORIGIN"))
+		origin, err := claimsOriginForMode(os.Getenv("PLAYER_CLAIMS_ORIGIN"), cfg.PlayerClaimsInsecureLocal)
 		if err != nil {
 			return Config{}, err
 		}
@@ -189,13 +195,20 @@ func claimsTrustedProxies(value string) ([]netip.Prefix, error) {
 }
 
 func claimsOrigin(value string) (string, error) {
+	return claimsOriginForMode(value, false)
+}
+
+func claimsOriginForMode(value string, allowInsecureLoopback bool) (string, error) {
 	if value == "" {
 		return "", errors.New("PLAYER_CLAIMS_ORIGIN is required when player claims are enabled")
 	}
 	parsed, err := url.Parse(value)
-	if err != nil || parsed.Scheme != "https" || parsed.Host == "" || parsed.Hostname() == "" ||
+	if err != nil || (parsed.Scheme != "https" && parsed.Scheme != "http") || parsed.Host == "" || parsed.Hostname() == "" ||
 		parsed.User != nil || parsed.Path != "" || parsed.RawPath != "" || parsed.RawQuery != "" ||
 		parsed.ForceQuery || parsed.Fragment != "" || parsed.RawFragment != "" {
+		return "", errors.New("PLAYER_CLAIMS_ORIGIN must be an exact https origin with no path, query, user information, or fragment")
+	}
+	if parsed.Scheme == "http" && !allowInsecureLoopback {
 		return "", errors.New("PLAYER_CLAIMS_ORIGIN must be an exact https origin with no path, query, user information, or fragment")
 	}
 
@@ -212,6 +225,9 @@ func claimsOrigin(value string) (string, error) {
 		if address.Is6() {
 			canonicalHost = "[" + canonicalHost + "]"
 		}
+		if parsed.Scheme == "http" && !address.IsLoopback() {
+			return "", errors.New("PLAYER_CLAIMS_ALLOW_INSECURE_LOOPBACK permits only an exact http loopback origin")
+		}
 	} else {
 		for _, character := range hostname {
 			if character > unicode.MaxASCII {
@@ -222,18 +238,25 @@ func claimsOrigin(value string) (string, error) {
 			return "", errors.New("PLAYER_CLAIMS_ORIGIN must be an exact https origin with no path, query, user information, or fragment")
 		}
 		canonicalHost = strings.ToLower(hostname)
+		if parsed.Scheme == "http" && canonicalHost != "localhost" {
+			return "", errors.New("PLAYER_CLAIMS_ALLOW_INSECURE_LOOPBACK permits only an exact http loopback origin")
+		}
 	}
 
+	defaultPort := uint64(443)
+	if parsed.Scheme == "http" {
+		defaultPort = 80
+	}
 	if port := parsed.Port(); port != "" {
 		portNumber, portErr := strconv.ParseUint(port, 10, 16)
 		if portErr != nil {
 			return "", errors.New("PLAYER_CLAIMS_ORIGIN must be an exact https origin with no path, query, user information, or fragment")
 		}
-		if portNumber != 443 {
+		if portNumber != defaultPort {
 			canonicalHost += ":" + strconv.FormatUint(portNumber, 10)
 		}
 	}
-	canonical := (&url.URL{Scheme: "https", Host: canonicalHost}).String()
+	canonical := (&url.URL{Scheme: parsed.Scheme, Host: canonicalHost}).String()
 	if value != canonical {
 		return "", errors.New("PLAYER_CLAIMS_ORIGIN must be an exact https origin with no path, query, user information, or fragment")
 	}

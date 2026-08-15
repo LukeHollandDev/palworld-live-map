@@ -253,6 +253,24 @@ func claimSessionFromResponse(t *testing.T, response *httptest.ResponseRecorder)
 	return nil
 }
 
+func TestInsecureLoopbackClaimsUseDistinctHostOnlyCookie(t *testing.T) {
+	server, _ := newClaimHTTPServer(t, nil, nil)
+	server.settings.playerClaimsInsecureLocal = true
+	response := httptest.NewRecorder()
+	server.setClaimCookie(response, strings.Repeat("a", 43), claimTestNow.Add(time.Hour))
+	cookies := response.Result().Cookies()
+	if len(cookies) != 1 {
+		t.Fatalf("cookies = %v", cookies)
+	}
+	cookie := cookies[0]
+	if cookie.Name != insecureClaimSessionCookie || cookie.Path != "/" || cookie.Domain != "" || cookie.Secure || !cookie.HttpOnly || cookie.SameSite != http.SameSiteStrictMode {
+		t.Fatalf("insecure loopback cookie = %+v", cookie)
+	}
+	if cookie.Name == claimSessionCookie {
+		t.Fatal("insecure loopback cookie reused the production __Host- name")
+	}
+}
+
 func assertPrivateClaimResponse(t *testing.T, response *httptest.ResponseRecorder) {
 	t.Helper()
 	cacheControl := response.Header().Get("Cache-Control")

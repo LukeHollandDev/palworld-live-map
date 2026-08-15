@@ -28,3 +28,8 @@ already-public catalogue IDs. Enable claims only behind HTTPS with the exact
 public origin configured. Trust forwarding headers only from explicitly
 configured proxy CIDRs, apply edge request limits, and keep the save mount and
 secret file read-only to the container.
+
+`PLAYER_CLAIMS_ALLOW_INSECURE_LOOPBACK` exists only for local development. It
+accepts exact HTTP origins on `localhost` or numeric loopback addresses and
+uses a separate non-`Secure` cookie. Never enable it on a shared or remotely
+reachable map.

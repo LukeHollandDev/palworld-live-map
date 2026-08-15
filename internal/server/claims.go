@@ -19,10 +19,11 @@ import (
 )
 
 const (
-	claimSessionCookie = "__Host-palworld_live_map_session"
-	claimCSRFHeader    = "X-Palworld-Live-Map"
-	maxClaimBody       = 8 << 10
-	maxClaimPlayerID   = 256
+	claimSessionCookie         = "__Host-palworld_live_map_session"
+	insecureClaimSessionCookie = "palworld_live_map_local_session"
+	claimCSRFHeader            = "X-Palworld-Live-Map"
+	maxClaimBody               = 8 << 10
+	maxClaimPlayerID           = 256
 )
 
 type startClaimRequest struct {
@@ -146,7 +147,7 @@ func (s *Server) verifyPlayerClaim(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, r, http.StatusServiceUnavailable, claimErrorResponse{Error: "claim_unavailable"})
 		return
 	}
-	setClaimCookie(w, verification.Session.Bearer, verification.Session.AbsoluteExpiresAt)
+	s.setClaimCookie(w, verification.Session.Bearer, verification.Session.AbsoluteExpiresAt)
 	writeJSON(w, r, http.StatusOK, claimVerificationResponse{
 		Status:            verification.Status,
 		IdleExpiresAt:     verification.Session.IdleExpiresAt,
@@ -192,14 +193,14 @@ func (s *Server) claimProgress(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) claimPrincipal(w http.ResponseWriter, r *http.Request) (playerclaim.Principal, bool) {
-	cookie, err := r.Cookie(claimSessionCookie)
+	cookie, err := r.Cookie(s.claimCookieName())
 	if err != nil || !validClaimBearer(cookie.Value) {
 		writeJSON(w, r, http.StatusUnauthorized, claimErrorResponse{Error: "authentication_required"})
 		return playerclaim.Principal{}, false
 	}
 	principal, err := s.claims.ValidateSession(cookie.Value)
 	if err != nil {
-		clearClaimCookie(w)
+		s.clearClaimCookie(w)
 		writeJSON(w, r, http.StatusUnauthorized, claimErrorResponse{Error: "authentication_required"})
 		return playerclaim.Principal{}, false
 	}
@@ -248,10 +249,10 @@ func (s *Server) logoutClaimSession(w http.ResponseWriter, r *http.Request) {
 	if !s.validClaimMutation(w, r) {
 		return
 	}
-	if cookie, err := r.Cookie(claimSessionCookie); err == nil && validClaimBearer(cookie.Value) {
+	if cookie, err := r.Cookie(s.claimCookieName()); err == nil && validClaimBearer(cookie.Value) {
 		s.claims.RevokeSession(cookie.Value)
 	}
-	clearClaimCookie(w)
+	s.clearClaimCookie(w)
 	writeJSON(w, r, http.StatusOK, map[string]bool{"authenticated": false})
 }
 
@@ -318,17 +319,24 @@ func validClaimBearer(value string) bool {
 	return err == nil && len(decoded) == 32
 }
 
-func setClaimCookie(w http.ResponseWriter, bearer string, expiresAt time.Time) {
+func (s *Server) claimCookieName() string {
+	if s.settings.playerClaimsInsecureLocal {
+		return insecureClaimSessionCookie
+	}
+	return claimSessionCookie
+}
+
+func (s *Server) setClaimCookie(w http.ResponseWriter, bearer string, expiresAt time.Time) {
 	http.SetCookie(w, &http.Cookie{
-		Name: claimSessionCookie, Value: bearer, Path: "/", Expires: expiresAt.UTC(),
-		Secure: true, HttpOnly: true, SameSite: http.SameSiteStrictMode,
+		Name: s.claimCookieName(), Value: bearer, Path: "/", Expires: expiresAt.UTC(),
+		Secure: !s.settings.playerClaimsInsecureLocal, HttpOnly: true, SameSite: http.SameSiteStrictMode,
 	})
 }
 
-func clearClaimCookie(w http.ResponseWriter) {
+func (s *Server) clearClaimCookie(w http.ResponseWriter) {
 	http.SetCookie(w, &http.Cookie{
-		Name: claimSessionCookie, Value: "", Path: "/", MaxAge: -1, Expires: time.Unix(1, 0).UTC(),
-		Secure: true, HttpOnly: true, SameSite: http.SameSiteStrictMode,
+		Name: s.claimCookieName(), Value: "", Path: "/", MaxAge: -1, Expires: time.Unix(1, 0).UTC(),
+		Secure: !s.settings.playerClaimsInsecureLocal, HttpOnly: true, SameSite: http.SameSiteStrictMode,
 	})
 }
 

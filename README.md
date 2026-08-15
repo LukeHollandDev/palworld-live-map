@@ -124,6 +124,7 @@ Every supported environment option and timeout is listed below and documented in
 | `SAVE_TIMEOUT`            | Whole-generation timeout; must be below `SAVE_POLL_INTERVAL`         | `20s`                  |
 | `PLAYER_CLAIMS_ENABLED`   | Enable save-backed “This is me” character connection                 | `false`                |
 | `PLAYER_CLAIMS_ORIGIN`    | Exact public HTTPS origin used for same-origin request validation     | required when enabled  |
+| `PLAYER_CLAIMS_ALLOW_INSECURE_LOOPBACK` | Development only: allow an exact HTTP loopback origin | `false` |
 | `PLAYER_CLAIMS_SECRET_FILE` | Owner-only file containing a persistent 32-byte installation secret | required when enabled  |
 | `PLAYER_CLAIMS_TRUSTED_PROXIES` | Comma-separated proxy CIDRs trusted to supply `X-Forwarded-For` | empty                  |
 
@@ -175,6 +176,12 @@ keeps private character subjects and opaque public IDs stable even when the
 REST URL or admin password changes.
 Enabling claims on an existing deployment changes opaque player/guild IDs once
 as they move from credential-derived IDs to the installation-secret key.
+
+For local validation without a TLS proxy, set
+`PLAYER_CLAIMS_ALLOW_INSECURE_LOOPBACK=true` and use an exact loopback origin,
+such as `PLAYER_CLAIMS_ORIGIN=http://127.0.0.1:8080`. This override rejects
+non-loopback hosts, uses a separate non-`Secure` development cookie, and must
+never be enabled on a shared or remotely reachable deployment.
 
 When an HTTPS reverse proxy connects to the map, configure its exact address
 range in `PLAYER_CLAIMS_TRUSTED_PROXIES` and have it append `X-Forwarded-For`.
