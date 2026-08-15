@@ -402,9 +402,15 @@ func projectLocation(input locationRecord, spec datasetSpec) (palworld.WorldObje
 	if input.Level != nil {
 		level = *input.Level
 	}
+	z := input.Z
+	rewards := make([]palworld.LandmarkReward, len(input.Rewards))
+	for index, item := range input.Rewards {
+		rewards[index] = palworld.LandmarkReward{Name: item.Name, Count: item.Count}
+	}
 	return palworld.WorldObject{
 		ID: "catalogue:" + input.ID, Kind: input.Category, Name: input.Name,
-		Detail: detail, Level: level, X: input.X, Y: input.Y, Map: mapID,
+		Detail: detail, Level: level, X: input.X, Y: input.Y, Z: &z, Map: mapID,
+		Rewards: rewards,
 	}, instanceID, nil
 }
 

@@ -74,18 +74,25 @@ type ServerMetrics struct {
 	Days            int     `json:"days"`
 }
 
+type LandmarkReward struct {
+	Name  string `json:"name"`
+	Count int    `json:"count"`
+}
+
 type WorldObject struct {
-	ID       string  `json:"id"`
-	Kind     string  `json:"kind"`
-	Name     string  `json:"name"`
-	Detail   string  `json:"detail,omitempty"`
-	BaseID   string  `json:"baseId,omitempty"`
-	GuildKey string  `json:"guildKey,omitempty"`
-	OwnerID  string  `json:"ownerId,omitempty"`
-	Level    int     `json:"level,omitempty"`
-	X        float64 `json:"x"`
-	Y        float64 `json:"y"`
-	Map      string  `json:"map"`
+	ID       string           `json:"id"`
+	Kind     string           `json:"kind"`
+	Name     string           `json:"name"`
+	Detail   string           `json:"detail,omitempty"`
+	BaseID   string           `json:"baseId,omitempty"`
+	GuildKey string           `json:"guildKey,omitempty"`
+	OwnerID  string           `json:"ownerId,omitempty"`
+	Level    int              `json:"level,omitempty"`
+	X        float64          `json:"x"`
+	Y        float64          `json:"y"`
+	Z        *float64         `json:"z,omitempty"`
+	Map      string           `json:"map"`
+	Rewards  []LandmarkReward `json:"rewards,omitempty"`
 }
 
 type parsedWorldObject struct {

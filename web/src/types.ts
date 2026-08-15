@@ -87,6 +87,11 @@ export interface Player {
   map: string
 }
 
+export interface LandmarkReward {
+  name: string
+  count: number
+}
+
 export interface WorldObject {
   id: string
   kind: Exclude<ItemKind, 'players'>
@@ -98,7 +103,9 @@ export interface WorldObject {
   level?: number
   x: number
   y: number
+  z?: number
   map: string
+  rewards?: LandmarkReward[]
 }
 
 export interface MapItem {
@@ -123,7 +130,9 @@ export interface MapItem {
   towerDefeats?: number
   x: number
   y: number
+  z?: number
   map: string
+  rewards?: LandmarkReward[]
 }
 
 export interface PlayerState {

@@ -412,7 +412,7 @@ func (p *Poller) publishWorld(objects []WorldObject, truncated bool, total int, 
 	defer p.mu.Unlock()
 	if p.snapshot.ObjectsAvailable && !p.snapshot.ObjectsStale && !p.snapshot.ObjectsUnsupported &&
 		p.snapshot.ObjectsTruncated == truncated && p.snapshot.ObjectsTotal == total &&
-		p.snapshot.ObjectsLastError == lastError && slices.Equal(p.snapshot.Objects, objects) {
+		p.snapshot.ObjectsLastError == lastError && slices.EqualFunc(p.snapshot.Objects, objects, worldObjectEqual) {
 		return
 	}
 	p.snapshot.ObjectsAvailable = true
@@ -538,6 +538,33 @@ func mergePersistedPlayer(player, persisted Player) Player {
 
 func cloneWorldObjects(objects []WorldObject) []WorldObject {
 	result := make([]WorldObject, len(objects))
-	copy(result, objects)
+	for index, object := range objects {
+		result[index] = object
+		if object.Z != nil {
+			z := *object.Z
+			result[index].Z = &z
+		}
+		result[index].Rewards = append([]LandmarkReward(nil), object.Rewards...)
+	}
 	return result
+}
+
+func worldObjectEqual(left, right WorldObject) bool {
+	return left.ID == right.ID &&
+		left.Kind == right.Kind &&
+		left.Name == right.Name &&
+		left.Detail == right.Detail &&
+		left.BaseID == right.BaseID &&
+		left.GuildKey == right.GuildKey &&
+		left.OwnerID == right.OwnerID &&
+		left.Level == right.Level &&
+		left.X == right.X &&
+		left.Y == right.Y &&
+		optionalFloat64Equal(left.Z, right.Z) &&
+		left.Map == right.Map &&
+		slices.Equal(left.Rewards, right.Rewards)
+}
+
+func optionalFloat64Equal(left, right *float64) bool {
+	return left == nil && right == nil || left != nil && right != nil && *left == *right
 }

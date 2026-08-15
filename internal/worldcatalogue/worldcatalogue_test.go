@@ -32,8 +32,20 @@ func TestLoadProjectsCompleteModularCatalogue(t *testing.T) {
 		first.Name != "Test bounty" ||
 		first.Detail != "Bounty" ||
 		first.Level != 30 ||
+		first.Z == nil ||
+		*first.Z != 100 ||
 		first.Map != "palpagos" {
 		t.Fatalf("first location = %#v", first)
+	}
+	journal := catalogue.Locations[6]
+	if journal.Kind != "journals" || journal.Detail != "A short journal preview..." {
+		t.Fatalf("journal location = %#v", journal)
+	}
+	shrine := catalogue.Locations[7]
+	if shrine.Kind != "ancient-shrine-pickups" || len(shrine.Rewards) != 2 ||
+		shrine.Rewards[0].Name != "Test schematic" || shrine.Rewards[0].Count != 1 ||
+		shrine.Rewards[1].Name != "Dog Coin" || shrine.Rewards[1].Count != 20 {
+		t.Fatalf("shrine location = %#v", shrine)
 	}
 	last := catalogue.Locations[len(catalogue.Locations)-1]
 	if last.ID != "catalogue:npc-location:test" || last.Map != "world-tree" {
@@ -64,8 +76,15 @@ func TestLoadProjectsCompleteModularCatalogue(t *testing.T) {
 		public["generator"] == nil ||
 		public["decoder"] == nil ||
 		public["locations"] == nil ||
+		!strings.Contains(string(encoded), `"z":100`) ||
+		!strings.Contains(string(encoded), `"rewards":[{"name":"Test schematic","count":1},{"name":"Dog Coin","count":20}]`) ||
 		strings.Contains(string(encoded), "contentHash") ||
-		strings.Contains(string(encoded), "sourcePackage") {
+		strings.Contains(string(encoded), "sourcePackage") ||
+		strings.Contains(string(encoded), "sourceObject") ||
+		strings.Contains(string(encoded), "stateKey") ||
+		strings.Contains(string(encoded), "itemId") ||
+		strings.Contains(string(encoded), "iconSource") ||
+		strings.Contains(string(encoded), "nameSource") {
 		t.Fatalf("public catalogue JSON = %s", encoded)
 	}
 }
@@ -487,14 +506,25 @@ func validCatalogueFS(t *testing.T) fstest.MapFS {
 			location("dungeon:test", "dungeon-entrances", "Test dungeon", 4, 4),
 		},
 	}
+	journalPreview := "A short journal preview..."
+	journalIcon := "/Game/Pal/Texture/Note/T_Test.T_Test"
+	journal := location("journal:test", "journals", "Test journal", 6, 6)
+	journal.Detail = &journalPreview
+	journal.IconSource = &journalIcon
 	shrine := location("ancient-shrine:test", "ancient-shrine-pickups", "Test schematic", 7, 7)
-	shrine.Rewards = []reward{validReward()}
+	shrineStateKey := "MapObject:GetItem:Test"
+	shrine.StateKey = &shrineStateKey
+	coinIcon := "/Game/Others/InventoryItemIcon/Texture/T_DogCoin.T_DogCoin"
+	shrine.Rewards = []reward{
+		validReward(),
+		{ItemID: "DogCoin", Name: "Dog Coin", Count: 20, IconSource: &coinIcon, NameSource: "localized"},
+	}
 	collectibles := dataset{
 		SchemaVersion: datasetSchema,
 		ID:            "collectibles",
 		Locations: []locationRecord{
 			location("effigy:test", "effigies", "Test effigy", 5, 5),
-			location("journal:test", "journals", "Test journal", 6, 6),
+			journal,
 			shrine,
 		},
 	}

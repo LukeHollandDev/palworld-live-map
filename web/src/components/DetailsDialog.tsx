@@ -3,7 +3,7 @@ import { useEffect, useId, useRef, useState } from 'react'
 import { buildGuildDetails, type GuildDetails as GuildDetailsModel } from '../lib/guilds'
 import { LEADERBOARDS, type LeaderboardId, leaderboardById } from '../lib/leaderboards'
 import { kindLabel } from '../lib/map'
-import type { ItemKind, MapItem, MapLayer } from '../types'
+import type { ItemKind, LandmarkReward, MapItem, MapLayer } from '../types'
 import { MapPanelHeader, MapPanelShell } from './MapPanel'
 import { MarkerGlyph } from './MarkerGlyph'
 
@@ -399,6 +399,41 @@ function FactList({ entries }: { entries: Array<[string, string | number | undef
   )
 }
 
+function JournalPreview({ preview }: { preview: string }) {
+  return (
+    <section>
+      <SectionTitle>Journal preview</SectionTitle>
+      <p className="pal-glass-inset m-0 px-3 py-3 text-[13px] leading-5 text-[#dbeaec]">{preview}</p>
+    </section>
+  )
+}
+
+function LandmarkRewards({ rewards }: { rewards: LandmarkReward[] }) {
+  if (rewards.length === 0) return null
+  return (
+    <section>
+      <SectionTitle>Rewards</SectionTitle>
+      <ul className="pal-glass-inset m-0 grid list-none divide-y divide-[#ceeaee]/15 p-0">
+        {rewards.map((reward) => {
+          const count = reward.count.toLocaleString()
+          return (
+            <li
+              key={`${reward.name}:${reward.count}`}
+              className="flex min-h-11 items-center justify-between gap-3 px-3 py-2.5 text-xs"
+            >
+              <span className="min-w-0 text-[#eff9fa]">{reward.name}</span>
+              <span className="shrink-0 rounded-sm border border-[#72d7e5]/25 bg-[#20353a] px-2 py-1 font-medium text-[#9eeaf3] tabular-nums">
+                <span aria-hidden="true">×{count}</span>
+                <span className="sr-only">Quantity {count}</span>
+              </span>
+            </li>
+          )
+        })}
+      </ul>
+    </section>
+  )
+}
+
 interface ItemRelationships {
   base?: MapItem
   owner?: MapItem
@@ -480,6 +515,11 @@ function levelLabel(item: MapItem) {
 
 function coordinates(item: MapItem) {
   return `X ${Math.round(item.x)}\u00a0\u00a0Y ${Math.round(item.y)}`
+}
+
+function altitude(z?: number) {
+  if (z === undefined || !Number.isFinite(z)) return undefined
+  return `${Math.round(z / 100).toLocaleString()} m`
 }
 
 function lastSeen(lastSeenAt?: string) {
@@ -711,6 +751,8 @@ function ItemDetails({
   const { base, owner, guildKey, guildName, guildMembers, guildBases, guildPals, relatedPals } = relationships
 
   const entries: Array<[string, string | number | undefined]> = []
+  const journalPreview = item.kind === 'journals' ? item.detail : undefined
+  const rewards = item.rewards || []
   if (item.level) entries.push(['Level', item.level])
   if (item.kind === 'players') {
     entries.push(['Status', item.online === false ? 'Offline' : 'Online'])
@@ -724,12 +766,13 @@ function ItemDetails({
     entries.push(['Boss clears', item.bossDefeats?.toLocaleString()])
     entries.push(['Tower clears', item.towerDefeats?.toLocaleString()])
   }
-  if (item.detail && item.kind !== 'players') {
+  if (item.detail && item.kind !== 'players' && item.kind !== 'journals' && rewards.length === 0) {
     entries.push([DETAIL_LABELS[item.kind], item.detail])
   }
   if (item.kind === 'bases') entries.push(['Assigned Pals', relatedPals.length])
   entries.push(['Region', layers.find((layer) => layer.id === item.map)?.name || item.map])
   entries.push(['Coordinates', coordinates(item)])
+  entries.push(['Altitude', altitude(item.z)])
 
   const guildMembershipNotice =
     item.kind === 'bases'
@@ -750,6 +793,8 @@ function ItemDetails({
   return (
     <>
       <FactList entries={entries} />
+      {journalPreview ? <JournalPreview preview={journalPreview} /> : null}
+      <LandmarkRewards rewards={rewards} />
       {hasGuildRelationships ? (
         <section>
           <SectionTitle>Guild</SectionTitle>

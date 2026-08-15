@@ -184,6 +184,38 @@ func TestPollerFiltersUnusedLiveObjectsAndKeepsSemanticRevisionStable(t *testing
 	}
 }
 
+func TestPollerClonesAndComparesWorldObjectLandmarkMetadata(t *testing.T) {
+	z := 1250.0
+	source := &stubSource{objects: []WorldObject{{
+		ID: "base", Kind: "bases", Name: "Home", Z: &z,
+		Rewards: []LandmarkReward{{Name: "Dog Coin", Count: 20}},
+	}}}
+	poller := testPoller(source)
+	poller.refreshWorld(context.Background())
+
+	first, revision, changed := poller.ObjectSnapshotSince(0)
+	if !changed || first.Objects[0].Z == nil || *first.Objects[0].Z != 1250 || first.Objects[0].Rewards[0].Count != 20 {
+		t.Fatalf("first snapshot = %#v, revision %d, changed %v", first, revision, changed)
+	}
+	*first.Objects[0].Z = 0
+	first.Objects[0].Rewards[0].Name = "mutated"
+	copy := poller.ObjectSnapshot()
+	if copy.Objects[0].Z == nil || *copy.Objects[0].Z != 1250 || copy.Objects[0].Rewards[0].Name != "Dog Coin" {
+		t.Fatalf("metadata shares snapshot storage: %#v", copy.Objects[0])
+	}
+
+	poller.refreshWorld(context.Background())
+	if _, nextRevision, changed := poller.ObjectSnapshotSince(revision); changed || nextRevision != revision {
+		t.Fatalf("unchanged metadata advanced revision %d -> %d", revision, nextRevision)
+	}
+	source.objects[0].Rewards[0].Count = 25
+	poller.refreshWorld(context.Background())
+	changedSnapshot, changedRevision, changed := poller.ObjectSnapshotSince(revision)
+	if !changed || changedRevision == revision || changedSnapshot.Objects[0].Rewards[0].Count != 25 {
+		t.Fatalf("changed metadata = %#v, revision %d, changed %v", changedSnapshot, changedRevision, changed)
+	}
+}
+
 func TestPollerCategorizesOversizedWorldResponse(t *testing.T) {
 	source := &stubSource{objectErr: &ResponseSizeError{Limit: maxWorldResponseBytes}}
 	poller := testPoller(source)
