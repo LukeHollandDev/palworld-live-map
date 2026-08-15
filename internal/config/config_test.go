@@ -253,6 +253,7 @@ func TestLoadPlayerClaimsRequireSaveDataAndNonDemoMode(t *testing.T) {
 func TestClaimsOriginAcceptsOnlyCanonicalBrowserSerialization(t *testing.T) {
 	for _, value := range []string{
 		"https://map.example.test",
+		"https://map.example.test.",
 		"https://map.example.test:8443",
 		"https://192.0.2.1",
 		"https://[2001:db8::1]",
@@ -277,10 +278,15 @@ func TestLoadValidatesPlayerClaimsOrigin(t *testing.T) {
 		"https://map.example.test:08443",
 		"https://127.1",
 		"https://2130706433",
+		"https://127.1.",
+		"https://2130706433.",
 		"https://0x7f000001",
 		"https://0x7f.1",
+		"https://0x7f.1.",
 		"https://127.0x0.0x0.0x1",
 		"https://[2001:0db8:0:0::1]",
+		"https://[::ffff:192.0.2.1]",
+		"https://[2001:db8::192.0.2.1]",
 		"https://mäp.example.test",
 		"https://user@map.example.test",
 		"https://map.example.test/",

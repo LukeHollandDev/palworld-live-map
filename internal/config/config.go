@@ -205,6 +205,9 @@ func claimsOrigin(value string) (string, error) {
 		if address.Zone() != "" {
 			return "", errors.New("PLAYER_CLAIMS_ORIGIN must be an exact https origin with no path, query, user information, or fragment")
 		}
+		if address.Is6() && strings.Contains(hostname, ".") {
+			return "", errors.New("PLAYER_CLAIMS_ORIGIN must be an exact https origin with no path, query, user information, or fragment")
+		}
 		canonicalHost = address.String()
 		if address.Is6() {
 			canonicalHost = "[" + canonicalHost + "]"
@@ -238,7 +241,11 @@ func claimsOrigin(value string) (string, error) {
 }
 
 func legacyIPv4Host(hostname string) bool {
-	for _, label := range strings.Split(hostname, ".") {
+	numericHostname := strings.TrimSuffix(hostname, ".")
+	if numericHostname == "" {
+		return false
+	}
+	for _, label := range strings.Split(numericHostname, ".") {
 		if label == "" {
 			return false
 		}
