@@ -54,7 +54,7 @@ export type PlayerClaimSessionState =
   | { phase: 'connected'; playerId: string; sessionEpoch: number; expiresAt: number }
   | { phase: 'unavailable' }
 
-type Notice = 'unavailable' | 'rejected' | null
+type Notice = 'unavailable' | 'rejected' | 'session-mismatch' | null
 
 interface PlayerClaimContextValue {
   enabled: boolean
@@ -415,14 +415,11 @@ export function PlayerClaimProvider({ enabled, children }: { enabled: boolean; c
         current.phase === 'connected' && current.playerId === body.playerId
           ? current.sessionEpoch
           : ++sessionEpochRef.current
-      setNotice(null)
+      const completedChallenge = challengeRef.current?.phase === 'proof-passed' ? challengeRef.current : null
+      setNotice(completedChallenge && completedChallenge.playerId !== body.playerId ? 'session-mismatch' : null)
       const next = { phase: 'connected', playerId: body.playerId, sessionEpoch, expiresAt } as const
       commitSession(next)
-      if (challengeRef.current?.phase === 'proof-passed' && challengeRef.current.playerId === body.playerId) {
-        challengeEpochRef.current++
-        challengeTokenRef.current = null
-        commitChallenge(null)
-      }
+      if (completedChallenge) resetProofPassedChallenge()
       return next
     } catch {
       if (isCurrent()) {
@@ -435,15 +432,7 @@ export function PlayerClaimProvider({ enabled, children }: { enabled: boolean; c
       if (sessionRequestRef.current?.controller === requestController) sessionRequestRef.current = null
       releaseController(requestController)
     }
-  }, [
-    cancelSessionLoad,
-    commitChallenge,
-    commitSession,
-    controller,
-    enabled,
-    releaseController,
-    resetProofPassedChallenge
-  ])
+  }, [cancelSessionLoad, commitSession, controller, enabled, releaseController, resetProofPassedChallenge])
 
   useEffect(() => {
     mountedRef.current = true
@@ -1410,11 +1399,15 @@ function InstructionSequence({
 }
 
 function ClaimNotice({ notice }: { notice: Exclude<Notice, null> }) {
+  const message =
+    notice === 'rejected'
+      ? 'This identity request was rejected. Reload the map and try again.'
+      : notice === 'session-mismatch'
+        ? 'The identity proof completed, but another player session is active. Disconnect it before trying again.'
+        : 'Identity checks are temporarily unavailable. Please try again shortly.'
   return (
     <p role="status" aria-live="polite" aria-atomic="true" className={statusClass('warning')}>
-      {notice === 'rejected'
-        ? 'This identity request was rejected. Reload the map and try again.'
-        : 'Identity checks are temporarily unavailable. Please try again shortly.'}
+      {message}
     </p>
   )
 }

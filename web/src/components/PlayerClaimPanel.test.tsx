@@ -872,6 +872,49 @@ describe('PlayerClaimPanel', () => {
     expect(meRequests).toBe(3)
   })
 
+  it('dismisses a consumed proof when another player session wins a cross-tab cookie race', async () => {
+    let meRequests = 0
+    let verifyRequests = 0
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: string | URL | Request) => {
+        const path = pathOf(input)
+        if (path === '/api/me') {
+          meRequests++
+          return meRequests === 1
+            ? jsonResponse({ error: 'authentication_required' }, 401)
+            : jsonResponse(authenticatedSession('different-player'))
+        }
+        if (path === '/api/player-claims') return jsonResponse(startResponse(), 201)
+        if (path === '/api/player-claims/verify') {
+          verifyRequests++
+          if (verifyRequests === 1) return jsonResponse(readyResponse('prove'), 202)
+          if (verifyRequests === 2) return jsonResponse(readyResponse('restore'), 202)
+          return jsonResponse({ status: 'verified' })
+        }
+        return new Response(null, { status: 404 })
+      })
+    )
+    const user = userEvent.setup()
+    renderPanel()
+    await user.click(await screen.findByRole('button', { name: 'This is me' }))
+    await user.click(screen.getByRole('button', { name: 'Check baseline now' }))
+    completeCurrentSequence()
+    await user.click(await screen.findByRole('button', { name: 'I completed all 7 swaps' }))
+    expect(await screen.findByText('Step 2 of 2 · Restore inventory')).toBeVisible()
+    completeCurrentSequence()
+    await user.click(screen.getByRole('button', { name: 'I completed all 7 swaps' }))
+
+    expect(await screen.findByRole('heading', { name: 'Connected private save' })).toBeVisible()
+    expect(screen.getByText('Private save connected for player different-player.')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Disconnect' })).toBeEnabled()
+    expect(screen.queryByRole('heading', { name: 'Active private identity check' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Check session again' })).not.toBeInTheDocument()
+    expect(screen.getByText(/another player session is active/i)).toBeVisible()
+    expect(window.sessionStorage.getItem(PLAYER_CLAIM_RECOVERY_STORAGE_KEY)).toBeNull()
+    expect(meRequests).toBe(2)
+  })
+
   it('recovers a lost terminal verify response by probing the session before showing expiry recovery', async () => {
     let meRequests = 0
     let verifyRequests = 0
