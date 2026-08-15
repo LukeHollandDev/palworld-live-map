@@ -5,6 +5,16 @@ import { MapViewport, type MapViewportHandle } from './components/MapViewport'
 import { ProjectLinks } from './components/ProjectLinks'
 import { StatusBar } from './components/StatusBar'
 import { usePolling } from './hooks/usePolling'
+import {
+  activeLocalCompletionProfile,
+  isChecklistItem,
+  loadLocalCompletionState,
+  manualCompletionIDs,
+  saveLocalCompletionState,
+  setManualLandmarkCompletion,
+  setRemainingOnly,
+  summarizeManualCompletion
+} from './lib/completion'
 import { buildGuildDetails, guildIdForBase } from './lib/guilds'
 import type { LeaderboardId } from './lib/leaderboards'
 import { itemSearchText } from './lib/map'
@@ -163,6 +173,7 @@ function LiveMap({
   const playerState = players.data
   const objectState = objects.data || { ...EMPTY_OBJECT_STATE, enabled: config.worldDataEnabled }
   const initialPreferences = useMemo(loadFilterPreferences, [])
+  const [localCompletion, setLocalCompletion] = useState(loadLocalCompletionState)
   const [activeLayer, setActiveLayer] = useState<MapLayer>(
     () => config.layers.find((layer) => layer.id === initialPreferences.activeLayerId) || config.layers[0]
   )
@@ -190,6 +201,8 @@ function LiveMap({
     saveFilterPreferences({ activeLayerId: activeLayer.id, enabledKinds, enabledPlayerStatuses, hiddenIds, seenKinds })
   }, [activeLayer.id, enabledKinds, enabledPlayerStatuses, hiddenIds, seenKinds])
 
+  useEffect(() => saveLocalCompletionState(localCompletion), [localCompletion])
+
   const items = useMemo<MapItem[]>(() => {
     const combined: MapItem[] = [
       ...(config.landmarks || []),
@@ -205,6 +218,19 @@ function LiveMap({
   }, [config.landmarks, objectState.objects, playerState?.players])
   const presentedItems = useMemo(() => items.filter((item) => item.kind !== 'companions'), [items])
   const itemById = useMemo(() => new Map(items.map((item) => [item.id, item])), [items])
+  const completionProfile = useMemo(() => activeLocalCompletionProfile(localCompletion), [localCompletion])
+  const manuallyCompletedIds = useMemo(() => manualCompletionIDs(completionProfile), [completionProfile])
+  const completionSummary = useMemo(
+    () => summarizeManualCompletion(items, manuallyCompletedIds, activeLayer.id),
+    [activeLayer.id, items, manuallyCompletedIds]
+  )
+  const completionVisibleItems = useMemo(
+    () =>
+      localCompletion.remainingOnly
+        ? items.filter((item) => !isChecklistItem(item) || !manuallyCompletedIds.has(item.id))
+        : items,
+    [items, localCompletion.remainingOnly, manuallyCompletedIds]
+  )
 
   // Reveal a category on the map the first time it has content, then remember it
   // so a kind the user later hides is never auto-enabled again.
@@ -546,7 +572,7 @@ function LiveMap({
   const explorerProps = {
     activeLayer,
     layers: config.layers,
-    items,
+    items: completionVisibleItems,
     search,
     filterButtonRef,
     searchInputRef: searchRef,
@@ -555,6 +581,16 @@ function LiveMap({
     hiddenIds,
     expandedGuilds,
     expandedBases,
+    manualChecklist: {
+      profileName: completionProfile.name,
+      completedIds: manuallyCompletedIds,
+      completed: completionSummary.completed,
+      total: completionSummary.total,
+      remaining: completionSummary.remaining,
+      remainingOnly: localCompletion.remainingOnly,
+      onRemainingOnlyChange: (remainingOnly: boolean) =>
+        setLocalCompletion((current) => setRemainingOnly(current, remainingOnly))
+    },
     dataNotices,
     catalogueRetry: catalogueError
       ? {
@@ -602,7 +638,8 @@ function LiveMap({
           <MapViewport
             ref={mapRef}
             activeLayer={activeLayer}
-            items={items}
+            items={completionVisibleItems}
+            manuallyCompletedIds={manuallyCompletedIds}
             enabledKinds={enabledKinds}
             enabledPlayerStatuses={enabledPlayerStatuses}
             hiddenIds={hiddenIds}
@@ -615,6 +652,12 @@ function LiveMap({
               detail={detail}
               items={items}
               layers={config.layers}
+              manualChecklist={{
+                profileName: completionProfile.name,
+                completedIds: manuallyCompletedIds,
+                onSetCompletion: (landmarkId, completed) =>
+                  setLocalCompletion((current) => setManualLandmarkCompletion(current, landmarkId, completed))
+              }}
               returnFocus={returnFocus}
               fallbackFocus={leaderboardButtonRef.current}
               onSelectItem={(item, focus) => {

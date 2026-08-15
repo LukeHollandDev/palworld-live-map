@@ -1,4 +1,4 @@
-import { IconCrosshair, IconMinus, IconPlus } from '@tabler/icons-react'
+import { IconCheck, IconCrosshair, IconMinus, IconPlus } from '@tabler/icons-react'
 import {
   forwardRef,
   useCallback,
@@ -40,6 +40,7 @@ export interface MapViewportHandle {
 interface MapViewportProps {
   activeLayer: MapLayer
   items: MapItem[]
+  manuallyCompletedIds?: ReadonlySet<string>
   enabledKinds: Set<ItemKind>
   enabledPlayerStatuses: Set<PlayerStatus>
   hiddenIds: Set<string>
@@ -104,6 +105,7 @@ const RESIZE_RENDER_SYNC_DELAY_MS = 120
 const MAP_FIT_PADDING_PX = 64
 const ZOOM_SAVE_DELAY_MS = 120
 const SELECTED_MARKER_STACK = 120
+const EMPTY_COMPLETION_IDS: ReadonlySet<string> = new Set()
 
 function mapTilePyramid(layer: MapLayer): MapTilePyramid | null {
   const candidate = (layer as MapLayer & { tilePyramid?: Partial<MapTilePyramid> }).tilePyramid
@@ -240,7 +242,18 @@ function sampleImageBackground(
 }
 
 export const MapViewport = forwardRef<MapViewportHandle, MapViewportProps>(function MapViewport(
-  { activeLayer, items, enabledKinds, enabledPlayerStatuses, hiddenIds, search, onShowItem, inspectorOpen, children },
+  {
+    activeLayer,
+    items,
+    manuallyCompletedIds = EMPTY_COMPLETION_IDS,
+    enabledKinds,
+    enabledPlayerStatuses,
+    hiddenIds,
+    search,
+    onShowItem,
+    inspectorOpen,
+    children
+  },
   ref
 ) {
   const viewportRef = useRef<HTMLElement>(null)
@@ -906,6 +919,7 @@ export const MapViewport = forwardRef<MapViewportHandle, MapViewportProps>(funct
               )
             }
             const selected = selectedId === item.id
+            const manuallyCompleted = manuallyCompletedIds.has(item.id)
             return (
               <button
                 key={key}
@@ -918,7 +932,8 @@ export const MapViewport = forwardRef<MapViewportHandle, MapViewportProps>(funct
                     '--marker-stack': selected ? SELECTED_MARKER_STACK : markerStackOrder(item.kind)
                   } as React.CSSProperties
                 }
-                aria-label={markerText(item)}
+                aria-label={`${markerText(item)}${manuallyCompleted ? ' · Manually completed' : ''}`}
+                data-manual-completion={manuallyCompleted || undefined}
                 tabIndex={-1}
                 onPointerDown={(event) => event.stopPropagation()}
                 onClick={(event) => {
@@ -928,7 +943,18 @@ export const MapViewport = forwardRef<MapViewportHandle, MapViewportProps>(funct
                 }}
               >
                 <MarkerGlyph kind={item.kind} online={item.online} />
-                <span className="marker-label">{markerText(item)}</span>
+                {manuallyCompleted ? (
+                  <span
+                    className="pointer-events-none absolute right-1 bottom-1 grid size-3.5 place-items-center rounded-full border border-[#d9fff0] bg-[#176a4a] text-white shadow-[0_0_0_2px_rgb(8_18_24/70%)]"
+                    aria-hidden="true"
+                  >
+                    <IconCheck className="size-2.5" stroke={2.5} />
+                  </span>
+                ) : null}
+                <span className="marker-label">
+                  {markerText(item)}
+                  {manuallyCompleted ? ' · Manual' : ''}
+                </span>
               </button>
             )
           })}

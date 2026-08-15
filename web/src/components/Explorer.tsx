@@ -1,4 +1,4 @@
-import { IconChevronRight, IconSearch, IconX } from '@tabler/icons-react'
+import { IconCheck, IconChevronRight, IconSearch, IconX } from '@tabler/icons-react'
 import { type ReactNode, type RefObject, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { guildIdForBase } from '../lib/guilds'
 import { itemSearchText, markerText } from '../lib/map'
@@ -20,6 +20,7 @@ interface ExplorerProps {
   hiddenIds: Set<string>
   expandedGuilds: Set<string>
   expandedBases: Set<string>
+  manualChecklist: ManualChecklistView
   dataNotices: string[]
   catalogueRetry?: {
     message: string
@@ -37,6 +38,16 @@ interface ExplorerProps {
   onFocusGuild: (guildId: string, returnFocus: HTMLElement) => void
   onClose: () => void
   onLayerChange: (layer: MapLayer) => void
+}
+
+interface ManualChecklistView {
+  profileName: string
+  completedIds: ReadonlySet<string>
+  completed: number
+  total: number
+  remaining: number
+  remainingOnly: boolean
+  onRemainingOnlyChange: (remainingOnly: boolean) => void
 }
 
 interface CheckState {
@@ -71,6 +82,44 @@ function Checkbox({
       aria-label={label}
       onChange={(event) => onChange(event.currentTarget.checked)}
     />
+  )
+}
+
+function ManualChecklistSummary({ checklist, layerName }: { checklist: ManualChecklistView; layerName: string }) {
+  const titleId = useId()
+  const remainingDescriptionId = useId()
+  return (
+    <section className="pal-glass-inset mx-3.5 mb-2 grid gap-2 px-3 py-2.5 text-xs" aria-labelledby={titleId}>
+      <div className="flex min-w-0 items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h3 id={titleId} className="m-0 truncate text-xs font-semibold text-[#edf9fb]">
+            {checklist.profileName}
+          </h3>
+          <p className="m-0 mt-0.5 text-[10px] tracking-[.08em] text-[#77b9c2] uppercase">Manual · this browser</p>
+        </div>
+        <strong className="shrink-0 font-medium text-[#9de4c1] tabular-nums">
+          {checklist.completed}/{checklist.total}
+        </strong>
+      </div>
+      <p aria-live="polite" aria-atomic="true" className="m-0 text-[11px] text-[#a8b9bd]">
+        {checklist.remainingOnly
+          ? `${checklist.remaining} remaining in ${layerName}`
+          : `${checklist.completed} of ${checklist.total} landmarks complete in ${layerName}`}
+      </p>
+      <label className="flex min-h-7 cursor-pointer items-center gap-2 text-[11px] text-[#d6e7e9]">
+        <input
+          type="checkbox"
+          className="size-3.5 shrink-0 accent-[#6cb4dd]"
+          checked={checklist.remainingOnly}
+          aria-describedby={remainingDescriptionId}
+          onChange={(event) => checklist.onRemainingOnlyChange(event.currentTarget.checked)}
+        />
+        <span>Show remaining only</span>
+      </label>
+      <p id={remainingDescriptionId} className="sr-only">
+        Hide manually completed landmarks from the map and map filter.
+      </p>
+    </section>
   )
 }
 
@@ -350,24 +399,44 @@ function ItemButton({
   item,
   meta,
   label,
+  manuallyCompleted = false,
+  completionProfileName,
   onFocus
 }: {
   item: MapItem
   meta?: string
   label?: string
+  manuallyCompleted?: boolean
+  completionProfileName?: string
   onFocus: ExplorerProps['onFocusItem']
 }) {
+  const completionDescription = manuallyCompleted
+    ? `, manually completed in ${completionProfileName || 'the local checklist'}`
+    : ''
   return (
     <button
       type="button"
       className="pal-interactive grid min-h-7 w-full min-w-0 flex-1 cursor-pointer grid-cols-[20px_minmax(0,1fr)_auto] items-center gap-1.5 border border-transparent bg-transparent px-1.5 py-1 text-left text-xs text-[#e3edef] focus-visible:outline-none"
-      aria-label={`View ${markerText(item)}`}
+      aria-label={`View ${markerText(item)}${completionDescription}`}
       title={item.detail}
       onClick={(event) => onFocus(item, event.currentTarget)}
     >
       <MarkerGlyph kind={item.kind} online={item.online} />
       <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">{label || item.name}</span>
-      {meta && <span className="ml-auto shrink-0 text-[11px] text-[#899398]">{meta}</span>}
+      {meta || manuallyCompleted ? (
+        <span className="ml-auto flex shrink-0 items-center gap-1.5 text-[11px] text-[#899398]">
+          {meta ? <span>{meta}</span> : null}
+          {manuallyCompleted ? (
+            <span
+              className="flex items-center gap-0.5 text-[10px] text-[#8fe0c2]"
+              title={`Manual completion in ${completionProfileName || 'the local checklist'}`}
+            >
+              <IconCheck className="size-3" aria-hidden="true" />
+              Manual
+            </span>
+          ) : null}
+        </span>
+      ) : null}
     </button>
   )
 }
@@ -404,10 +473,14 @@ function ObjectRow({
   enabledKinds,
   enabledPlayerStatuses,
   hiddenIds,
+  manualChecklist,
   onToggleItems,
   onFocusItem,
   className = ''
-}: Pick<ExplorerProps, 'enabledKinds' | 'enabledPlayerStatuses' | 'hiddenIds' | 'onToggleItems' | 'onFocusItem'> & {
+}: Pick<
+  ExplorerProps,
+  'enabledKinds' | 'enabledPlayerStatuses' | 'hiddenIds' | 'manualChecklist' | 'onToggleItems' | 'onFocusItem'
+> & {
   item: MapItem
   meta?: string
   label?: string
@@ -422,7 +495,14 @@ function ObjectRow({
           onChange={(checked) => onToggleItems([item.id], checked)}
         />
       </span>
-      <ItemButton item={item} meta={meta} label={label} onFocus={onFocusItem} />
+      <ItemButton
+        item={item}
+        meta={meta}
+        label={label}
+        manuallyCompleted={manualChecklist.completedIds.has(item.id)}
+        completionProfileName={manualChecklist.profileName}
+        onFocus={onFocusItem}
+      />
     </div>
   )
 }
@@ -634,6 +714,7 @@ export function Explorer(props: ExplorerProps) {
                 )
               })}
             </fieldset>
+            <ManualChecklistSummary checklist={props.manualChecklist} layerName={props.activeLayer.name} />
             <div className="mx-3.5 mb-2 flex shrink-0 justify-end gap-1.5">
               <button
                 type="button"

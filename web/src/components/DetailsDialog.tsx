@@ -1,5 +1,6 @@
 import { IconCheck, IconChevronDown, IconChevronRight } from '@tabler/icons-react'
 import { useEffect, useId, useRef, useState } from 'react'
+import { isChecklistItem } from '../lib/completion'
 import { buildGuildDetails, type GuildDetails as GuildDetailsModel } from '../lib/guilds'
 import { LEADERBOARDS, type LeaderboardId, leaderboardById } from '../lib/leaderboards'
 import { kindLabel } from '../lib/map'
@@ -39,10 +40,17 @@ interface DetailsDialogProps {
   layers: MapLayer[]
   returnFocus: HTMLElement | null
   fallbackFocus: HTMLElement | null
+  manualChecklist: ManualChecklistDetails
   onClose: () => void
   onSelectItem: (item: MapItem, focus: HTMLElement) => void
   onSelectGuild: (guildId: string, focus: HTMLElement) => void
   onSelectLeaderboard: (leaderboardId: LeaderboardId) => void
+}
+
+interface ManualChecklistDetails {
+  profileName: string
+  completedIds: ReadonlySet<string>
+  onSetCompletion: (landmarkId: string, completed: boolean) => void
 }
 
 function canRestoreFocus(target: HTMLElement | null) {
@@ -64,6 +72,7 @@ export function DetailsDialog({
   layers,
   returnFocus,
   fallbackFocus,
+  manualChecklist,
   onClose,
   onSelectItem,
   onSelectGuild,
@@ -143,6 +152,7 @@ export function DetailsDialog({
               item={item}
               items={items}
               layers={layers}
+              manualChecklist={manualChecklist}
               onSelectItem={onSelectItem}
               onSelectGuild={onSelectGuild}
             />
@@ -738,12 +748,14 @@ function ItemDetails({
   item,
   items,
   layers,
+  manualChecklist,
   onSelectItem,
   onSelectGuild
 }: {
   item: MapItem
   items: MapItem[]
   layers: MapLayer[]
+  manualChecklist: ManualChecklistDetails
   onSelectItem: (item: MapItem, focus: HTMLElement) => void
   onSelectGuild: (guildId: string, focus: HTMLElement) => void
 }) {
@@ -795,6 +807,7 @@ function ItemDetails({
       <FactList entries={entries} />
       {journalPreview ? <JournalPreview preview={journalPreview} /> : null}
       <LandmarkRewards rewards={rewards} />
+      {isChecklistItem(item) ? <ManualChecklistControl item={item} checklist={manualChecklist} /> : null}
       {hasGuildRelationships ? (
         <section>
           <SectionTitle>Guild</SectionTitle>
@@ -848,5 +861,40 @@ function ItemDetails({
         <p className="m-0 text-[13px] text-[#8f989d]">This base currently has no assigned Pals.</p>
       ) : null}
     </>
+  )
+}
+
+function ManualChecklistControl({ item, checklist }: { item: MapItem; checklist: ManualChecklistDetails }) {
+  const descriptionId = useId()
+  const completed = checklist.completedIds.has(item.id)
+  return (
+    <section>
+      <SectionTitle>{checklist.profileName}</SectionTitle>
+      <div className="pal-glass-inset grid gap-2.5 p-3">
+        <div>
+          <p className="m-0 text-[10px] tracking-[.1em] text-[#78c6d0] uppercase">Manual · this browser</p>
+          <p id={descriptionId} className="mt-1 mb-0 text-[11px] leading-4 text-[#9fb0b5]">
+            This manual mark is stored only in this browser. It is separate from save-backed progress.
+          </p>
+        </div>
+        <label
+          className={`pal-interactive flex min-h-11 cursor-pointer items-center gap-2.5 border px-3 py-2 text-xs focus-within:border-[#8de9f5] ${
+            completed
+              ? 'pal-selected border-[#72d7e5]/55 text-[#effafb]'
+              : 'border-[#8bb7bd]/25 bg-[#26363b]/55 text-[#d6e7e9]'
+          }`}
+        >
+          <input
+            type="checkbox"
+            className="size-4 shrink-0 accent-[#63c9d8]"
+            checked={completed}
+            aria-label={`Mark ${item.name} complete in ${checklist.profileName}`}
+            aria-describedby={descriptionId}
+            onChange={(event) => checklist.onSetCompletion(item.id, event.currentTarget.checked)}
+          />
+          <span>{completed ? 'Completed' : 'Mark complete'}</span>
+        </label>
+      </div>
+    </section>
   )
 }
