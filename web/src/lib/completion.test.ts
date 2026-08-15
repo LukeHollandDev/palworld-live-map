@@ -11,6 +11,7 @@ import {
   saveLocalCompletionState,
   setManualLandmarkCompletion,
   setRemainingOnly,
+  summarizeCompletion,
   summarizeManualCompletion
 } from './completion'
 
@@ -61,8 +62,9 @@ describe('local completion profiles', () => {
 
   it('allowlists manual browser state instead of persisting future private evidence', () => {
     const state = Object.assign(createDefaultLocalCompletionState(new Date('2026-08-15T10:00:00Z')), {
-      saveSnapshot: { completedStateKeys: ['private-key'] },
-      claimToken: 'secret-token'
+      saveSnapshot: { completedStateKeys: ['private-key'], completedIds: ['private-save-id'] },
+      claimToken: 'secret-token',
+      challengeToken: 'private-challenge-token'
     })
     Object.assign(state.profiles[0], { saveEvidence: { playerId: 'private-player' } })
 
@@ -70,7 +72,9 @@ describe('local completion profiles', () => {
 
     const raw = window.localStorage.getItem(LOCAL_COMPLETION_STORAGE_KEY) || ''
     expect(raw).not.toContain('private-key')
+    expect(raw).not.toContain('private-save-id')
     expect(raw).not.toContain('secret-token')
+    expect(raw).not.toContain('private-challenge-token')
     expect(raw).not.toContain('private-player')
     expect(JSON.parse(raw)).toEqual(createDefaultLocalCompletionState(new Date('2026-08-15T10:00:00Z')))
   })
@@ -124,7 +128,7 @@ describe('local completion profiles', () => {
       { id: 'player', kind: 'players', name: 'Player', x: 3, y: 3, map: 'palpagos' }
     ]
 
-    expect(summarizeManualCompletion(items, new Set(['effigy', 'player']), 'palpagos')).toEqual({
+    expect(summarizeCompletion(items, new Set(['effigy', 'player']), 'palpagos')).toEqual({
       total: 1,
       completed: 1,
       remaining: 0

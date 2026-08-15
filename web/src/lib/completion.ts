@@ -39,10 +39,10 @@ export interface LocalManualCompletionProfile {
   manualMarks: ManualCompletionMark[]
 }
 
-// This payload deliberately owns only user-authored browser state. Save-backed
-// observations, identity claims, and claim credentials must remain outside it
-// so a later save overlay can be linked or revoked without rewriting manual
-// progress or persisting private evidence in localStorage.
+// Only user-authored browser state belongs in this payload. Save-backed
+// observations, identity claims, and claim credentials deliberately live in
+// ephemeral React state so disconnecting can remove them without touching the
+// user's manual checklist.
 export interface LocalCompletionState {
   version: typeof LOCAL_COMPLETION_VERSION
   activeProfileId: string
@@ -159,9 +159,9 @@ export function loadLocalCompletionState(): LocalCompletionState {
 
 export function saveLocalCompletionState(state: LocalCompletionState) {
   try {
-    // Sanitizing before serialization is an intentional allowlist. Even if a
-    // future in-memory composite grows save evidence, this writer persists only
-    // the versioned manual profile layer and its local view preference.
+    // Sanitizing is an intentional allowlist. Even if a future in-memory
+    // composite accidentally reaches this writer, private save evidence and
+    // credentials are stripped before serialization.
     const manualState = sanitizeLocalCompletionState(state)
     window.localStorage.setItem(LOCAL_COMPLETION_STORAGE_KEY, JSON.stringify(manualState))
   } catch {
@@ -211,7 +211,7 @@ export function isChecklistItem(item: Pick<MapItem, 'kind'>): boolean {
   return CHECKLIST_KIND_SET.has(item.kind)
 }
 
-export function summarizeManualCompletion(
+export function summarizeCompletion(
   items: readonly MapItem[],
   completedIDs: ReadonlySet<string>,
   layerId?: string
@@ -227,3 +227,6 @@ export function summarizeManualCompletion(
   }
   return { total, completed, remaining: total - completed }
 }
+
+// Kept as a compatibility name for existing local-checklist callers.
+export const summarizeManualCompletion = summarizeCompletion

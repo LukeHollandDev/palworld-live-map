@@ -4,10 +4,12 @@ import { isChecklistItem } from '../lib/completion'
 import { buildGuildDetails, type GuildDetails as GuildDetailsModel } from '../lib/guilds'
 import { LEADERBOARDS, type LeaderboardId, leaderboardById } from '../lib/leaderboards'
 import { kindLabel } from '../lib/map'
+import { completionSource, completionSourceLabel } from '../lib/saveProgress'
 import type { SharePositionResult } from '../lib/sharePosition'
 import type { ItemKind, LandmarkReward, MapItem, MapLayer } from '../types'
 import { MapPanelHeader, MapPanelShell } from './MapPanel'
 import { MarkerGlyph } from './MarkerGlyph'
+import { PlayerClaimPanel } from './PlayerClaimPanel'
 
 export type Detail =
   | { kind: 'item'; itemId: string }
@@ -39,9 +41,11 @@ interface DetailsDialogProps {
   detail: Detail | null
   items: MapItem[]
   layers: MapLayer[]
+  playerClaimsEnabled?: boolean
   returnFocus: HTMLElement | null
   fallbackFocus: HTMLElement | null
   manualChecklist?: ManualChecklistDetails
+  onShowPlayerClaim?: () => void
   onClose: () => void
   onSelectItem: (item: MapItem, focus: HTMLElement) => void
   onSelectGuild: (guildId: string, focus: HTMLElement) => void
@@ -51,7 +55,8 @@ interface DetailsDialogProps {
 
 interface ManualChecklistDetails {
   profileName: string
-  completedIds: ReadonlySet<string>
+  manualCompletedIds: ReadonlySet<string>
+  saveCompletedIds: ReadonlySet<string>
   onSetCompletion: (landmarkId: string, completed: boolean) => void
 }
 
@@ -72,9 +77,11 @@ export function DetailsDialog({
   detail,
   items,
   layers,
+  playerClaimsEnabled,
   returnFocus,
   fallbackFocus,
   manualChecklist,
+  onShowPlayerClaim,
   onClose,
   onSelectItem,
   onSelectGuild,
@@ -156,7 +163,9 @@ export function DetailsDialog({
               item={item}
               items={items}
               layers={layers}
+              playerClaimsEnabled={playerClaimsEnabled === true}
               manualChecklist={manualChecklist}
+              onShowPlayerClaim={onShowPlayerClaim}
               onSelectItem={onSelectItem}
               onSelectGuild={onSelectGuild}
               onSharePosition={onSharePosition}
@@ -753,7 +762,9 @@ function ItemDetails({
   item,
   items,
   layers,
+  playerClaimsEnabled,
   manualChecklist,
+  onShowPlayerClaim,
   onSelectItem,
   onSelectGuild,
   onSharePosition
@@ -761,7 +772,9 @@ function ItemDetails({
   item: MapItem
   items: MapItem[]
   layers: MapLayer[]
+  playerClaimsEnabled: boolean
   manualChecklist?: ManualChecklistDetails
+  onShowPlayerClaim?: () => void
   onSelectItem: (item: MapItem, focus: HTMLElement) => void
   onSelectGuild: (guildId: string, focus: HTMLElement) => void
   onSharePosition?: (item: MapItem) => Promise<SharePositionResult>
@@ -817,8 +830,11 @@ function ItemDetails({
       <FactList entries={entries} />
       {journalPreview ? <JournalPreview preview={journalPreview} /> : null}
       <LandmarkRewards rewards={rewards} />
+      {item.kind === 'players' && playerClaimsEnabled ? (
+        <PlayerClaimPanel key={item.id} playerId={item.id} onShowGlobalControl={onShowPlayerClaim} />
+      ) : null}
       {manualChecklist && isChecklistItem(item) ? (
-        <ManualChecklistControl item={item} checklist={manualChecklist} />
+        <CompletionChecklistControl item={item} checklist={manualChecklist} />
       ) : null}
       {onSharePosition ? (
         <section className="grid gap-2">
@@ -919,22 +935,30 @@ function ItemDetails({
   )
 }
 
-function ManualChecklistControl({ item, checklist }: { item: MapItem; checklist: ManualChecklistDetails }) {
+function CompletionChecklistControl({ item, checklist }: { item: MapItem; checklist: ManualChecklistDetails }) {
   const descriptionId = useId()
-  const completed = checklist.completedIds.has(item.id)
+  const manuallyCompleted = checklist.manualCompletedIds.has(item.id)
+  const source = completionSource(item.id, checklist.manualCompletedIds, checklist.saveCompletedIds)
+  const sourceLabel = completionSourceLabel(source)
   return (
-    <section>
+    <section data-completion-source={source || undefined}>
       <SectionTitle>{checklist.profileName}</SectionTitle>
       <div className="pal-glass-inset grid gap-2.5 p-3">
         <div>
-          <p className="m-0 text-[10px] tracking-[.1em] text-[#78c6d0] uppercase">Manual · this browser</p>
+          <p className="m-0 text-[10px] tracking-[.1em] text-[#78c6d0] uppercase">{sourceLabel || 'Not completed'}</p>
           <p id={descriptionId} className="mt-1 mb-0 text-[11px] leading-4 text-[#9fb0b5]">
-            This manual mark is stored only in this browser. It is separate from save-backed progress.
+            {source === 'save'
+              ? 'Confirmed by your connected save. A manual mark remains a separate, optional browser-only note.'
+              : source === 'combined'
+                ? 'Confirmed by your connected save and marked manually in this browser.'
+                : source === 'manual'
+                  ? 'This manual mark is stored only in this browser.'
+                  : 'Manual marks stay in this browser. Save-confirmed progress appears only while connected.'}
           </p>
         </div>
         <label
           className={`pal-interactive flex min-h-11 cursor-pointer items-center gap-2.5 border px-3 py-2 text-xs focus-within:border-[#8de9f5] ${
-            completed
+            manuallyCompleted
               ? 'pal-selected border-[#72d7e5]/55 text-[#effafb]'
               : 'border-[#8bb7bd]/25 bg-[#26363b]/55 text-[#d6e7e9]'
           }`}
@@ -942,12 +966,18 @@ function ManualChecklistControl({ item, checklist }: { item: MapItem; checklist:
           <input
             type="checkbox"
             className="size-4 shrink-0 accent-[#63c9d8]"
-            checked={completed}
+            checked={manuallyCompleted}
             aria-label={`Mark ${item.name} complete in ${checklist.profileName}`}
             aria-describedby={descriptionId}
             onChange={(event) => checklist.onSetCompletion(item.id, event.currentTarget.checked)}
           />
-          <span>{completed ? 'Completed' : 'Mark complete'}</span>
+          <span>
+            {manuallyCompleted
+              ? 'Manual mark saved'
+              : source === 'save'
+                ? 'Also add manual mark'
+                : 'Mark complete manually'}
+          </span>
         </label>
       </div>
     </section>

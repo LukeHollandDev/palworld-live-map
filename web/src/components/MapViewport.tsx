@@ -29,6 +29,7 @@ import {
   type View
 } from '../lib/map'
 import { loadZoomRatio, saveZoomRatio } from '../lib/preferences'
+import { completionSource, completionSourceLabel } from '../lib/saveProgress'
 import type { SharedPosition } from '../lib/sharePosition'
 import type { ItemKind, MapItem, MapLayer, PlayerStatus } from '../types'
 import { MarkerGlyph } from './MarkerGlyph'
@@ -43,7 +44,8 @@ export interface MapViewportHandle {
 interface MapViewportProps {
   activeLayer: MapLayer
   items: MapItem[]
-  manuallyCompletedIds?: ReadonlySet<string>
+  manualCompletedIds?: ReadonlySet<string>
+  saveCompletedIds?: ReadonlySet<string>
   enabledKinds: Set<ItemKind>
   enabledPlayerStatuses: Set<PlayerStatus>
   hiddenIds: Set<string>
@@ -249,7 +251,8 @@ export const MapViewport = forwardRef<MapViewportHandle, MapViewportProps>(funct
   {
     activeLayer,
     items,
-    manuallyCompletedIds = EMPTY_COMPLETION_IDS,
+    manualCompletedIds = EMPTY_COMPLETION_IDS,
+    saveCompletedIds = EMPTY_COMPLETION_IDS,
     enabledKinds,
     enabledPlayerStatuses,
     hiddenIds,
@@ -969,7 +972,8 @@ export const MapViewport = forwardRef<MapViewportHandle, MapViewportProps>(funct
               )
             }
             const selected = selectedId === item.id
-            const manuallyCompleted = manuallyCompletedIds.has(item.id)
+            const source = completionSource(item.id, manualCompletedIds, saveCompletedIds)
+            const sourceLabel = completionSourceLabel(source)
             return (
               <button
                 key={key}
@@ -982,8 +986,8 @@ export const MapViewport = forwardRef<MapViewportHandle, MapViewportProps>(funct
                     '--marker-stack': selected ? SELECTED_MARKER_STACK : markerStackOrder(item.kind)
                   } as React.CSSProperties
                 }
-                aria-label={`${markerText(item)}${manuallyCompleted ? ' · Manually completed' : ''}`}
-                data-manual-completion={manuallyCompleted || undefined}
+                aria-label={`${markerText(item)}${sourceLabel ? ` · ${sourceLabel} completion` : ''}`}
+                data-completion-source={source || undefined}
                 tabIndex={-1}
                 onPointerDown={(event) => event.stopPropagation()}
                 onClick={(event) => {
@@ -993,9 +997,9 @@ export const MapViewport = forwardRef<MapViewportHandle, MapViewportProps>(funct
                 }}
               >
                 <MarkerGlyph kind={item.kind} online={item.online} />
-                {manuallyCompleted ? (
+                {sourceLabel ? (
                   <span
-                    className="pointer-events-none absolute right-1 bottom-1 grid size-3.5 place-items-center rounded-full border border-[#d9fff0] bg-[#176a4a] text-white shadow-[0_0_0_2px_rgb(8_18_24/70%)]"
+                    className={`pointer-events-none absolute right-1 bottom-1 grid size-3.5 place-items-center rounded-full border border-[#d9fff0] text-white shadow-[0_0_0_2px_rgb(8_18_24/70%)] ${source === 'save' ? 'bg-[#176083]' : source === 'combined' ? 'bg-[#4e7a2a]' : 'bg-[#176a4a]'}`}
                     aria-hidden="true"
                   >
                     <IconCheck className="size-2.5" stroke={2.5} />
@@ -1003,7 +1007,7 @@ export const MapViewport = forwardRef<MapViewportHandle, MapViewportProps>(funct
                 ) : null}
                 <span className="marker-label">
                   {markerText(item)}
-                  {manuallyCompleted ? ' · Manual' : ''}
+                  {sourceLabel ? ` · ${sourceLabel}` : ''}
                 </span>
               </button>
             )

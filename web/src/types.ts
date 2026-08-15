@@ -34,6 +34,7 @@ export interface PublicConfig {
   pollIntervalMs: number
   worldPollIntervalMs: number
   worldDataEnabled: boolean
+  playerClaimsEnabled: boolean
   layers: MapLayer[]
   catalogueUrl: string
   landmarks: WorldObject[]

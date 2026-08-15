@@ -1,11 +1,19 @@
 import { IconCheck, IconChevronRight, IconSearch, IconX } from '@tabler/icons-react'
 import { type ReactNode, type RefObject, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import type { SaveProgressState } from '../hooks/useSaveProgress'
 import { guildIdForBase } from '../lib/guilds'
 import { itemSearchText, markerText } from '../lib/map'
 import { DEFAULT_ENABLED_PLAYER_STATUSES, FILTERABLE_KINDS } from '../lib/preferences'
+import {
+  type CompletionSource,
+  completionSource,
+  completionSourceLabel,
+  formatSaveProgressAge
+} from '../lib/saveProgress'
 import type { ItemKind, MapItem, MapLayer, PlayerStatus } from '../types'
 import { MapPanelHeader, MapPanelShell } from './MapPanel'
 import { MarkerGlyph } from './MarkerGlyph'
+import { PlayerClaimSessionControl } from './PlayerClaimPanel'
 
 interface ExplorerProps {
   open: boolean
@@ -20,7 +28,7 @@ interface ExplorerProps {
   hiddenIds: Set<string>
   expandedGuilds: Set<string>
   expandedBases: Set<string>
-  manualChecklist: ManualChecklistView
+  manualChecklist: CompletionChecklistView
   dataNotices: string[]
   catalogueRetry?: {
     message: string
@@ -40,16 +48,19 @@ interface ExplorerProps {
   onLayerChange: (layer: MapLayer) => void
 }
 
-interface ManualChecklistView {
+interface CompletionChecklistView {
   profileName: string
   completedIds: ReadonlySet<string>
+  manualCompletedIds: ReadonlySet<string>
+  saveCompletedIds: ReadonlySet<string>
   completed: number
   total: number
   remaining: number
   remainingOnly: boolean
+  saveProgress: SaveProgressState
+  onRetrySaveProgress: () => void
   onRemainingOnlyChange: (remainingOnly: boolean) => void
 }
-
 interface CheckState {
   checked: boolean
   indeterminate: boolean
@@ -85,17 +96,47 @@ function Checkbox({
   )
 }
 
-function ManualChecklistSummary({ checklist, layerName }: { checklist: ManualChecklistView; layerName: string }) {
+function saveProgressDescription(progress: SaveProgressState) {
+  if (progress.phase === 'loading') return 'Loading private save progress…'
+  if (progress.phase === 'unavailable')
+    return progress.reason === 'catalogue-version'
+      ? 'Private save progress does not match this map catalogue. Manual marks still count.'
+      : 'Save progress is temporarily unavailable. Manual marks still count.'
+  if (progress.phase === 'inactive') return 'Manual only · connect with “This is me” for save-confirmed progress.'
+  const age = formatSaveProgressAge(progress.snapshot.snapshotAt)
+  if (progress.refreshing) return `Refreshing private save progress; the valid snapshot from ${age} remains applied.`
+  if (progress.refreshFailed) return `Refresh failed; keeping the valid save snapshot from ${age}.`
+  return progress.stale
+    ? `Save snapshot from ${age} may be stale. Manual marks still count.`
+    : `Save-confirmed · ${age}`
+}
+
+function CompletionChecklistSummary({
+  checklist,
+  layerName
+}: {
+  checklist: CompletionChecklistView
+  layerName: string
+}) {
   const titleId = useId()
   const remainingDescriptionId = useId()
+  const progress = checklist.saveProgress
   return (
     <section className="pal-glass-inset mx-3.5 mb-2 grid gap-2 px-3 py-2.5 text-xs" aria-labelledby={titleId}>
       <div className="flex min-w-0 items-start justify-between gap-3">
         <div className="min-w-0">
-          <h3 id={titleId} className="m-0 truncate text-xs font-semibold text-[#edf9fb]">
-            {checklist.profileName}
+          <h3 id={titleId} className="m-0 text-xs font-semibold text-[#edf9fb]">
+            What am I missing?
           </h3>
-          <p className="m-0 mt-0.5 text-[10px] tracking-[.08em] text-[#77b9c2] uppercase">Manual · this browser</p>
+          <p className="m-0 mt-0.5 truncate text-[10px] tracking-[.08em] text-[#77b9c2] uppercase">
+            {progress.phase === 'available'
+              ? `${checklist.profileName} + private save`
+              : progress.phase === 'loading'
+                ? `${checklist.profileName} · loading private save`
+                : progress.phase === 'inactive'
+                  ? `${checklist.profileName} · manual only`
+                  : `${checklist.profileName} · manual only`}
+          </p>
         </div>
         <strong className="shrink-0 font-medium text-[#9de4c1] tabular-nums">
           {checklist.completed}/{checklist.total}
@@ -103,9 +144,39 @@ function ManualChecklistSummary({ checklist, layerName }: { checklist: ManualChe
       </div>
       <p aria-live="polite" aria-atomic="true" className="m-0 text-[11px] text-[#a8b9bd]">
         {checklist.remainingOnly
-          ? `${checklist.remaining} remaining in ${layerName}`
+          ? `${checklist.remaining} missing in ${layerName}`
           : `${checklist.completed} of ${checklist.total} landmarks complete in ${layerName}`}
       </p>
+      <p
+        aria-live="polite"
+        aria-atomic="true"
+        className={`m-0 text-[10px] leading-4 ${progress.phase === 'unavailable' || (progress.phase === 'available' && (progress.stale || progress.refreshFailed)) ? 'text-[#d8bc83]' : 'text-[#78949a]'}`}
+      >
+        {saveProgressDescription(progress)}
+      </p>
+      <p className="m-0 text-[10px] leading-4 text-[#78949a]">
+        Private saves confirm waypoints and journals only; every other category uses manual marks.
+      </p>
+      {progress.phase === 'available' ? (
+        <time className="sr-only" dateTime={progress.snapshot.snapshotAt}>
+          Save snapshot {progress.snapshot.snapshotAt}
+        </time>
+      ) : null}
+      {(progress.phase === 'unavailable' && progress.reason === 'request') ||
+      (progress.phase === 'available' && (progress.stale || progress.refreshFailed)) ? (
+        <button
+          type="button"
+          className="pal-interactive min-h-7 justify-self-start border border-[#8bb7bd]/25 bg-[#26363b]/55 px-2.5 text-[11px] text-[#d7e8ea]"
+          disabled={progress.phase === 'available' && progress.refreshing}
+          onClick={checklist.onRetrySaveProgress}
+        >
+          {progress.phase === 'unavailable'
+            ? 'Retry save progress'
+            : progress.refreshing
+              ? 'Refreshing save progress…'
+              : 'Refresh save progress'}
+        </button>
+      ) : null}
       <label className="flex min-h-7 cursor-pointer items-center gap-2 text-[11px] text-[#d6e7e9]">
         <input
           type="checkbox"
@@ -114,10 +185,10 @@ function ManualChecklistSummary({ checklist, layerName }: { checklist: ManualChe
           aria-describedby={remainingDescriptionId}
           onChange={(event) => checklist.onRemainingOnlyChange(event.currentTarget.checked)}
         />
-        <span>Show remaining only</span>
+        <span>Show only missing</span>
       </label>
       <p id={remainingDescriptionId} className="sr-only">
-        Hide manually completed landmarks from the map and map filter.
+        Hide landmarks completed manually or confirmed by the connected save from the map and map filter.
       </p>
     </section>
   )
@@ -399,20 +470,17 @@ function ItemButton({
   item,
   meta,
   label,
-  manuallyCompleted = false,
-  completionProfileName,
+  completion = null,
   onFocus
 }: {
   item: MapItem
   meta?: string
   label?: string
-  manuallyCompleted?: boolean
-  completionProfileName?: string
+  completion?: CompletionSource | null
   onFocus: ExplorerProps['onFocusItem']
 }) {
-  const completionDescription = manuallyCompleted
-    ? `, manually completed in ${completionProfileName || 'the local checklist'}`
-    : ''
+  const sourceLabel = completionSourceLabel(completion)
+  const completionDescription = sourceLabel ? `, ${sourceLabel.toLowerCase()} completion` : ''
   return (
     <button
       type="button"
@@ -423,16 +491,16 @@ function ItemButton({
     >
       <MarkerGlyph kind={item.kind} online={item.online} />
       <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">{label || item.name}</span>
-      {meta || manuallyCompleted ? (
+      {meta || sourceLabel ? (
         <span className="ml-auto flex shrink-0 items-center gap-1.5 text-[11px] text-[#899398]">
           {meta ? <span>{meta}</span> : null}
-          {manuallyCompleted ? (
+          {sourceLabel ? (
             <span
-              className="flex items-center gap-0.5 text-[10px] text-[#8fe0c2]"
-              title={`Manual completion in ${completionProfileName || 'the local checklist'}`}
+              className={`flex items-center gap-0.5 text-[10px] ${completion === 'save' ? 'text-[#8ed7f2]' : completion === 'combined' ? 'text-[#b7e8a2]' : 'text-[#8fe0c2]'}`}
+              title={`${sourceLabel} completion`}
             >
               <IconCheck className="size-3" aria-hidden="true" />
-              Manual
+              {sourceLabel}
             </span>
           ) : null}
         </span>
@@ -499,8 +567,7 @@ function ObjectRow({
         item={item}
         meta={meta}
         label={label}
-        manuallyCompleted={manualChecklist.completedIds.has(item.id)}
-        completionProfileName={manualChecklist.profileName}
+        completion={completionSource(item.id, manualChecklist.manualCompletedIds, manualChecklist.saveCompletedIds)}
         onFocus={onFocusItem}
       />
     </div>
@@ -714,7 +781,8 @@ export function Explorer(props: ExplorerProps) {
                 )
               })}
             </fieldset>
-            <ManualChecklistSummary checklist={props.manualChecklist} layerName={props.activeLayer.name} />
+            <PlayerClaimSessionControl />
+            <CompletionChecklistSummary checklist={props.manualChecklist} layerName={props.activeLayer.name} />
             <div className="mx-3.5 mb-2 flex shrink-0 justify-end gap-1.5">
               <button
                 type="button"

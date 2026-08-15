@@ -74,6 +74,7 @@ function mockAPI(resolve: (path: string) => unknown = (path) => responses[path])
         typeof input === 'string' ? input : input instanceof URL ? input.pathname : new URL(input.url).pathname
       const body = resolve(path)
       if (body instanceof Error) throw body
+      if (body instanceof Response) return body
       return body
         ? new Response(JSON.stringify(body), { status: 200, headers: { 'Content-Type': 'application/json' } })
         : new Response(null, { status: 404 })
@@ -306,8 +307,17 @@ describe('App', () => {
     expect(screen.getByText('No guild membership is known for this player.')).toBeVisible()
   })
 
-  it('shares fixed player and landmark coordinates with an accessible manual-copy fallback', async () => {
+  it('composes player claims with private fixed-position sharing and landmark sharing', async () => {
     mockAPI((path) => {
+      if (path === '/api/config') {
+        return { ...(responses[path] as Record<string, unknown>), playerClaimsEnabled: true }
+      }
+      if (path === '/api/me') {
+        return new Response(JSON.stringify({ error: 'authentication_required' }), {
+          status: 401,
+          headers: { 'Content-Type': 'application/json' }
+        })
+      }
       if (path === '/assets/test-world-catalogue.json') {
         return {
           ...(responses[path] as Record<string, unknown>),
@@ -333,6 +343,7 @@ describe('App', () => {
     const explorer = await screen.findByRole('complementary', { name: 'Map filters' })
     await user.click(await within(explorer).findByRole('button', { name: 'View Luke · Lv 55' }))
     let inspector = screen.getByRole('dialog', { name: 'Luke' })
+    expect(await within(inspector).findByRole('button', { name: 'This is me' })).toBeVisible()
     const sharePlayer = within(inspector).getByRole('button', { name: 'Share position' })
     expect(sharePlayer.querySelector('svg')).toHaveAttribute('aria-hidden', 'true')
     await user.click(sharePlayer)
@@ -344,7 +355,9 @@ describe('App', () => {
     expect(sharedUrl.searchParams.get('x')).toBe('10')
     expect(sharedUrl.searchParams.get('y')).toBe('20')
     expect(sharedUrl.searchParams.get('zoom')).toBe('8')
+    expect([...sharedUrl.searchParams.keys()].sort()).toEqual(['region', 'share', 'x', 'y', 'zoom'])
     expect(sharedUrl.toString()).not.toContain('player-luke')
+    expect(sharedUrl.toString()).not.toMatch(/bearer|challenge|claim|subject|token/i)
     expect(within(inspector).getByRole('status')).toHaveTextContent('Automatic copy unavailable. Copy this link:')
 
     await user.click(within(inspector).getByRole('button', { name: 'Close details' }))
@@ -1854,9 +1867,9 @@ describe('App', () => {
     const view = render(<App />)
     await screen.findByRole('heading', { name: 'Test Realm' })
     const explorer = screen.getByRole('complementary', { name: 'Map filters' })
-    expect(within(explorer).getByRole('heading', { name: 'My checklist' })).toBeVisible()
+    expect(within(explorer).getByRole('heading', { name: 'What am I missing?' })).toBeVisible()
     expect(await within(explorer).findByText('0 of 2 landmarks complete in Palpagos Islands')).toBeVisible()
-    expect(within(explorer).getByText('Manual · this browser')).toBeVisible()
+    expect(within(explorer).getByText('My checklist · manual only')).toBeVisible()
 
     const effigyVisibility = within(explorer).getByRole('checkbox', { name: 'Show Pal Effigies' })
     await user.click(effigyVisibility)
@@ -1869,34 +1882,34 @@ describe('App', () => {
     })
     expect(completion).not.toBeChecked()
     expect(completion).toHaveAccessibleDescription(
-      'This manual mark is stored only in this browser. It is separate from save-backed progress.'
+      'Manual marks stay in this browser. Save-confirmed progress appears only while connected.'
     )
     await user.click(completion)
 
     expect(completion).toBeChecked()
-    expect(within(inspector).getByText('Completed')).toBeVisible()
+    expect(within(inspector).getByText('Manual mark saved')).toBeVisible()
     expect(within(explorer).getByText('1 of 2 landmarks complete in Palpagos Islands')).toBeVisible()
-    expect(
-      within(explorer).getByRole('button', { name: 'View First Effigy, manually completed in My checklist' })
-    ).toBeVisible()
-    expect(screen.getByRole('button', { name: 'First Effigy · Manually completed' })).toHaveAttribute(
-      'data-manual-completion',
-      'true'
+    expect(within(explorer).getByRole('button', { name: 'View First Effigy, manual completion' })).toBeVisible()
+    expect(screen.getByRole('button', { name: 'First Effigy · Manual completion' })).toHaveAttribute(
+      'data-completion-source',
+      'manual'
     )
 
-    const remainingOnly = within(explorer).getByRole('checkbox', { name: 'Show remaining only' })
-    expect(remainingOnly).toHaveAccessibleDescription('Hide manually completed landmarks from the map and map filter.')
+    const remainingOnly = within(explorer).getByRole('checkbox', { name: 'Show only missing' })
+    expect(remainingOnly).toHaveAccessibleDescription(
+      'Hide landmarks completed manually or confirmed by the connected save from the map and map filter.'
+    )
     await user.click(remainingOnly)
 
-    expect(within(explorer).getByText('1 remaining in Palpagos Islands')).toBeVisible()
+    expect(within(explorer).getByText('1 missing in Palpagos Islands')).toBeVisible()
     expect(within(explorer).queryByRole('button', { name: /View First Effigy/ })).not.toBeInTheDocument()
     expect(within(explorer).getByRole('button', { name: 'View Second Effigy' })).toBeVisible()
-    expect(screen.queryByRole('button', { name: 'First Effigy · Manually completed' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'First Effigy · Manual completion' })).not.toBeInTheDocument()
     expect(completion).toBeChecked()
 
     await user.click(completion)
     expect(completion).not.toBeChecked()
-    expect(within(explorer).getByText('2 remaining in Palpagos Islands')).toBeVisible()
+    expect(within(explorer).getByText('2 missing in Palpagos Islands')).toBeVisible()
     expect(within(explorer).getByRole('button', { name: 'View First Effigy' })).toBeVisible()
 
     await user.click(completion)
@@ -1924,8 +1937,8 @@ describe('App', () => {
     render(<App />)
     await screen.findByRole('heading', { name: 'Test Realm' })
     const restoredExplorer = screen.getByRole('complementary', { name: 'Map filters' })
-    expect(await within(restoredExplorer).findByText('1 remaining in Palpagos Islands')).toBeVisible()
-    expect(within(restoredExplorer).getByRole('checkbox', { name: 'Show remaining only' })).toBeChecked()
+    expect(await within(restoredExplorer).findByText('1 missing in Palpagos Islands')).toBeVisible()
+    expect(within(restoredExplorer).getByRole('checkbox', { name: 'Show only missing' })).toBeChecked()
     expect(within(restoredExplorer).queryByRole('button', { name: /View First Effigy/ })).not.toBeInTheDocument()
   })
 

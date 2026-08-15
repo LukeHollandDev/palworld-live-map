@@ -2,9 +2,11 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { type Detail, DetailsDialog } from './components/DetailsDialog'
 import { Explorer } from './components/Explorer'
 import { MapViewport, type MapViewportHandle } from './components/MapViewport'
+import { PlayerClaimProvider, usePlayerClaimSession } from './components/PlayerClaimPanel'
 import { ProjectLinks } from './components/ProjectLinks'
 import { StatusBar } from './components/StatusBar'
 import { usePolling } from './hooks/usePolling'
+import { useSaveProgress } from './hooks/useSaveProgress'
 import {
   activeLocalCompletionProfile,
   isChecklistItem,
@@ -13,7 +15,7 @@ import {
   saveLocalCompletionState,
   setManualLandmarkCompletion,
   setRemainingOnly,
-  summarizeManualCompletion
+  summarizeCompletion
 } from './lib/completion'
 import { buildGuildDetails, guildIdForBase } from './lib/guilds'
 import type { LeaderboardId } from './lib/leaderboards'
@@ -25,6 +27,7 @@ import {
   loadFilterPreferences,
   saveFilterPreferences
 } from './lib/preferences'
+import { catalogueVersionFromURL, combineCompletionIDs, saveCompletionIDs } from './lib/saveProgress'
 import {
   buildSharedPositionUrl,
   copySharedPositionUrl,
@@ -154,14 +157,16 @@ export function App() {
   }
 
   return (
-    <LiveMap
-      config={config}
-      catalogueError={catalogueError}
-      onRetryCatalogue={() => {
-        setCatalogueError(false)
-        setCatalogueAttempt((attempt) => attempt + 1)
-      }}
-    />
+    <PlayerClaimProvider enabled={config.playerClaimsEnabled}>
+      <LiveMap
+        config={config}
+        catalogueError={catalogueError}
+        onRetryCatalogue={() => {
+          setCatalogueError(false)
+          setCatalogueAttempt((attempt) => attempt + 1)
+        }}
+      />
+    </PlayerClaimProvider>
   )
 }
 
@@ -176,6 +181,12 @@ function LiveMap({
 }) {
   const players = usePolling<PlayerState>('/api/players', config.pollIntervalMs)
   const objects = usePolling<ObjectState>('/api/objects', config.worldPollIntervalMs, config.worldDataEnabled)
+  const claimSession = usePlayerClaimSession()
+  const expectedCatalogueVersion = useMemo(() => catalogueVersionFromURL(config.catalogueUrl), [config.catalogueUrl])
+  const { state: saveProgress, retry: retrySaveProgress } = useSaveProgress(claimSession.session, {
+    expectedCatalogueVersion,
+    onUnauthorized: claimSession.invalidate
+  })
   const playerState = players.data
   const objectState = objects.data || { ...EMPTY_OBJECT_STATE, enabled: config.worldDataEnabled }
   const initialPreferences = useMemo(loadFilterPreferences, [])
@@ -223,7 +234,6 @@ function LiveMap({
     })
     return () => window.cancelAnimationFrame(frame)
   }, [activeLayer.id, sharedPosition])
-
   const items = useMemo<MapItem[]>(() => {
     const combined: MapItem[] = [
       ...(config.landmarks || []),
@@ -241,16 +251,24 @@ function LiveMap({
   const itemById = useMemo(() => new Map(items.map((item) => [item.id, item])), [items])
   const completionProfile = useMemo(() => activeLocalCompletionProfile(localCompletion), [localCompletion])
   const manuallyCompletedIds = useMemo(() => manualCompletionIDs(completionProfile), [completionProfile])
+  const saveCompletedIds = useMemo(
+    () => saveCompletionIDs(saveProgress.phase === 'available' ? saveProgress.snapshot : null, items),
+    [items, saveProgress]
+  )
+  const completedIds = useMemo(
+    () => combineCompletionIDs(manuallyCompletedIds, saveCompletedIds),
+    [manuallyCompletedIds, saveCompletedIds]
+  )
   const completionSummary = useMemo(
-    () => summarizeManualCompletion(items, manuallyCompletedIds, activeLayer.id),
-    [activeLayer.id, items, manuallyCompletedIds]
+    () => summarizeCompletion(items, completedIds, activeLayer.id),
+    [activeLayer.id, completedIds, items]
   )
   const completionVisibleItems = useMemo(
     () =>
       localCompletion.remainingOnly
-        ? items.filter((item) => !isChecklistItem(item) || !manuallyCompletedIds.has(item.id))
+        ? items.filter((item) => !isChecklistItem(item) || !completedIds.has(item.id))
         : items,
-    [items, localCompletion.remainingOnly, manuallyCompletedIds]
+    [completedIds, items, localCompletion.remainingOnly]
   )
 
   // Reveal a category on the map the first time it has content, then remember it
@@ -615,11 +633,15 @@ function LiveMap({
     expandedBases,
     manualChecklist: {
       profileName: completionProfile.name,
-      completedIds: manuallyCompletedIds,
+      completedIds,
+      manualCompletedIds: manuallyCompletedIds,
+      saveCompletedIds,
       completed: completionSummary.completed,
       total: completionSummary.total,
       remaining: completionSummary.remaining,
       remainingOnly: localCompletion.remainingOnly,
+      saveProgress,
+      onRetrySaveProgress: retrySaveProgress,
       onRemainingOnlyChange: (remainingOnly: boolean) =>
         setLocalCompletion((current) => setRemainingOnly(current, remainingOnly))
     },
@@ -671,7 +693,8 @@ function LiveMap({
             ref={mapRef}
             activeLayer={activeLayer}
             items={completionVisibleItems}
-            manuallyCompletedIds={manuallyCompletedIds}
+            manualCompletedIds={manuallyCompletedIds}
+            saveCompletedIds={saveCompletedIds}
             enabledKinds={enabledKinds}
             enabledPlayerStatuses={enabledPlayerStatuses}
             hiddenIds={hiddenIds}
@@ -685,14 +708,22 @@ function LiveMap({
               detail={detail}
               items={items}
               layers={config.layers}
+              playerClaimsEnabled={config.playerClaimsEnabled}
               manualChecklist={{
                 profileName: completionProfile.name,
-                completedIds: manuallyCompletedIds,
+                manualCompletedIds: manuallyCompletedIds,
+                saveCompletedIds,
                 onSetCompletion: (landmarkId, completed) =>
                   setLocalCompletion((current) => setManualLandmarkCompletion(current, landmarkId, completed))
               }}
               returnFocus={returnFocus}
               fallbackFocus={leaderboardButtonRef.current}
+              onShowPlayerClaim={() => {
+                pendingFocusRef.current = null
+                setDetail(null)
+                mapRef.current?.clearSelection()
+                setFiltersOpen(true)
+              }}
               onSelectItem={(item, focus) => {
                 const query = search.trim().toLowerCase()
                 if (query && !itemSearchText(item).includes(query)) setSearch('')

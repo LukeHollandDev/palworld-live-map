@@ -1,0 +1,170 @@
+import { cleanup, render, screen, waitFor, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { App } from './App'
+import { LOCAL_COMPLETION_STORAGE_KEY } from './lib/completion'
+
+function json(body: unknown, status = 200) {
+  return new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } })
+}
+
+function pathOf(input: string | URL | Request) {
+  return input instanceof Request ? new URL(input.url).pathname : new URL(String(input), window.location.href).pathname
+}
+
+afterEach(() => {
+  cleanup()
+  window.localStorage.clear()
+  vi.restoreAllMocks()
+  vi.unstubAllGlobals()
+})
+
+describe('authenticated completion overlay', () => {
+  it('combines source-labelled progress, filters missing items, and removes only the save layer on disconnect', async () => {
+    const manualState = {
+      version: 1,
+      activeProfileId: 'manual:default',
+      remainingOnly: false,
+      profiles: [
+        {
+          id: 'manual:default',
+          name: 'My checklist',
+          source: 'manual',
+          createdAt: '2026-08-15T10:00:00.000Z',
+          manualMarks: [
+            { landmarkId: 'journal-both', completedAt: '2026-08-15T10:01:00.000Z' },
+            { landmarkId: 'effigy-manual', completedAt: '2026-08-15T10:02:00.000Z' }
+          ]
+        }
+      ]
+    }
+    window.localStorage.setItem(LOCAL_COMPLETION_STORAGE_KEY, JSON.stringify(manualState))
+
+    const snapshotAt = new Date().toISOString()
+    const locations = [
+      { id: 'waypoint-save', kind: 'waypoints', name: 'Save Waypoint', x: 10, y: 10, map: 'palpagos' },
+      { id: 'journal-both', kind: 'journals', name: 'Combined Journal', x: 20, y: 20, map: 'palpagos' },
+      { id: 'effigy-manual', kind: 'effigies', name: 'Manual Effigy', x: 30, y: 30, map: 'palpagos' }
+    ]
+    const requests: Array<{ path: string; init?: RequestInit }> = []
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
+        const path = pathOf(input)
+        requests.push({ path, init })
+        if (path === '/api/config') {
+          return json({
+            pollIntervalMs: 60_000,
+            worldPollIntervalMs: 60_000,
+            worldDataEnabled: true,
+            playerClaimsEnabled: true,
+            layers: [{ id: 'palpagos', name: 'Palpagos Islands', bounds: [100, 100, -100, -100] }],
+            catalogueUrl: '/assets/test-world-catalogue.json?v=private-catalogue-hash',
+            landmarks: [],
+            landmarkCatalogue: { gameVersion: '1.0.1', generator: 'test', decoder: 'test' }
+          })
+        }
+        if (path === '/assets/test-world-catalogue.json') {
+          return json({ gameVersion: '1.0.1', generator: 'test', decoder: 'test', locations })
+        }
+        if (path === '/api/players') {
+          return json({
+            server: { name: 'Progress Realm', version: 'v1.0.1' },
+            metrics: {
+              currentPlayers: 1,
+              maxPlayers: 32,
+              serverFps: 60,
+              serverFrameTime: 16,
+              uptimeSeconds: 60,
+              baseCount: 0,
+              days: 1
+            },
+            metricsAvailable: true,
+            metricsStale: false,
+            connected: true,
+            stale: false,
+            saveEnabled: true,
+            saveAvailable: true,
+            saveStale: false,
+            players: []
+          })
+        }
+        if (path === '/api/objects') {
+          return json({
+            enabled: true,
+            available: true,
+            stale: false,
+            unsupported: false,
+            truncated: false,
+            total: 0,
+            objects: []
+          })
+        }
+        if (path === '/api/me')
+          return json({
+            authenticated: true,
+            playerId: 'claimed-player',
+            idleExpiresAt: new Date(Date.now() + 60 * 60_000).toISOString(),
+            absoluteExpiresAt: new Date(Date.now() + 2 * 60 * 60_000).toISOString()
+          })
+        if (path === '/api/me/progress') {
+          return json({
+            snapshotAt,
+            catalogueVersion: 'private-catalogue-hash',
+            domains: [
+              { id: 'waypoints', coverage: 'complete', completedIds: ['waypoint-save'], total: 1 },
+              { id: 'journals', coverage: 'complete', completedIds: ['journal-both'], total: 1 }
+            ]
+          })
+        }
+        if (path === '/api/logout') return json({ authenticated: false })
+        return new Response(null, { status: 404 })
+      })
+    )
+
+    const user = userEvent.setup()
+    render(<App />)
+    const explorer = await screen.findByRole('complementary', { name: 'Map filters' })
+    expect(await within(explorer).findByRole('heading', { name: 'What am I missing?' })).toBeVisible()
+    expect(await within(explorer).findByText('3 of 3 landmarks complete in Palpagos Islands')).toBeVisible()
+    expect(within(explorer).getByText(/Save-confirmed ·/)).toBeVisible()
+    expect(within(explorer).getByText(/private saves confirm waypoints and journals only/i)).toBeVisible()
+    expect(within(explorer).getByRole('heading', { name: 'Connected private save' })).toBeVisible()
+
+    await user.click(within(explorer).getByRole('button', { name: 'Expand Waypoints section' }))
+    await user.click(within(explorer).getByRole('button', { name: 'Expand Journals section' }))
+    await user.click(within(explorer).getByRole('button', { name: 'Expand Pal Effigies section' }))
+    expect(
+      within(explorer).getByRole('button', { name: 'View Save Waypoint, save-confirmed completion' })
+    ).toBeVisible()
+    expect(within(explorer).getByRole('button', { name: 'View Combined Journal, combined completion' })).toBeVisible()
+    expect(within(explorer).getByRole('button', { name: 'View Manual Effigy, manual completion' })).toBeVisible()
+
+    await user.click(within(explorer).getByRole('checkbox', { name: 'Show only missing' }))
+    expect(within(explorer).getByText('0 missing in Palpagos Islands')).toBeVisible()
+    expect(within(explorer).queryByRole('button', { name: /View Save Waypoint/ })).not.toBeInTheDocument()
+
+    await user.click(within(explorer).getByRole('button', { name: 'Disconnect' }))
+
+    expect(await within(explorer).findByText('1 missing in Palpagos Islands')).toBeVisible()
+    expect(within(explorer).getByText(/Manual only · connect/)).toBeVisible()
+    expect(within(explorer).getByText('My checklist · manual only')).toBeVisible()
+    expect(within(explorer).getByRole('button', { name: 'View Save Waypoint' })).toBeVisible()
+    expect(within(explorer).queryByRole('button', { name: /View Combined Journal/ })).not.toBeInTheDocument()
+
+    await waitFor(() =>
+      expect(JSON.parse(window.localStorage.getItem(LOCAL_COMPLETION_STORAGE_KEY) || '{}')).toMatchObject({
+        ...manualState,
+        remainingOnly: true
+      })
+    )
+    const stored = window.localStorage.getItem(LOCAL_COMPLETION_STORAGE_KEY) || ''
+    expect(stored).not.toContain('waypoint-save')
+    expect(stored).not.toContain('private-catalogue-hash')
+    expect(stored).not.toContain(snapshotAt)
+    expect(requests.find((request) => request.path === '/api/me/progress')?.init).toMatchObject({
+      credentials: 'same-origin',
+      cache: 'no-store'
+    })
+  })
+})
