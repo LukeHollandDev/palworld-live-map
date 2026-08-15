@@ -245,27 +245,24 @@ func legacyIPv4Host(hostname string) bool {
 	if numericHostname == "" {
 		return false
 	}
-	for _, label := range strings.Split(numericHostname, ".") {
-		if label == "" {
-			return false
-		}
-		digits := label
-		base := byte(10)
-		if strings.HasPrefix(digits, "0x") || strings.HasPrefix(digits, "0X") {
-			digits = digits[2:]
-			base = 16
-		}
-		if digits == "" {
-			return false
-		}
-		for index := range len(digits) {
-			character := digits[index]
-			if character >= '0' && character <= '9' {
-				continue
+	labels := strings.Split(numericHostname, ".")
+	last := labels[len(labels)-1]
+	if last == "" {
+		return false
+	}
+	if strings.HasPrefix(last, "0x") || strings.HasPrefix(last, "0X") {
+		for index := 2; index < len(last); index++ {
+			character := last[index]
+			if (character < '0' || character > '9') &&
+				(character < 'a' || character > 'f') &&
+				(character < 'A' || character > 'F') {
+				return false
 			}
-			if base == 16 && ((character >= 'a' && character <= 'f') || (character >= 'A' && character <= 'F')) {
-				continue
-			}
+		}
+		return true
+	}
+	for index := range len(last) {
+		if last[index] < '0' || last[index] > '9' {
 			return false
 		}
 	}
