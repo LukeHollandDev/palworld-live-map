@@ -210,16 +210,12 @@ func claimsOrigin(value string) (string, error) {
 			canonicalHost = "[" + canonicalHost + "]"
 		}
 	} else {
-		legacyNumericHost := true
 		for _, character := range hostname {
 			if character > unicode.MaxASCII {
 				return "", errors.New("PLAYER_CLAIMS_ORIGIN must be an exact https origin with no path, query, user information, or fragment")
 			}
-			if (character < '0' || character > '9') && character != '.' {
-				legacyNumericHost = false
-			}
 		}
-		if legacyNumericHost {
+		if legacyIPv4Host(hostname) {
 			return "", errors.New("PLAYER_CLAIMS_ORIGIN must be an exact https origin with no path, query, user information, or fragment")
 		}
 		canonicalHost = strings.ToLower(hostname)
@@ -239,6 +235,34 @@ func claimsOrigin(value string) (string, error) {
 		return "", errors.New("PLAYER_CLAIMS_ORIGIN must be an exact https origin with no path, query, user information, or fragment")
 	}
 	return value, nil
+}
+
+func legacyIPv4Host(hostname string) bool {
+	for _, label := range strings.Split(hostname, ".") {
+		if label == "" {
+			return false
+		}
+		digits := label
+		base := byte(10)
+		if strings.HasPrefix(digits, "0x") || strings.HasPrefix(digits, "0X") {
+			digits = digits[2:]
+			base = 16
+		}
+		if digits == "" {
+			return false
+		}
+		for index := range len(digits) {
+			character := digits[index]
+			if character >= '0' && character <= '9' {
+				continue
+			}
+			if base == 16 && ((character >= 'a' && character <= 'f') || (character >= 'A' && character <= 'F')) {
+				continue
+			}
+			return false
+		}
+	}
+	return true
 }
 
 func claimsSecret(value string) ([32]byte, error) {
