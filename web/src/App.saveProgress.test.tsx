@@ -125,15 +125,15 @@ describe('authenticated completion overlay', () => {
     const user = userEvent.setup()
     render(<App />)
     const explorer = await screen.findByRole('complementary', { name: 'Map filters' })
-    expect(await within(explorer).findByRole('heading', { name: 'Exploration progress' })).toBeVisible()
-    const progressDisclosure = within(explorer).getByRole('button', { name: 'Expand exploration progress details' })
-    await user.click(progressDisclosure)
-    const progressDetails = document.getElementById(progressDisclosure.getAttribute('aria-controls') || '')
-    if (!progressDetails) throw new Error('Expected exploration progress details')
-    expect(await within(explorer).findByText('3 of 3 landmarks complete in Palpagos Islands')).toBeVisible()
-    expect(within(progressDetails).getByText(/Save-confirmed ·/)).toBeVisible()
-    expect(within(explorer).getByText(/private saves confirm waypoints and journals only/i)).toBeVisible()
-    expect(within(explorer).getByRole('heading', { name: 'Connected private save' })).toBeVisible()
+    await user.click(screen.getByRole('button', { name: 'My Progress' }))
+    const progressPanel = await screen.findByRole('complementary', { name: 'My Progress' })
+    expect(within(progressPanel).getByRole('progressbar', { name: 'Palpagos Islands completion' })).toHaveAttribute(
+      'aria-valuenow',
+      '3'
+    )
+    expect(await within(progressPanel).findByText(/Save-confirmed ·/)).toBeVisible()
+    expect(within(progressPanel).getByText(/connected saves confirm waypoints and journals/i)).toBeVisible()
+    expect(within(progressPanel).getByRole('heading', { name: 'Connected private save' })).toBeVisible()
 
     await user.click(within(explorer).getByRole('button', { name: 'Expand Waypoints section' }))
     await user.click(within(explorer).getByRole('button', { name: 'Expand Journals section' }))
@@ -144,15 +144,19 @@ describe('authenticated completion overlay', () => {
     expect(within(explorer).getByRole('button', { name: 'View Combined Journal, combined completion' })).toBeVisible()
     expect(within(explorer).getByRole('button', { name: 'View Manual Effigy, manual completion' })).toBeVisible()
 
-    await user.click(within(explorer).getByRole('checkbox', { name: 'Show only missing' }))
-    expect(within(explorer).getByText('0 missing in Palpagos Islands')).toBeVisible()
+    await user.click(within(progressPanel).getByRole('checkbox', { name: 'Show only missing on the map' }))
+    expect(within(progressPanel).getByText('0')).toBeVisible()
     expect(within(explorer).queryByRole('button', { name: /View Save Waypoint/ })).not.toBeInTheDocument()
 
-    await user.click(within(explorer).getByRole('button', { name: 'Disconnect' }))
+    await user.click(within(progressPanel).getByRole('button', { name: 'Disconnect' }))
 
-    expect(await within(explorer).findByText('1 missing in Palpagos Islands')).toBeVisible()
-    expect(within(progressDetails).getByText(/Manual only · connect/)).toBeVisible()
-    expect(within(explorer).getByText('My checklist · manual only')).toBeVisible()
+    await waitFor(() =>
+      expect(within(progressPanel).getByRole('progressbar', { name: 'Palpagos Islands completion' })).toHaveAttribute(
+        'aria-valuenow',
+        '2'
+      )
+    )
+    expect(within(progressPanel).getByText('Manual checklist on this browser')).toBeVisible()
     expect(within(explorer).getByRole('button', { name: 'View Save Waypoint' })).toBeVisible()
     expect(within(explorer).queryByRole('button', { name: /View Combined Journal/ })).not.toBeInTheDocument()
 

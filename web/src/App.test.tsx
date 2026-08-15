@@ -233,20 +233,21 @@ describe('App', () => {
     const serverSurface = serverTitle.parentElement?.parentElement
     if (!commandbarLayout || !serverSurface) throw new Error('Expected the responsive command bar layout')
     expect(commandbarLayout).toHaveClass(
-      'grid-cols-[54px_minmax(0,1fr)_54px]',
-      'max-sm:grid-cols-2',
+      'grid-cols-[54px_minmax(0,1fr)_54px_54px]',
+      'max-sm:grid-cols-3',
       'max-sm:grid-rows-[70px_44px]'
     )
     expect(serverSurface).toHaveClass(
       'pal-glass-surface',
       'h-[54px]',
-      'max-sm:col-span-2',
+      'max-sm:col-span-3',
       'max-sm:col-start-1',
       'row-start-1'
     )
     const filterControl = within(statusBar).getByRole('button', { name: 'Map filters' })
+    const progressControl = within(statusBar).getByRole('button', { name: 'My Progress' })
     const leaderboardControl = within(statusBar).getByRole('button', { name: 'Leaderboards' })
-    for (const control of [filterControl, leaderboardControl]) {
+    for (const control of [filterControl, progressControl, leaderboardControl]) {
       expect(control).toHaveClass(
         'header-panel-control',
         'relative',
@@ -259,12 +260,17 @@ describe('App', () => {
       expect(control).not.toHaveAttribute('aria-hidden')
       expect(control).not.toHaveAttribute('inert')
     }
-    expect(filterControl.parentElement).toBe(leaderboardControl.parentElement)
+    expect(filterControl.parentElement).toBe(progressControl.parentElement)
+    expect(progressControl.parentElement).toBe(leaderboardControl.parentElement)
     expect(filterControl).toHaveClass('pal-selected', 'col-start-1', 'max-sm:row-start-2')
     expect(filterControl).toHaveAttribute('aria-expanded', 'true')
     expect(filterControl.querySelector('svg')).toHaveClass('tabler-icon-filter')
+    expect(progressControl).not.toHaveClass('pal-selected')
+    expect(progressControl).toHaveClass('col-start-3', 'max-sm:col-start-2', 'max-sm:row-start-2')
+    expect(progressControl).toHaveAttribute('aria-expanded', 'false')
+    expect(progressControl.querySelector('svg')).toHaveClass('tabler-icon-checklist')
     expect(leaderboardControl).not.toHaveClass('pal-selected')
-    expect(leaderboardControl).toHaveClass('col-start-3', 'max-sm:col-start-2', 'max-sm:row-start-2')
+    expect(leaderboardControl).toHaveClass('col-start-4', 'max-sm:col-start-3', 'max-sm:row-start-2')
     expect(leaderboardControl).toHaveAttribute('aria-expanded', 'false')
     expect(leaderboardControl.querySelector('svg')).toHaveClass('tabler-icon-trophy')
     expect(filterControl.compareDocumentPosition(serverSurface) & Node.DOCUMENT_POSITION_FOLLOWING).not.toBe(0)
@@ -1892,10 +1898,14 @@ describe('App', () => {
     const view = render(<App />)
     await screen.findByRole('heading', { name: 'Test Realm' })
     const explorer = screen.getByRole('complementary', { name: 'Map filters' })
-    expect(within(explorer).getByRole('heading', { name: 'Exploration progress' })).toBeVisible()
-    await user.click(within(explorer).getByRole('button', { name: 'Expand exploration progress details' }))
-    expect(await within(explorer).findByText('0 of 2 landmarks complete in Palpagos Islands')).toBeVisible()
-    expect(within(explorer).getByText('My checklist · manual only')).toBeVisible()
+    await user.click(screen.getByRole('button', { name: 'My Progress' }))
+    let progressPanel = screen.getByRole('complementary', { name: 'My Progress' })
+    expect(within(progressPanel).getByRole('progressbar', { name: 'Palpagos Islands completion' })).toHaveAttribute(
+      'aria-valuenow',
+      '0'
+    )
+    expect(within(progressPanel).getByText('My checklist')).toBeVisible()
+    await user.click(within(progressPanel).getByRole('button', { name: 'Close My Progress' }))
 
     const effigyVisibility = within(explorer).getByRole('checkbox', { name: 'Show Pal Effigies' })
     await user.click(effigyVisibility)
@@ -1914,31 +1924,27 @@ describe('App', () => {
 
     expect(completion).toBeChecked()
     expect(within(inspector).getByText('Manual mark saved')).toBeVisible()
-    expect(within(explorer).getByText('1 of 2 landmarks complete in Palpagos Islands')).toBeVisible()
     expect(within(explorer).getByRole('button', { name: 'View First Effigy, manual completion' })).toBeVisible()
     expect(screen.getByRole('button', { name: 'First Effigy · Manual completion' })).toHaveAttribute(
       'data-completion-source',
       'manual'
     )
 
-    const remainingOnly = within(explorer).getByRole('checkbox', { name: 'Show only missing' })
+    await user.click(screen.getByRole('button', { name: 'My Progress' }))
+    progressPanel = screen.getByRole('complementary', { name: 'My Progress' })
+    expect(within(progressPanel).getByRole('progressbar', { name: 'Palpagos Islands completion' })).toHaveAttribute(
+      'aria-valuenow',
+      '1'
+    )
+    const remainingOnly = within(progressPanel).getByRole('checkbox', { name: 'Show only missing on the map' })
     expect(remainingOnly).toHaveAccessibleDescription(
-      'Hide landmarks completed manually or confirmed by the connected save from the map and map filter.'
+      'Hide landmarks completed manually or confirmed by your connected save from the map and Map filters.'
     )
     await user.click(remainingOnly)
 
-    expect(within(explorer).getByText('1 missing in Palpagos Islands')).toBeVisible()
     expect(within(explorer).queryByRole('button', { name: /View First Effigy/ })).not.toBeInTheDocument()
     expect(within(explorer).getByRole('button', { name: 'View Second Effigy' })).toBeVisible()
     expect(screen.queryByRole('button', { name: 'First Effigy · Manual completion' })).not.toBeInTheDocument()
-    expect(completion).toBeChecked()
-
-    await user.click(completion)
-    expect(completion).not.toBeChecked()
-    expect(within(explorer).getByText('2 missing in Palpagos Islands')).toBeVisible()
-    expect(within(explorer).getByRole('button', { name: 'View First Effigy' })).toBeVisible()
-
-    await user.click(completion)
     await waitFor(() => {
       const stored = JSON.parse(
         window.localStorage.getItem('palworld-live-map.completion-profiles.v1') || '{}'
@@ -1963,9 +1969,10 @@ describe('App', () => {
     render(<App />)
     await screen.findByRole('heading', { name: 'Test Realm' })
     const restoredExplorer = screen.getByRole('complementary', { name: 'Map filters' })
-    await user.click(within(restoredExplorer).getByRole('button', { name: 'Expand exploration progress details' }))
-    expect(await within(restoredExplorer).findByText('1 missing in Palpagos Islands')).toBeVisible()
-    expect(within(restoredExplorer).getByRole('checkbox', { name: 'Show only missing' })).toBeChecked()
+    await user.click(screen.getByRole('button', { name: 'My Progress' }))
+    const restoredProgress = screen.getByRole('complementary', { name: 'My Progress' })
+    expect(within(restoredProgress).getByRole('checkbox', { name: 'Show only missing on the map' })).toBeChecked()
+    expect(within(restoredProgress).getByRole('progressbar')).toHaveAttribute('aria-valuenow', '1')
     expect(within(restoredExplorer).queryByRole('button', { name: /View First Effigy/ })).not.toBeInTheDocument()
   })
 

@@ -9,6 +9,7 @@ import {
   useRef,
   useState
 } from 'react'
+import type { MapItem } from '../types'
 
 const CLAIM_POLL_INTERVAL_MS = 30_000
 const SESSION_REVALIDATE_INTERVAL_MS = 30_000
@@ -865,7 +866,12 @@ export function usePlayerClaimSession() {
   }
 }
 
-export function PlayerClaimSessionControl() {
+function claimPlayerLabel(playerId: string, players: readonly MapItem[]) {
+  const player = players.find((item) => item.kind === 'players' && item.id === playerId)
+  return player?.name || `Player ${playerId}`
+}
+
+export function PlayerClaimSessionControl({ players = [] }: { players?: readonly MapItem[] } = {}) {
   const headingId = useId()
   const claim = useContext(PlayerClaimContext)
   if (!claim) return null
@@ -910,7 +916,7 @@ export function PlayerClaimSessionControl() {
             Active private identity check
           </h3>
           <p className="m-0 mt-0.5 truncate text-[10px] tracking-[.08em] text-[#77b9c2] uppercase">
-            Player {claim.challenge.playerId}
+            {claimPlayerLabel(claim.challenge.playerId, players)}
           </p>
         </div>
         <ActiveChallenge
@@ -943,7 +949,7 @@ export function PlayerClaimSessionControl() {
             Connected private save
           </h3>
           <p className="m-0 mt-0.5 truncate text-[10px] tracking-[.08em] text-[#77b9c2] uppercase">
-            Player {session.playerId}
+            {claimPlayerLabel(session.playerId, players)}
           </p>
         </div>
         <button
@@ -958,6 +964,94 @@ export function PlayerClaimSessionControl() {
       <p role="status" aria-live="polite" aria-atomic="true" className="sr-only">
         Private save connected for player {session.playerId}.
       </p>
+      {claim.notice ? <ClaimNotice notice={claim.notice} /> : null}
+    </section>
+  )
+}
+
+export function PlayerClaimIdentityChooser({ players }: { players: readonly MapItem[] }) {
+  const headingId = useId()
+  const claim = useContext(PlayerClaimContext)
+  if (!claim || claim.recovery || claim.challenge || claim.session.phase === 'connected') return null
+
+  if (!claim.enabled) {
+    return (
+      <section className="pal-glass-inset mx-3.5 mb-3 grid gap-1.5 px-3 py-2.5" aria-labelledby={headingId}>
+        <h3 id={headingId} className="m-0 text-xs font-semibold text-[#edf9fb]">
+          Connect your character
+        </h3>
+        <p className="m-0 text-[11px] leading-5 text-[#859da2]">
+          Save-backed identity is not enabled on this map. Your manual checklist still stays private to this browser.
+        </p>
+      </section>
+    )
+  }
+
+  if (claim.session.phase === 'loading') {
+    return (
+      <p role="status" aria-live="polite" className="mx-3.5 mb-3 text-xs text-[#9bb0b5]">
+        Checking for a connected character…
+      </p>
+    )
+  }
+
+  if (claim.session.phase === 'unavailable') {
+    return (
+      <section className="pal-glass-inset mx-3.5 mb-3 grid gap-2 px-3 py-2.5" aria-labelledby={headingId}>
+        <h3 id={headingId} className="m-0 text-xs font-semibold text-[#edf9fb]">
+          Connect your character
+        </h3>
+        <p role="status" className={statusClass('warning')}>
+          Your private player session is temporarily unavailable.
+        </p>
+        <button type="button" className={buttonClass(true)} onClick={() => void claim.loadSession()}>
+          Retry
+        </button>
+      </section>
+    )
+  }
+
+  const onlinePlayers = players.filter((item) => item.kind === 'players' && item.online !== false)
+  return (
+    <section className="pal-glass-inset mx-3.5 mb-3 grid gap-2 px-3 py-2.5" aria-labelledby={headingId}>
+      <div>
+        <h3 id={headingId} className="m-0 text-xs font-semibold text-[#edf9fb]">
+          Connect your character
+        </h3>
+        <p className="m-0 mt-1 text-[11px] leading-5 text-[#859da2]">
+          Choose who you are, then complete a private in-game inventory check. Other players cannot open your saved
+          progress just by choosing your name.
+        </p>
+      </div>
+      {onlinePlayers.length > 0 ? (
+        <ul className="m-0 grid list-none gap-1.5 p-0" aria-label="Online characters">
+          {onlinePlayers.map((player) => (
+            <li
+              key={player.id}
+              className="flex min-w-0 items-center justify-between gap-2 border border-[#8bb7bd]/20 bg-[#182329]/65 px-2.5 py-2"
+            >
+              <div className="min-w-0">
+                <p className="m-0 truncate text-xs font-medium text-[#e6f5f7]">{player.name}</p>
+                <p className="m-0 truncate text-[10px] text-[#78949a]">
+                  {player.guildName ? `${player.guildName} · ` : ''}Level {player.level ?? '?'}
+                </p>
+              </div>
+              <button
+                type="button"
+                className="pal-interactive min-h-8 shrink-0 cursor-pointer border border-[#69c8d5]/35 bg-[#263b41]/70 px-2.5 text-[11px] text-[#dff7fa] disabled:cursor-wait disabled:opacity-60"
+                disabled={claim.starting}
+                onClick={() => void claim.startClaim(player.id)}
+              >
+                {claim.starting ? 'Preparing…' : 'This is me'}
+              </button>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="m-0 text-[11px] leading-5 text-[#859da2]">
+          Join the server so your character appears here, then return to connect it.
+        </p>
+      )}
       {claim.notice ? <ClaimNotice notice={claim.notice} /> : null}
     </section>
   )
@@ -998,27 +1092,27 @@ export function PlayerClaimPanel({
         {claim.recovery && (!challenge || challenge.phase === 'expired') ? (
           <GlobalControlPointer
             message="Inventory recovery must be completed before another private identity check can start."
-            buttonLabel="Open emergency recovery in Map filters"
+            buttonLabel="Open emergency recovery in My Progress"
             onShow={showGlobalControl}
           />
         ) : challenge ? (
           <GlobalControlPointer
             message={
               challenge.playerId === playerId
-                ? 'An identity check for this player is active in Map filters.'
-                : 'An identity check for a different player is active in Map filters.'
+                ? 'An identity check for this player is active in My Progress.'
+                : 'An identity check for a different player is active in My Progress.'
             }
-            buttonLabel="Continue identity check in Map filters"
+            buttonLabel="Continue identity check in My Progress"
             onShow={showGlobalControl}
           />
         ) : session.phase === 'connected' ? (
           <GlobalControlPointer
             message={
               session.playerId === playerId
-                ? 'Connected as this player. Manage the private session in Map filters.'
-                : 'A different player is connected. Manage the private session in Map filters.'
+                ? 'Connected as this player. Manage the private session in My Progress.'
+                : 'A different player is connected. Manage the private session in My Progress.'
             }
-            buttonLabel="Manage private session in Map filters"
+            buttonLabel="Manage private session in My Progress"
             onShow={showGlobalControl}
           />
         ) : session.phase === 'loading' ? (

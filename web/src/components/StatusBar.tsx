@@ -1,4 +1,4 @@
-import { IconFilter, IconTrophy } from '@tabler/icons-react'
+import { IconChecklist, IconFilter, IconTrophy } from '@tabler/icons-react'
 import { type Ref, useEffect, useId, useState } from 'react'
 import { formatUptime } from '../lib/map'
 import type { PlayerState, ServerMetrics } from '../types'
@@ -8,9 +8,12 @@ interface StatusBarControls {
   filterButtonRef: Ref<HTMLButtonElement>
   filterSearch: string
   filtersOpen: boolean
+  progressButtonRef: Ref<HTMLButtonElement>
+  progressOpen: boolean
   leaderboardButtonRef: Ref<HTMLButtonElement>
   leaderboardOpen: boolean
   onToggleFilters: () => void
+  onToggleProgress: () => void
   onToggleLeaderboards: (focus: HTMLButtonElement) => void
 }
 
@@ -203,7 +206,7 @@ export function StatusBar({ playerState, offline, controls }: StatusBarProps) {
     <div
       className={`pal-glass-surface pointer-events-auto relative z-[1] grid h-[54px] w-full min-w-0 grid-cols-[minmax(0,1fr)_clamp(300px,25vw,360px)_minmax(0,1fr)] items-stretch text-center text-xs text-[#e5f7f8] max-md:h-[70px] max-md:grid-cols-1 max-md:grid-rows-[30px_40px] ${
         controls
-          ? 'col-start-2 row-start-1 max-sm:col-span-2 max-sm:col-start-1'
+          ? 'col-start-2 row-start-1 max-sm:col-span-3 max-sm:col-start-1'
           : 'mx-auto max-w-[1240px] min-[1600px]:max-w-none'
       }`}
       data-status-surface
@@ -244,7 +247,7 @@ export function StatusBar({ playerState, offline, controls }: StatusBarProps) {
 
   return (
     <header className="status-commandbar pointer-events-none absolute inset-x-0 top-0 z-40 flex min-w-0 px-7 pt-3 min-[1600px]:inset-x-[324px] min-[1600px]:px-0 max-md:px-2.5 max-md:pt-2">
-      <div className="status-commandbar-layout pointer-events-none mx-auto grid w-full max-w-[1364px] min-w-0 grid-cols-[54px_minmax(0,1fr)_54px] grid-rows-[54px] gap-x-2 min-[1600px]:max-w-none max-md:grid-rows-[70px] max-sm:grid-cols-2 max-sm:grid-rows-[70px_44px] max-sm:gap-y-2">
+      <div className="status-commandbar-layout pointer-events-none mx-auto grid w-full max-w-[1426px] min-w-0 grid-cols-[54px_minmax(0,1fr)_54px_54px] grid-rows-[54px] gap-x-2 min-[1600px]:max-w-none max-md:grid-rows-[70px] max-sm:grid-cols-3 max-sm:grid-rows-[70px_44px] max-sm:gap-y-2">
         <MapPanelControl
           buttonRef={controls.filterButtonRef}
           controlsId="map-filter-panel"
@@ -272,6 +275,17 @@ export function StatusBar({ playerState, offline, controls }: StatusBarProps) {
         {statusSurface}
 
         <MapPanelControl
+          buttonRef={controls.progressButtonRef}
+          controlsId="progress-panel"
+          expanded={controls.progressOpen}
+          icon={IconChecklist}
+          kind="progress"
+          label="My Progress"
+          mobileLabel="PROGRESS"
+          onToggle={controls.onToggleProgress}
+        />
+
+        <MapPanelControl
           buttonRef={controls.leaderboardButtonRef}
           controlsId="leaderboard-panel"
           dialog
@@ -279,7 +293,7 @@ export function StatusBar({ playerState, offline, controls }: StatusBarProps) {
           icon={IconTrophy}
           kind="leaderboards"
           label="Leaderboards"
-          mobileLabel="LEADERBOARDS"
+          mobileLabel="RANKINGS"
           onToggle={controls.onToggleLeaderboards}
         />
       </div>

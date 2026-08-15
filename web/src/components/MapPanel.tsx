@@ -377,7 +377,7 @@ export function MapPanelHeader({
   )
 }
 
-type MapPanelControlKind = 'filters' | 'leaderboards'
+type MapPanelControlKind = 'filters' | 'progress' | 'leaderboards'
 
 interface MapPanelControlProps {
   buttonRef: Ref<HTMLButtonElement>
@@ -395,7 +395,8 @@ interface MapPanelControlProps {
 
 const controlPlacementClass: Record<MapPanelControlKind, string> = {
   filters: 'col-start-1 max-sm:col-start-1',
-  leaderboards: 'col-start-3 max-sm:col-start-2'
+  progress: 'col-start-3 max-sm:col-start-2',
+  leaderboards: 'col-start-4 max-sm:col-start-3'
 }
 
 export function MapPanelControl({

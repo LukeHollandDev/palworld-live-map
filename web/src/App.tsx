@@ -3,6 +3,7 @@ import { type Detail, DetailsDialog } from './components/DetailsDialog'
 import { Explorer } from './components/Explorer'
 import { MapViewport, type MapViewportHandle } from './components/MapViewport'
 import { PlayerClaimProvider, usePlayerClaimSession } from './components/PlayerClaimPanel'
+import { ProgressPanel } from './components/ProgressPanel'
 import { ProjectLinks } from './components/ProjectLinks'
 import { StatusBar } from './components/StatusBar'
 import { usePolling } from './hooks/usePolling'
@@ -210,6 +211,7 @@ function LiveMap({
   const [expandedBases, setExpandedBases] = useState(() => new Set<string>())
   const [search, setSearch] = useState('')
   const [filtersOpen, setFiltersOpen] = useState(() => typeof window === 'undefined' || window.innerWidth >= 640)
+  const [progressOpen, setProgressOpen] = useState(false)
   const [detail, setDetail] = useState<Detail | null>(null)
   const [returnFocus, setReturnFocus] = useState<HTMLElement | null>(null)
   const mapRef = useRef<MapViewportHandle>(null)
@@ -217,6 +219,7 @@ function LiveMap({
   const pendingFocusRef = useRef<{ itemId: string; returnFocus: HTMLElement } | null>(null)
   const searchRef = useRef<HTMLInputElement>(null)
   const filterButtonRef = useRef<HTMLButtonElement>(null)
+  const progressButtonRef = useRef<HTMLButtonElement>(null)
   const leaderboardButtonRef = useRef<HTMLButtonElement>(null)
 
   useEffect(() => {
@@ -320,12 +323,12 @@ function LiveMap({
 
   useEffect(() => {
     const reconcileMobilePanels = () => {
-      if (window.innerWidth < 640 && detail?.kind === 'leaderboard') setFiltersOpen(false)
+      if (window.innerWidth < 640 && (detail?.kind === 'leaderboard' || progressOpen)) setFiltersOpen(false)
     }
     reconcileMobilePanels()
     window.addEventListener('resize', reconcileMobilePanels)
     return () => window.removeEventListener('resize', reconcileMobilePanels)
-  }, [detail?.kind])
+  }, [detail?.kind, progressOpen])
 
   useEffect(() => {
     if (!detail) return
@@ -352,11 +355,13 @@ function LiveMap({
   }, [activeLayer.id, itemById])
 
   const showItem = (item: MapItem, focus: HTMLElement) => {
+    setProgressOpen(false)
     setReturnFocus(focus)
     setDetail({ kind: 'item', itemId: item.id })
   }
 
   const showGuild = (guildId: string, focus: HTMLElement) => {
+    setProgressOpen(false)
     pendingFocusRef.current = null
     const query = search.trim().toLowerCase()
     if (query && !buildGuildDetails(guildId, items).name.toLowerCase().includes(query)) setSearch('')
@@ -366,6 +371,7 @@ function LiveMap({
   }
 
   const showLeaderboard = (leaderboardId: LeaderboardId, focus: HTMLElement) => {
+    setProgressOpen(false)
     pendingFocusRef.current = null
     setReturnFocus(focus)
     mapRef.current?.clearSelection()
@@ -384,11 +390,25 @@ function LiveMap({
       setDetail(null)
       mapRef.current?.clearSelection()
     }
+    if (mobilePanelLayout()) setProgressOpen(false)
     setFiltersOpen(true)
+  }
+
+  const toggleProgress = () => {
+    if (progressOpen) {
+      setProgressOpen(false)
+      return
+    }
+    pendingFocusRef.current = null
+    setDetail(null)
+    mapRef.current?.clearSelection()
+    if (mobilePanelLayout()) setFiltersOpen(false)
+    setProgressOpen(true)
   }
 
   const toggleLeaderboards = (focus: HTMLButtonElement) => {
     if (detail?.kind !== 'leaderboard') {
+      setProgressOpen(false)
       if (mobilePanelLayout()) setFiltersOpen(false)
       showLeaderboard('player-level', focus)
       return
@@ -632,18 +652,8 @@ function LiveMap({
     expandedGuilds,
     expandedBases,
     manualChecklist: {
-      profileName: completionProfile.name,
-      completedIds,
       manualCompletedIds: manuallyCompletedIds,
-      saveCompletedIds,
-      completed: completionSummary.completed,
-      total: completionSummary.total,
-      remaining: completionSummary.remaining,
-      remainingOnly: localCompletion.remainingOnly,
-      saveProgress,
-      onRetrySaveProgress: retrySaveProgress,
-      onRemainingOnlyChange: (remainingOnly: boolean) =>
-        setLocalCompletion((current) => setRemainingOnly(current, remainingOnly))
+      saveCompletedIds
     },
     dataNotices,
     catalogueRetry: catalogueError
@@ -680,14 +690,35 @@ function LiveMap({
           filterButtonRef,
           filterSearch: search,
           filtersOpen,
+          progressButtonRef,
+          progressOpen,
           leaderboardButtonRef,
           leaderboardOpen: detail?.kind === 'leaderboard',
           onToggleFilters: toggleFilters,
+          onToggleProgress: toggleProgress,
           onToggleLeaderboards: toggleLeaderboards
         }}
       />
       <main className="absolute inset-0 overflow-hidden bg-[#0d161e]">
         <Explorer {...explorerProps} open={filtersOpen} />
+        <ProgressPanel
+          open={progressOpen}
+          activeLayer={activeLayer}
+          players={items}
+          progressButtonRef={progressButtonRef}
+          checklist={{
+            profileName: completionProfile.name,
+            completed: completionSummary.completed,
+            total: completionSummary.total,
+            remaining: completionSummary.remaining,
+            remainingOnly: localCompletion.remainingOnly,
+            saveProgress,
+            onRetrySaveProgress: retrySaveProgress,
+            onRemainingOnlyChange: (remainingOnly) =>
+              setLocalCompletion((current) => setRemainingOnly(current, remainingOnly))
+          }}
+          onClose={() => setProgressOpen(false)}
+        />
         <div className="relative size-full min-h-0 min-w-0 overflow-hidden">
           <MapViewport
             ref={mapRef}
@@ -700,7 +731,7 @@ function LiveMap({
             hiddenIds={hiddenIds}
             search={search}
             onShowItem={showItem}
-            inspectorOpen={Boolean(detail)}
+            inspectorOpen={Boolean(detail) || progressOpen}
           >
             <ProjectLinks hidden={Boolean(detail && detail.kind !== 'leaderboard')} />
             <DetailsDialog
@@ -721,7 +752,8 @@ function LiveMap({
                 pendingFocusRef.current = null
                 setDetail(null)
                 mapRef.current?.clearSelection()
-                setFiltersOpen(true)
+                if (mobilePanelLayout()) setFiltersOpen(false)
+                setProgressOpen(true)
               }}
               onSelectItem={(item, focus) => {
                 const query = search.trim().toLowerCase()
