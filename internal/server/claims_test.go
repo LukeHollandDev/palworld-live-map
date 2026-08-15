@@ -253,9 +253,9 @@ func claimSessionFromResponse(t *testing.T, response *httptest.ResponseRecorder)
 	return nil
 }
 
-func TestInsecureLoopbackClaimsUseDistinctHostOnlyCookie(t *testing.T) {
+func TestHTTPClaimsUseDistinctHostOnlyCookie(t *testing.T) {
 	server, _ := newClaimHTTPServer(t, nil, nil)
-	server.settings.playerClaimsInsecureLocal = true
+	server.settings.playerClaimsHTTP = true
 	response := httptest.NewRecorder()
 	server.setClaimCookie(response, strings.Repeat("a", 43), claimTestNow.Add(time.Hour))
 	cookies := response.Result().Cookies()
@@ -263,11 +263,11 @@ func TestInsecureLoopbackClaimsUseDistinctHostOnlyCookie(t *testing.T) {
 		t.Fatalf("cookies = %v", cookies)
 	}
 	cookie := cookies[0]
-	if cookie.Name != insecureClaimSessionCookie || cookie.Path != "/" || cookie.Domain != "" || cookie.Secure || !cookie.HttpOnly || cookie.SameSite != http.SameSiteStrictMode {
-		t.Fatalf("insecure loopback cookie = %+v", cookie)
+	if cookie.Name != httpClaimSessionCookie || cookie.Path != "/" || cookie.Domain != "" || cookie.Secure || !cookie.HttpOnly || cookie.SameSite != http.SameSiteStrictMode {
+		t.Fatalf("HTTP claim cookie = %+v", cookie)
 	}
 	if cookie.Name == claimSessionCookie {
-		t.Fatal("insecure loopback cookie reused the production __Host- name")
+		t.Fatal("HTTP claim cookie reused the HTTPS __Host- name")
 	}
 }
 

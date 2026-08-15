@@ -63,7 +63,7 @@ type serverSettings struct {
 	worldDataEnabled           bool
 	playerClaimsEnabled        bool
 	playerClaimsOrigin         string
-	playerClaimsInsecureLocal  bool
+	playerClaimsHTTP           bool
 	playerClaimsTrustedProxies []netip.Prefix
 }
 
@@ -181,7 +181,7 @@ func NewWithClaims(cfg config.Config, source snapshotSource, claims *playerclaim
 			pollInterval: cfg.PollInterval, worldPollInterval: cfg.WorldPollInterval,
 			worldDataEnabled: cfg.WorldDataEnabled, playerClaimsEnabled: cfg.PlayerClaimsEnabled,
 			playerClaimsOrigin:         cfg.PlayerClaimsOrigin,
-			playerClaimsInsecureLocal:  cfg.PlayerClaimsInsecureLocal,
+			playerClaimsHTTP:           cfg.PlayerClaimsHTTP,
 			playerClaimsTrustedProxies: append([]netip.Prefix{}, cfg.PlayerClaimsTrustedProxies...),
 		},
 		source: source, assets: webAssets, maps: maps, mapFiles: mapFiles, layers: layers,

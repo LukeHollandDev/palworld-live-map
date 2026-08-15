@@ -123,8 +123,7 @@ Every supported environment option and timeout is listed below and documented in
 | `SAVE_POLL_INTERVAL`      | Save enrichment interval; minimum `15s`                              | `30s`                  |
 | `SAVE_TIMEOUT`            | Whole-generation timeout; must be below `SAVE_POLL_INTERVAL`         | `20s`                  |
 | `PLAYER_CLAIMS_ENABLED`   | Enable save-backed “This is me” character connection                 | `false`                |
-| `PLAYER_CLAIMS_ORIGIN`    | Exact public HTTPS origin used for same-origin request validation     | required when enabled  |
-| `PLAYER_CLAIMS_ALLOW_INSECURE_LOOPBACK` | Development only: allow an exact HTTP loopback origin | `false` |
+| `PLAYER_CLAIMS_ORIGIN`    | Exact browser-facing HTTP or HTTPS origin used for request validation | required when enabled  |
 | `PLAYER_CLAIMS_SECRET_FILE` | Owner-only file containing a persistent 32-byte installation secret | required when enabled  |
 | `PLAYER_CLAIMS_TRUSTED_PROXIES` | Comma-separated proxy CIDRs trusted to supply `X-Forwarded-For` | empty                  |
 
@@ -142,7 +141,7 @@ temporarily unavailable.
 
 ### Connect a saved character privately
 
-Character connection is opt-in and requires save integration plus HTTPS. It
+Character connection is opt-in and requires save integration. It
 does not ask a player to reveal an inventory item, party member, raw account ID,
 or server password. After establishing a fresh immutable baseline, the map
 selects an eight-slot inventory cycle from at least sixteen uniquely
@@ -168,8 +167,9 @@ openssl rand -hex 32 > player-claims.secret
 ```
 
 Mount that file read-only in the map container, then set
-`PLAYER_CLAIMS_ENABLED=true`, `PLAYER_CLAIMS_ORIGIN` to the exact public origin
-(for example `https://map.example.com`), and `PLAYER_CLAIMS_SECRET_FILE` to its
+`PLAYER_CLAIMS_ENABLED=true`, `PLAYER_CLAIMS_ORIGIN` to the exact browser-facing
+origin (for example `http://192.0.2.10:8080` or `https://map.example.com`), and
+`PLAYER_CLAIMS_SECRET_FILE` to its
 absolute container path. Keep it owner-only and readable by the container's
 non-root runtime user. The secret must survive restarts and be backed up: it
 keeps private character subjects and opaque public IDs stable even when the
@@ -177,11 +177,12 @@ REST URL or admin password changes.
 Enabling claims on an existing deployment changes opaque player/guild IDs once
 as they move from credential-derived IDs to the installation-secret key.
 
-For local validation without a TLS proxy, set
-`PLAYER_CLAIMS_ALLOW_INSECURE_LOOPBACK=true` and use an exact loopback origin,
-such as `PLAYER_CLAIMS_ORIGIN=http://127.0.0.1:8080`. This override rejects
-non-loopback hosts, uses a separate non-`Secure` development cookie, and must
-never be enabled on a shared or remotely reachable deployment.
+HTTP origins are supported for simple self-hosted and raw-IP deployments. HTTPS
+is still strongly recommended on shared or untrusted networks because it
+prevents interception of the authenticated session and private completion
+progress. HTTPS uses a `Secure`, `__Host-` session cookie; HTTP uses a separate
+non-`Secure`, HttpOnly, SameSite=Strict cookie. Exact-origin validation, CSRF
+checks, self-only endpoints, and no-store responses apply in both modes.
 
 When an HTTPS reverse proxy connects to the map, configure its exact address
 range in `PLAYER_CLAIMS_TRUSTED_PROXIES` and have it append `X-Forwarded-For`.
@@ -191,8 +192,9 @@ the proxy as well as the map's built-in per-client and process-wide limits.
 Because roster safety deliberately reads the second-newest native backup, each
 of baseline, proof, and restore normally needs roughly two Palworld backup
 intervals plus save polling. Each phase has a 90-minute deadline. Sessions are
-held only in memory in this first release, use Secure, HttpOnly, SameSite=Strict
-cookies, and must be re-established after a map restart. Connected players can
+held only in memory in this first release, use HttpOnly, SameSite=Strict cookies
+(plus `Secure` under HTTPS), and must be re-established after a map restart.
+Connected players can
 see exact save-confirmed waypoint and journal completion through
 `/api/me/progress` only;
 raw save state keys are projected to public catalogue location IDs. Manual

@@ -19,11 +19,11 @@ import (
 )
 
 const (
-	claimSessionCookie         = "__Host-palworld_live_map_session"
-	insecureClaimSessionCookie = "palworld_live_map_local_session"
-	claimCSRFHeader            = "X-Palworld-Live-Map"
-	maxClaimBody               = 8 << 10
-	maxClaimPlayerID           = 256
+	claimSessionCookie     = "__Host-palworld_live_map_session"
+	httpClaimSessionCookie = "palworld_live_map_http_session"
+	claimCSRFHeader        = "X-Palworld-Live-Map"
+	maxClaimBody           = 8 << 10
+	maxClaimPlayerID       = 256
 )
 
 type startClaimRequest struct {
@@ -320,8 +320,8 @@ func validClaimBearer(value string) bool {
 }
 
 func (s *Server) claimCookieName() string {
-	if s.settings.playerClaimsInsecureLocal {
-		return insecureClaimSessionCookie
+	if s.settings.playerClaimsHTTP {
+		return httpClaimSessionCookie
 	}
 	return claimSessionCookie
 }
@@ -329,14 +329,14 @@ func (s *Server) claimCookieName() string {
 func (s *Server) setClaimCookie(w http.ResponseWriter, bearer string, expiresAt time.Time) {
 	http.SetCookie(w, &http.Cookie{
 		Name: s.claimCookieName(), Value: bearer, Path: "/", Expires: expiresAt.UTC(),
-		Secure: !s.settings.playerClaimsInsecureLocal, HttpOnly: true, SameSite: http.SameSiteStrictMode,
+		Secure: !s.settings.playerClaimsHTTP, HttpOnly: true, SameSite: http.SameSiteStrictMode,
 	})
 }
 
 func (s *Server) clearClaimCookie(w http.ResponseWriter) {
 	http.SetCookie(w, &http.Cookie{
 		Name: s.claimCookieName(), Value: "", Path: "/", MaxAge: -1, Expires: time.Unix(1, 0).UTC(),
-		Secure: !s.settings.playerClaimsInsecureLocal, HttpOnly: true, SameSite: http.SameSiteStrictMode,
+		Secure: !s.settings.playerClaimsHTTP, HttpOnly: true, SameSite: http.SameSiteStrictMode,
 	})
 }
 
