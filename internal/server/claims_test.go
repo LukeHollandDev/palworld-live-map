@@ -538,6 +538,41 @@ func TestClaimMutationsRequireStrictBrowserAndJSONHeaders(t *testing.T) {
 	})
 }
 
+func TestHTTPClaimMutationsUseTheBrowserFacingSameOrigin(t *testing.T) {
+	tests := []struct {
+		name       string
+		requestURL string
+		origin     string
+		fetchSite  string
+		wantStatus int
+	}{
+		{name: "configured address", requestURL: "http://127.0.0.1:8080/api/player-claims", origin: "http://127.0.0.1:8080", fetchSite: "same-origin", wantStatus: http.StatusCreated},
+		{name: "local hostname alias", requestURL: "http://localhost:8080/api/player-claims", origin: "http://localhost:8080", fetchSite: "same-origin", wantStatus: http.StatusCreated},
+		{name: "missing fetch metadata", requestURL: "http://localhost:8080/api/player-claims", origin: "http://localhost:8080", wantStatus: http.StatusCreated},
+		{name: "different request origin", requestURL: "http://localhost:8080/api/player-claims", origin: "http://127.0.0.1:8080", fetchSite: "same-origin", wantStatus: http.StatusForbidden},
+		{name: "cross site remains rejected", requestURL: "http://localhost:8080/api/player-claims", origin: "http://localhost:8080", fetchSite: "cross-site", wantStatus: http.StatusForbidden},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			server, _ := newClaimHTTPServer(t, &claimHTTPProver{}, nil)
+			server.settings.playerClaimsOrigin = "http://127.0.0.1:8080"
+			request := httptest.NewRequest(http.MethodPost, test.requestURL, strings.NewReader(`{"playerId":"public-player"}`))
+			request.Header.Set("Origin", test.origin)
+			if test.fetchSite != "" {
+				request.Header.Set("Sec-Fetch-Site", test.fetchSite)
+			}
+			request.Header.Set(claimCSRFHeader, "1")
+			request.Header.Set("Content-Type", "application/json")
+
+			response := serveClaim(t, server, request)
+			if response.Code != test.wantStatus {
+				t.Fatalf("response = status %d, body %s; want %d", response.Code, response.Body.String(), test.wantStatus)
+			}
+		})
+	}
+}
+
 func TestClaimStartRejectsMalformedAndAmbiguousBodies(t *testing.T) {
 	tests := []struct {
 		name string

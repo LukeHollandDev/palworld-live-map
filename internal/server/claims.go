@@ -8,6 +8,7 @@ import (
 	"mime"
 	"net/http"
 	"net/netip"
+	"net/url"
 	"sort"
 	"strings"
 	"sync"
@@ -279,9 +280,10 @@ func (s *Server) writeStartClaimError(w http.ResponseWriter, r *http.Request, er
 }
 
 func (s *Server) validClaimMutation(w http.ResponseWriter, r *http.Request) bool {
+	originOK, insecureHTTP := validClaimOrigin(r.Header.Get("Origin"), s.settings.playerClaimsOrigin, r.Host)
 	site := r.Header.Get("Sec-Fetch-Site")
-	if r.Header.Get("Origin") != s.settings.playerClaimsOrigin ||
-		site != "same-origin" ||
+	if !originOK ||
+		(site != "same-origin" && !(insecureHTTP && site == "")) ||
 		r.Header.Get(claimCSRFHeader) != "1" {
 		writeJSON(w, r, http.StatusForbidden, claimErrorResponse{Error: "request_rejected"})
 		return false
@@ -292,6 +294,28 @@ func (s *Server) validClaimMutation(w http.ResponseWriter, r *http.Request) bool
 		return false
 	}
 	return true
+}
+
+func validClaimOrigin(origin, configuredOrigin, requestHost string) (bool, bool) {
+	configured, err := url.Parse(configuredOrigin)
+	if err != nil || configured.Scheme == "" || configured.Host == "" {
+		return false, false
+	}
+	insecureHTTP := configured.Scheme == "http"
+	if !insecureHTTP {
+		return origin == configuredOrigin, false
+	}
+
+	// HTTP claims are an explicit compatibility mode for direct-IP and local
+	// deployments. Keep the request same-origin, but use the browser-facing Host
+	// rather than forcing every alias (for example localhost and 127.0.0.1) into
+	// configuration. The non-simple CSRF header remains mandatory.
+	parsed, err := url.Parse(origin)
+	if err != nil || parsed.Scheme != "http" || parsed.Host == "" || parsed.Host != requestHost ||
+		parsed.User != nil || parsed.Path != "" || parsed.RawQuery != "" || parsed.Fragment != "" {
+		return false, true
+	}
+	return true, true
 }
 
 func decodeClaimJSON(w http.ResponseWriter, r *http.Request, destination any) bool {
