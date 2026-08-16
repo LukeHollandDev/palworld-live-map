@@ -31,7 +31,8 @@ type startClaimRequest struct {
 }
 
 type verifyClaimRequest struct {
-	ChallengeToken string `json:"challengeToken"`
+	ChallengeToken string                   `json:"challengeToken"`
+	Answers        []playerclaim.QuizAnswer `json:"answers,omitempty"`
 }
 
 type claimErrorResponse struct {
@@ -121,7 +122,11 @@ func (s *Server) verifyPlayerClaim(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer s.releaseClaimWork()
-	verification, err := s.claims.Verify(r.Context(), request.ChallengeToken)
+	if len(request.Answers) > 2 {
+		writeJSON(w, r, http.StatusBadRequest, claimErrorResponse{Error: "invalid_request"})
+		return
+	}
+	verification, err := s.claims.Verify(r.Context(), request.ChallengeToken, request.Answers...)
 	if err != nil {
 		if errors.Is(err, playerclaim.ErrVerificationInFlight) {
 			writeJSON(w, r, http.StatusAccepted, claimVerificationResponse{Status: playerclaim.VerificationPending})
@@ -129,6 +134,10 @@ func (s *Server) verifyPlayerClaim(w http.ResponseWriter, r *http.Request) {
 		}
 		if errors.Is(err, playerclaim.ErrChallengeNotFound) || errors.Is(err, playerclaim.ErrChallengeExpired) {
 			writeJSON(w, r, http.StatusUnauthorized, claimErrorResponse{Error: "invalid_or_expired_challenge"})
+			return
+		}
+		if errors.Is(err, playerclaim.ErrIncorrectAnswer) {
+			writeJSON(w, r, http.StatusUnauthorized, claimErrorResponse{Error: "verification_failed"})
 			return
 		}
 		writeJSON(w, r, http.StatusServiceUnavailable, claimErrorResponse{Error: "claim_unavailable"})

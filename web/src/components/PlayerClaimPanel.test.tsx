@@ -46,6 +46,30 @@ function startResponse(expiresInMs = 10 * 60_000, token = challengeToken) {
   }
 }
 
+function quizStartResponse(expiresInMs = 10 * 60_000, token = challengeToken) {
+  return {
+    challengeToken: token,
+    status: 'ready',
+    expiresAt: new Date(Date.now() + expiresInMs).toISOString(),
+    instructions: {
+      kind: 'inventory_quiz',
+      snapshotAt: new Date(Date.now() - 1_000).toISOString(),
+      questions: [
+        {
+          id: 'q1',
+          prompt: 'Which item is in common-inventory slot 4?',
+          options: ['Wood', 'Stone', 'Fiber', 'Ore', 'Coal', 'Sulfur', 'Quartz', 'Pal Sphere']
+        },
+        {
+          id: 'q2',
+          prompt: 'Which item is in common-inventory slot 9?',
+          options: ['Berry', 'Milk', 'Honey', 'Flour', 'Cake', 'Wool', 'Leather', 'Bone']
+        }
+      ]
+    }
+  }
+}
+
 function readyResponse(phase: 'prove' | 'restore', expiresInMs = 90 * 60_000) {
   return {
     status: 'ready',
@@ -139,6 +163,70 @@ afterEach(() => {
 })
 
 describe('PlayerClaimPanel', () => {
+  it('verifies an offline character with two quick multiple-choice questions', async () => {
+    const requests: Array<{ path: string; init?: RequestInit }> = []
+    let meRequests = 0
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
+        const path = pathOf(input)
+        requests.push({ path, init })
+        if (path === '/api/me') {
+          meRequests++
+          return meRequests === 1
+            ? jsonResponse({ error: 'authentication_required' }, 401)
+            : jsonResponse(authenticatedSession('offline-player'))
+        }
+        if (path === '/api/player-claims') return jsonResponse(quizStartResponse(), 201)
+        if (path === '/api/player-claims/verify') {
+          return jsonResponse({
+            status: 'verified',
+            idleExpiresAt: new Date(Date.now() + 60_000).toISOString(),
+            absoluteExpiresAt: new Date(Date.now() + 120_000).toISOString()
+          })
+        }
+        return new Response(null, { status: 404 })
+      })
+    )
+    const players = [
+      {
+        id: 'offline-player',
+        kind: 'players' as const,
+        name: 'Offline Player',
+        level: 40,
+        online: false,
+        x: 3,
+        y: 4,
+        map: 'palpagos'
+      }
+    ]
+    const user = userEvent.setup()
+    render(
+      <PlayerClaimProvider enabled>
+        <PlayerClaimSessionControl players={players} />
+        <PlayerClaimIdentityChooser players={players} />
+      </PlayerClaimProvider>
+    )
+
+    await user.click(await screen.findByRole('button', { name: 'This is me' }))
+    expect(
+      await screen.findByText('Choose the two answers that match this character’s latest completed save.')
+    ).toBeVisible()
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Which item is in common-inventory slot 4?' }), '1')
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Which item is in common-inventory slot 9?' }), '3')
+    await user.click(screen.getByRole('button', { name: 'Verify answers' }))
+
+    const verify = requests.find((request) => request.path === '/api/player-claims/verify')
+    expect(JSON.parse(String(verify?.init?.body))).toEqual({
+      challengeToken,
+      answers: [
+        { questionId: 'q1', option: 1 },
+        { questionId: 'q2', option: 3 }
+      ]
+    })
+    expect(await screen.findByRole('heading', { name: 'Connected private save' })).toBeVisible()
+  })
+
   it('offers both online and offline roster characters for verification', async () => {
     const requests: Array<{ path: string; init?: RequestInit }> = []
     vi.stubGlobal(

@@ -36,6 +36,8 @@ const (
 	maxNameBytes         = 96
 	claimCandidateFloor  = 16
 	claimCycleSlots      = 8
+	claimQuizQuestions   = 2
+	claimQuizOptions     = 8
 	maxClaimPlayerCache  = 32
 	maxCachedPlayerBytes = 1 << 20
 )
@@ -52,6 +54,10 @@ type SnapshotReader interface {
 // roster enrichment does not implicitly enable private per-player reads.
 type ClaimReader interface {
 	ReadClaimPlayer(context.Context, string, string) (savesidecar.ClaimPlayer, error)
+}
+
+type knowledgeQuizReader interface {
+	KnowledgeQuizEnabled() bool
 }
 
 // IDProjector turns a private persistent save GUID into an opaque public key.
@@ -575,6 +581,11 @@ type claimEvidence struct {
 	inventory         []savesidecar.ClaimStack
 }
 
+type claimQuizEvidence struct {
+	target  claimTarget
+	correct []int
+}
+
 type claimPhase uint8
 
 const (
@@ -621,6 +632,18 @@ func (s *Source) Prepare(ctx context.Context, publicPlayerID string, selector ui
 	if err != nil || baseline.worldID != target.worldID {
 		return playerclaim.Prepared{}, playerclaim.ErrUnavailable
 	}
+	if quizReader, ok := s.claimReader.(knowledgeQuizReader); ok && quizReader.KnowledgeQuizEnabled() {
+		player, readErr := s.readClaimPlayerCached(ctx, baseline, target)
+		if readErr == nil && player.PlayerID == target.playerID {
+			instructions, correct, selected := selectInventoryQuiz(player.Common, selector, baseline.snapshotAt)
+			if selected {
+				return playerclaim.Prepared{
+					Subject: target.subject, PublicPlayerID: strings.TrimSpace(publicPlayerID), Instructions: instructions,
+					Evidence: &claimQuizEvidence{target: target, correct: correct},
+				}, nil
+			}
+		}
+	}
 	issued, err := visibleGenerationPaths(ctx, baseline.worldPath)
 	if err != nil || len(issued) == 0 {
 		return playerclaim.Prepared{}, playerclaim.ErrUnavailable
@@ -642,6 +665,24 @@ func (s *Source) Verify(ctx context.Context, prepared *playerclaim.Prepared) err
 	}
 	if prepared == nil {
 		return playerclaim.ErrUnavailable
+	}
+	if quiz, ok := prepared.Evidence.(*claimQuizEvidence); ok {
+		if quiz == nil || prepared.Subject == "" || prepared.Subject != quiz.target.subject ||
+			prepared.Instructions.Kind != playerclaim.InventoryQuiz || len(prepared.Answers) != len(quiz.correct) {
+			return playerclaim.ErrUnavailable
+		}
+		s.claimMu.RLock()
+		current, exists := s.claimTargetsForSubjectLocked(quiz.target.subject)
+		s.claimMu.RUnlock()
+		if !exists || current.playerID != quiz.target.playerID || current.worldID != quiz.target.worldID {
+			return playerclaim.ErrUnavailable
+		}
+		for index, answer := range prepared.Answers {
+			if answer.QuestionID != prepared.Instructions.Questions[index].ID || answer.Option != quiz.correct[index] {
+				return playerclaim.ErrIncorrectAnswer
+			}
+		}
+		return nil
 	}
 	evidence, ok := prepared.Evidence.(*claimEvidence)
 	if !ok || evidence == nil || prepared.Subject == "" || prepared.Subject != evidence.target.subject {
@@ -712,6 +753,90 @@ func (s *Source) Verify(ctx context.Context, prepared *playerclaim.Prepared) err
 	default:
 		return playerclaim.ErrUnavailable
 	}
+}
+
+func selectInventoryQuiz(stacks []savesidecar.ClaimStack, selector uint64, snapshotAt time.Time) (playerclaim.Instructions, []int, bool) {
+	type candidate struct {
+		slot  uint32
+		label string
+	}
+	seen := make(map[string]struct{}, len(stacks))
+	candidates := make([]candidate, 0, len(stacks))
+	for _, stack := range stacks {
+		label := humanizeItemID(stack.ItemID)
+		if !validClaimStack(stack) || label == "" {
+			continue
+		}
+		key := strings.ToLower(label)
+		if _, exists := seen[key]; exists {
+			continue
+		}
+		seen[key] = struct{}{}
+		candidates = append(candidates, candidate{slot: stack.Slot, label: label})
+	}
+	required := claimQuizQuestions * claimQuizOptions
+	if len(candidates) < required || snapshotAt.IsZero() {
+		return playerclaim.Instructions{}, nil, false
+	}
+	state := selector ^ 0xd1b54a32d192ed03
+	for index := len(candidates) - 1; index > 0; index-- {
+		state = claimRandom(state)
+		other := int(state % uint64(index+1))
+		candidates[index], candidates[other] = candidates[other], candidates[index]
+	}
+	questions := make([]playerclaim.QuizQuestion, 0, claimQuizQuestions)
+	correct := make([]int, 0, claimQuizQuestions)
+	for questionIndex := 0; questionIndex < claimQuizQuestions; questionIndex++ {
+		group := append([]candidate(nil), candidates[questionIndex*claimQuizOptions:(questionIndex+1)*claimQuizOptions]...)
+		target := group[0]
+		for index := len(group) - 1; index > 0; index-- {
+			state = claimRandom(state)
+			other := int(state % uint64(index+1))
+			group[index], group[other] = group[other], group[index]
+		}
+		options := make([]string, len(group))
+		answer := -1
+		for index, option := range group {
+			options[index] = option.label
+			if option.slot == target.slot {
+				answer = index
+			}
+		}
+		if answer < 0 {
+			return playerclaim.Instructions{}, nil, false
+		}
+		questions = append(questions, playerclaim.QuizQuestion{
+			ID:      fmt.Sprintf("q%d", questionIndex+1),
+			Prompt:  fmt.Sprintf("Which item is in common-inventory slot %d?", target.slot+1),
+			Options: options,
+		})
+		correct = append(correct, answer)
+	}
+	return playerclaim.Instructions{Kind: playerclaim.InventoryQuiz, Questions: questions, SnapshotAt: snapshotAt}, correct, true
+}
+
+func humanizeItemID(value string) string {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return ""
+	}
+	var result strings.Builder
+	var previous rune
+	for _, current := range value {
+		if current == '_' || current == '-' {
+			if result.Len() > 0 && previous != ' ' {
+				result.WriteByte(' ')
+				previous = ' '
+			}
+			continue
+		}
+		if result.Len() > 0 && unicode.IsUpper(current) && (unicode.IsLower(previous) || unicode.IsDigit(previous)) {
+			result.WriteByte(' ')
+		}
+		result.WriteRune(current)
+		previous = current
+	}
+	return strings.Join(strings.Fields(result.String()), " ")
 }
 
 // Progress resolves exact keys for one already-authenticated private subject.

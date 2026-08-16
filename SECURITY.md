@@ -7,19 +7,22 @@ Do not expose the Palworld REST API or its credentials publicly. REST Basic Auth
 This map does not provide general viewer authentication. Anyone who can access it can see online player names and positions, plus any enabled world-object layers. Restrict access to the map if that information should not be public.
 
 The optional saved-character connection authenticates only self-private routes;
-it is not an access-control layer for the live map. It uses a nonce-selected
-eight-slot inventory cycle and a separately observed restore sequence across
-new immutable backup generations. Claims require at least sixteen distinct
-stack fingerprints, reveal slot numbers only, and use a dedicated persistent
-installation secret, bounded hash-at-rest challenges and sessions, and
-HttpOnly, SameSite=Strict cookies (`Secure` under HTTPS). Exact inventory contents, Pal instance IDs,
-raw save identifiers, proof evidence, completion state keys, and the
-installation secret must never be returned by an API or written to logs.
-For reload recovery, the browser may retain only validated slot pairs, the
-proof phase, and advisory per-swap progress in `sessionStorage`; bearer tokens,
-player identities, item data, and save progress must never be persisted there.
-That recovery record is cleared only after verified completion or explicit
-inventory-recovery acknowledgement.
+it is not an access-control layer for the live map. Its primary proof is a
+one-shot, two-question inventory quiz generated from a safely completed backup,
+with eight display-label choices per question. A wrong submission consumes the
+challenge, and existing per-client and global limits bound guessing and private
+decoder work. Correct answers, counts, dynamic instance IDs, raw item IDs, raw
+save identifiers, proof evidence, completion state keys, and the installation
+secret must never be returned by an API or written to logs. Challenges and
+sessions are bounded and stored hash-at-rest; sessions use HttpOnly,
+SameSite=Strict cookies (`Secure` under HTTPS).
+
+The reversible inventory transition remains only as a fallback for saves that
+cannot produce a safe quiz. For reload recovery, the browser may retain only
+its validated slot pairs, proof phase, and advisory per-swap progress in
+`sessionStorage`; bearer tokens, player identities, quiz questions or answers,
+item data, and save progress must never be persisted there. That recovery record
+is cleared only after verified completion or explicit recovery acknowledgement.
 
 Enabling claims does not change the existing public player endpoints: their
 online and offline rosters, saved positions, levels, guild relationships,

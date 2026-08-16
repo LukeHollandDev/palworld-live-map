@@ -43,15 +43,17 @@ func (c *claimHTTPClock) Advance(delta time.Duration) {
 type claimHTTPProver struct {
 	mu sync.Mutex
 
-	prepareErr  error
-	verifySteps []claimHTTPVerifyStep
-	progress    playerclaim.PrivateProgress
-	progressErr error
+	prepareErr          error
+	prepareInstructions playerclaim.Instructions
+	verifySteps         []claimHTTPVerifyStep
+	progress            playerclaim.PrivateProgress
+	progressErr         error
 
 	prepareCalls int
 	verifyCalls  int
 	lastTarget   string
 	lastSelector uint64
+	lastAnswers  []playerclaim.QuizAnswer
 }
 
 type claimHTTPVerifyStep struct {
@@ -96,6 +98,7 @@ func (p *claimHTTPProver) Prepare(_ context.Context, target string, selector uin
 	return playerclaim.Prepared{
 		Subject:        "private-world-subject:" + target,
 		PublicPlayerID: target,
+		Instructions:   p.prepareInstructions,
 		Evidence: struct {
 			Secret string
 		}{Secret: "never disclose this evidence"},
@@ -106,6 +109,9 @@ func (p *claimHTTPProver) Verify(_ context.Context, prepared *playerclaim.Prepar
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	p.verifyCalls++
+	if prepared != nil {
+		p.lastAnswers = append([]playerclaim.QuizAnswer(nil), prepared.Answers...)
+	}
 	if len(p.verifySteps) == 0 {
 		return nil
 	}
@@ -652,6 +658,43 @@ func TestOfflinePublicPlayerCanStartClaim(t *testing.T) {
 	}
 	if prepare, _ := prover.calls(); prepare != 1 {
 		t.Fatalf("Prover.Prepare calls = %d, want 1", prepare)
+	}
+}
+
+func TestOfflineInventoryQuizAnswersIssuePrivateSession(t *testing.T) {
+	quiz := playerclaim.Instructions{
+		Kind: playerclaim.InventoryQuiz, SnapshotAt: claimTestNow,
+		Questions: []playerclaim.QuizQuestion{
+			{ID: "q1", Prompt: "First item?", Options: []string{"Wood", "Stone", "Fiber", "Ore", "Coal", "Sulfur", "Quartz", "Pal Sphere"}},
+			{ID: "q2", Prompt: "Second item?", Options: []string{"A", "B", "C", "D", "E", "F", "G", "H"}},
+		},
+	}
+	prover := &claimHTTPProver{prepareInstructions: quiz}
+	server, _ := newClaimHTTPServer(t, prover, nil)
+	startBody, err := json.Marshal(map[string]string{"playerId": "offline-player"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	started := serveClaim(t, server, newClaimMutation(http.MethodPost, "/api/player-claims", string(startBody)))
+	if started.Code != http.StatusCreated || !strings.Contains(started.Body.String(), `"status":"ready"`) ||
+		!strings.Contains(started.Body.String(), `"kind":"inventory_quiz"`) || strings.Contains(started.Body.String(), "correct") {
+		t.Fatalf("quiz start = status %d, body %s", started.Code, started.Body.String())
+	}
+	var challenge playerclaim.Challenge
+	if err := json.Unmarshal(started.Body.Bytes(), &challenge); err != nil {
+		t.Fatal(err)
+	}
+	answers := []playerclaim.QuizAnswer{{QuestionID: "q1", Option: 1}, {QuestionID: "q2", Option: 3}}
+	verifyBody, err := json.Marshal(verifyClaimRequest{ChallengeToken: challenge.Bearer, Answers: answers})
+	if err != nil {
+		t.Fatal(err)
+	}
+	verified := serveClaim(t, server, newClaimMutation(http.MethodPost, "/api/player-claims/verify", string(verifyBody)))
+	if verified.Code != http.StatusOK || len(verified.Result().Cookies()) != 1 {
+		t.Fatalf("quiz verify = status %d, body %s", verified.Code, verified.Body.String())
+	}
+	if !reflect.DeepEqual(prover.lastAnswers, answers) {
+		t.Fatalf("quiz answers = %+v, want %+v", prover.lastAnswers, answers)
 	}
 }
 

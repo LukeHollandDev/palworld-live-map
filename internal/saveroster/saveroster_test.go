@@ -1311,6 +1311,40 @@ func testPlayerProjector(raw string) (string, bool) {
 	return "player:test", true
 }
 
+func TestSelectInventoryQuizBuildsTwoBoundedMultipleChoiceQuestions(t *testing.T) {
+	stacks := make([]savesidecar.ClaimStack, 18)
+	for index := range stacks {
+		stacks[index] = savesidecar.ClaimStack{Slot: uint32(index), ItemID: fmt.Sprintf("TestItem%d", index+1), Count: 1}
+	}
+	snapshotAt := time.Date(2026, time.August, 16, 1, 0, 0, 0, time.UTC)
+	instructions, correct, ok := selectInventoryQuiz(stacks, 42, snapshotAt)
+	if !ok || instructions.Kind != playerclaim.InventoryQuiz || len(instructions.Questions) != 2 || len(correct) != 2 {
+		t.Fatalf("selectInventoryQuiz() = %+v, %v, %v", instructions, correct, ok)
+	}
+	for index, question := range instructions.Questions {
+		if len(question.Options) != 8 || correct[index] < 0 || correct[index] >= len(question.Options) {
+			t.Fatalf("question %d = %+v, correct %d", index, question, correct[index])
+		}
+		seen := make(map[string]struct{}, len(question.Options))
+		for _, option := range question.Options {
+			seen[option] = struct{}{}
+		}
+		if len(seen) != 8 {
+			t.Fatalf("question %d options are not unique: %v", index, question.Options)
+		}
+	}
+	encoded, err := json.Marshal(instructions)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(encoded), "correct") || strings.Contains(string(encoded), "TestItem") {
+		t.Fatalf("quiz JSON exposed answers or raw item IDs: %s", encoded)
+	}
+	if got := humanizeItemID("MegaPalSphere"); got != "Mega Pal Sphere" {
+		t.Fatalf("humanizeItemID() = %q", got)
+	}
+}
+
 // Distinct guilds must project to distinct keys without the result carrying any
 // part of the private GUID, which is what the real keyed HMAC gives.
 func testGuildProjector(raw string) (string, bool) {

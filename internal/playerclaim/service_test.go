@@ -931,6 +931,58 @@ type errorReader struct{}
 
 func (errorReader) Read([]byte) (int, error) { return 0, io.ErrUnexpectedEOF }
 
+type knowledgeQuizProver struct{}
+
+func (knowledgeQuizProver) Prepare(_ context.Context, target string, _ uint64) (Prepared, error) {
+	return Prepared{
+		Subject: "subject:" + target, PublicPlayerID: target,
+		Instructions: Instructions{
+			Kind: InventoryQuiz, SnapshotAt: time.Now().Add(-time.Minute),
+			Questions: []QuizQuestion{
+				{ID: "q1", Prompt: "First?", Options: []string{"A", "B", "C", "D", "E", "F", "G", "H"}},
+				{ID: "q2", Prompt: "Second?", Options: []string{"I", "J", "K", "L", "M", "N", "O", "P"}},
+			},
+		},
+		Evidence: "private answers",
+	}, nil
+}
+
+func (knowledgeQuizProver) Verify(_ context.Context, prepared *Prepared) error {
+	if len(prepared.Answers) != 2 || prepared.Answers[0] != (QuizAnswer{QuestionID: "q1", Option: 1}) ||
+		prepared.Answers[1] != (QuizAnswer{QuestionID: "q2", Option: 3}) {
+		return ErrIncorrectAnswer
+	}
+	return nil
+}
+
+func TestKnowledgeQuizIsReadyImmediatelyAndConsumesIncorrectAttempt(t *testing.T) {
+	service, err := NewService(knowledgeQuizProver{}, Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	incorrect, err := service.Start(context.Background(), "offline-player")
+	if err != nil || incorrect.Status != VerificationReady || incorrect.Instructions == nil || incorrect.Instructions.Kind != InventoryQuiz {
+		t.Fatalf("Start() = %+v, %v", incorrect, err)
+	}
+	if _, err := service.Verify(context.Background(), incorrect.Bearer,
+		QuizAnswer{QuestionID: "q1", Option: 0}, QuizAnswer{QuestionID: "q2", Option: 3}); !errors.Is(err, ErrIncorrectAnswer) {
+		t.Fatalf("incorrect Verify() error = %v", err)
+	}
+	if _, err := service.Verify(context.Background(), incorrect.Bearer); !errors.Is(err, ErrChallengeNotFound) {
+		t.Fatalf("consumed Verify() error = %v", err)
+	}
+
+	correct, err := service.Start(context.Background(), "offline-player")
+	if err != nil {
+		t.Fatal(err)
+	}
+	verified, err := service.Verify(context.Background(), correct.Bearer,
+		QuizAnswer{QuestionID: "q1", Option: 1}, QuizAnswer{QuestionID: "q2", Option: 3})
+	if err != nil || verified.Status != VerificationVerified || verified.Session == nil {
+		t.Fatalf("correct Verify() = %+v, %v", verified, err)
+	}
+}
+
 func claimSession(t *testing.T, service *Service) string {
 	t.Helper()
 	return claimSessionFor(t, service, "player")

@@ -53,6 +53,10 @@ type Reader struct {
 	processGate chan struct{}
 }
 
+// KnowledgeQuizEnabled marks the concrete private reader as capable of
+// supplying the bounded inventory projection used by offline claim quizzes.
+func (*Reader) KnowledgeQuizEnabled() bool { return true }
+
 // NewReader resolves the executable and verifies both reader contracts needed
 // by the application. Preset gameVersion is provenance, not an invocation
 // selector.

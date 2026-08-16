@@ -18,7 +18,8 @@ const (
 	// ChallengePhaseTTL applies independently to arming, proof, and restore.
 	// Native backups can be infrequent and the safe reader intentionally lags
 	// one generation, so each phase needs room for two backup intervals.
-	ChallengePhaseTTL = 90 * time.Minute
+	ChallengePhaseTTL     = 90 * time.Minute
+	KnowledgeChallengeTTL = 10 * time.Minute
 
 	DefaultSessionIdleTTL     = 24 * time.Hour
 	DefaultSessionAbsoluteTTL = 7 * 24 * time.Hour
@@ -248,7 +249,17 @@ func (s *Service) Start(ctx context.Context, publicPlayerID string) (Challenge, 
 	}
 
 	now := s.now()
+	phase := challengeArming
+	status := VerificationArming
+	var instructions *Instructions
 	expiresAt := now.Add(ChallengePhaseTTL)
+	if prepared.Instructions.Kind == InventoryQuiz {
+		phase = challengeProving
+		status = VerificationReady
+		expiresAt = now.Add(KnowledgeChallengeTTL)
+		value := cloneInstructions(prepared.Instructions)
+		instructions = &value
+	}
 
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -263,10 +274,10 @@ func (s *Service) Start(ctx context.Context, publicPlayerID string) (Challenge, 
 
 	s.challenges[key] = &challengeEntry{
 		prepared: clonePrepared(prepared), subject: prepared.Subject, publicPlayerID: prepared.PublicPlayerID,
-		phase: challengeArming, expiresAt: expiresAt,
+		phase: phase, expiresAt: expiresAt,
 	}
 	return Challenge{
-		Bearer: bearer, Status: VerificationArming, ExpiresAt: expiresAt,
+		Bearer: bearer, Status: status, Instructions: instructions, ExpiresAt: expiresAt,
 	}, nil
 }
 
@@ -274,7 +285,7 @@ func (s *Service) Start(ctx context.Context, publicPlayerID string) (Challenge, 
 // client may poll without learning why the next safe save is not ready. A
 // successful transition consumes the challenge and creates exactly one
 // session in the same critical section.
-func (s *Service) Verify(ctx context.Context, challengeBearer string) (Verification, error) {
+func (s *Service) Verify(ctx context.Context, challengeBearer string, answers ...QuizAnswer) (Verification, error) {
 	key := hashBearer(challengeBearer)
 	now := s.now()
 
@@ -295,6 +306,7 @@ func (s *Service) Verify(ctx context.Context, challengeBearer string) (Verificat
 	}
 	entry.verifying = true
 	prepared := clonePrepared(entry.prepared)
+	prepared.Answers = append([]QuizAnswer(nil), answers...)
 	s.mu.Unlock()
 
 	verifyErr := s.prover.Verify(ctx, &prepared)
@@ -322,6 +334,10 @@ func (s *Service) Verify(ctx context.Context, challengeBearer string) (Verificat
 	if !matchesPreparedBinding(prepared, entry) {
 		entry.verifying = false
 		return Verification{}, ErrInvalidProof
+	}
+	if errors.Is(verifyErr, ErrIncorrectAnswer) {
+		s.deleteChallengeLocked(key, entry)
+		return Verification{}, ErrIncorrectAnswer
 	}
 
 	if errors.Is(verifyErr, ErrPending) {
@@ -363,7 +379,11 @@ func (s *Service) Verify(ctx context.Context, challengeBearer string) (Verificat
 		entry.verifying = false
 		return Verification{}, fmt.Errorf("verify player claim proof: %w", verifyErr)
 	}
-	if entry.phase != challengeRestoring || !sameInstructions(prepared.Instructions, entry.prepared.Instructions) {
+	quizProof := entry.phase == challengeProving && entry.prepared.Instructions.Kind == InventoryQuiz &&
+		sameInstructions(prepared.Instructions, entry.prepared.Instructions)
+	swapProof := entry.phase == challengeRestoring && entry.prepared.Instructions.Kind == InventorySwapSequence &&
+		sameInstructions(prepared.Instructions, entry.prepared.Instructions)
+	if !quizProof && !swapProof {
 		entry.verifying = false
 		return Verification{}, ErrInvalidProof
 	}
@@ -532,7 +552,7 @@ func validatePrepared(prepared Prepared, requestedPublicPlayerID string) error {
 	if prepared.PublicPlayerID != requestedPublicPlayerID {
 		return fmt.Errorf("%w: public player binding changed", ErrInvalidProof)
 	}
-	if !emptyInstructions(prepared.Instructions) {
+	if !emptyInstructions(prepared.Instructions) && !validQuizInstructions(prepared.Instructions) {
 		return fmt.Errorf("%w: proof must begin unarmed", ErrInvalidProof)
 	}
 	return nil
@@ -540,7 +560,36 @@ func validatePrepared(prepared Prepared, requestedPublicPlayerID string) error {
 
 func emptyInstructions(instructions Instructions) bool {
 	return instructions.Kind == "" && instructions.Phase == "" && instructions.Step == 0 &&
-		instructions.TotalSteps == 0 && len(instructions.Pairs) == 0 && instructions.SnapshotAt.IsZero()
+		instructions.TotalSteps == 0 && len(instructions.Pairs) == 0 && len(instructions.Questions) == 0 && instructions.SnapshotAt.IsZero()
+}
+
+func validQuizInstructions(instructions Instructions) bool {
+	if instructions.Kind != InventoryQuiz || instructions.Phase != "" || instructions.Step != 0 ||
+		instructions.TotalSteps != 0 || len(instructions.Pairs) != 0 || len(instructions.Questions) != 2 ||
+		instructions.SnapshotAt.IsZero() {
+		return false
+	}
+	seen := make(map[string]struct{}, len(instructions.Questions))
+	for _, question := range instructions.Questions {
+		if strings.TrimSpace(question.ID) == "" || strings.TrimSpace(question.Prompt) == "" || len(question.Options) != 8 {
+			return false
+		}
+		if _, exists := seen[question.ID]; exists {
+			return false
+		}
+		seen[question.ID] = struct{}{}
+		optionSeen := make(map[string]struct{}, len(question.Options))
+		for _, option := range question.Options {
+			if strings.TrimSpace(option) == "" || len(option) > 96 {
+				return false
+			}
+			if _, exists := optionSeen[option]; exists {
+				return false
+			}
+			optionSeen[option] = struct{}{}
+		}
+	}
+	return true
 }
 
 func validInstructions(instructions Instructions) bool {
@@ -573,11 +622,16 @@ func matchesPreparedBinding(prepared Prepared, entry *challengeEntry) bool {
 
 func clonePrepared(prepared Prepared) Prepared {
 	prepared.Instructions = cloneInstructions(prepared.Instructions)
+	prepared.Answers = append([]QuizAnswer(nil), prepared.Answers...)
 	return prepared
 }
 
 func cloneInstructions(instructions Instructions) Instructions {
 	instructions.Pairs = append([]SlotPair(nil), instructions.Pairs...)
+	instructions.Questions = append([]QuizQuestion(nil), instructions.Questions...)
+	for index := range instructions.Questions {
+		instructions.Questions[index].Options = append([]string(nil), instructions.Questions[index].Options...)
+	}
 	return instructions
 }
 
@@ -606,12 +660,24 @@ func readyTransition(entry *challengeEntry, instructions Instructions) (challeng
 func sameInstructions(left, right Instructions) bool {
 	if left.Kind != right.Kind || left.Phase != right.Phase || left.Step != right.Step ||
 		left.TotalSteps != right.TotalSteps || !left.SnapshotAt.Equal(right.SnapshotAt) ||
-		len(left.Pairs) != len(right.Pairs) {
+		len(left.Pairs) != len(right.Pairs) || len(left.Questions) != len(right.Questions) {
 		return false
 	}
 	for index := range left.Pairs {
 		if left.Pairs[index] != right.Pairs[index] {
 			return false
+		}
+	}
+	for index := range left.Questions {
+		if left.Questions[index].ID != right.Questions[index].ID ||
+			left.Questions[index].Prompt != right.Questions[index].Prompt ||
+			len(left.Questions[index].Options) != len(right.Questions[index].Options) {
+			return false
+		}
+		for option := range left.Questions[index].Options {
+			if left.Questions[index].Options[option] != right.Questions[index].Options[option] {
+				return false
+			}
 		}
 	}
 	return true

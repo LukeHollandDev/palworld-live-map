@@ -141,16 +141,19 @@ temporarily unavailable.
 
 ### Connect a saved character privately
 
-Character connection is opt-in and requires save integration. It
-does not ask a player to reveal an inventory item, party member, raw account ID,
-or server password. After establishing a fresh immutable baseline, the map
-selects an eight-slot inventory cycle from at least sixteen uniquely
-distinguishable stacks. The player performs seven ordered swaps, waits for that
-state to appear in a later immutable backup, then performs the reverse sequence
-so their inventory is restored. The cycle has more than 25 bits of random
-selection at the minimum candidate count and every phase must appear in a new
-safe generation. The browser receives slot numbers only—never item names,
-counts, instance IDs, or raw save identifiers.
+Character connection is opt-in and requires save integration. Online and
+offline characters use the same quick check: the map asks two multiple-choice
+questions about which item display label occupies a randomly selected common
+inventory slot in the latest completed backup. Each compact question has eight choices,
+both answers are submitted once, and a wrong submission consumes the challenge.
+Correct answers, counts, dynamic instance IDs, raw item IDs, account IDs, and
+save identifiers never reach the browser or logs. Challenges and submissions
+remain bounded by the built-in per-client and process-wide rate limits.
+
+If a save cannot supply eight distinct safe item labels, the older reversible
+inventory-swap proof remains available as a fallback. Its recovery slot pairs,
+proof phase, and advisory per-swap progress are the only claim data that may be
+kept in `sessionStorage`; quiz questions and answers are never persisted.
 
 For reload safety, the browser keeps only the recovery slot pairs, proof phase,
 and advisory per-swap progress in `sessionStorage`. It never stores the claim
@@ -189,9 +192,10 @@ range in `PLAYER_CLAIMS_TRUSTED_PROXIES` and have it append `X-Forwarded-For`.
 Forwarding headers from every other source are ignored. Apply request limits at
 the proxy as well as the map's built-in per-client and process-wide limits.
 
-Because roster safety deliberately reads the second-newest native backup, each
-of baseline, proof, and restore normally needs roughly two Palworld backup
-intervals plus save polling. Each phase has a 90-minute deadline. Sessions are
+The quiz reads the safely completed second-newest native backup and normally
+appears as soon as that private player projection is decoded. Quiz challenges
+expire after ten minutes. The fallback transition proof can require multiple
+native backup intervals and uses a 90-minute deadline per phase. Sessions are
 held only in memory in this first release, use HttpOnly, SameSite=Strict cookies
 (plus `Secure` under HTTPS), and must be re-established after a map restart.
 Connected players can

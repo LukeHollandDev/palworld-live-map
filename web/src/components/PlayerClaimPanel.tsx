@@ -32,6 +32,17 @@ interface ClaimInstructions {
   pairs: ClaimPair[]
 }
 
+interface QuizQuestion {
+  id: string
+  prompt: string
+  options: string[]
+}
+
+interface QuizInstructions {
+  kind: 'inventory_quiz'
+  questions: QuizQuestion[]
+}
+
 interface RecoverySnapshot {
   kind: 'inventory_swap_sequence'
   phase: 'prove' | 'restore'
@@ -44,6 +55,8 @@ type ChallengePhase = 'arming' | 'ready' | 'checking' | 'pending' | 'unavailable
 interface ChallengeState {
   playerId: string
   instructions: ClaimInstructions | null
+  quiz: QuizInstructions | null
+  answers: Array<number | null>
   expiresAt: number
   phase: ChallengePhase
   recoveryAcknowledged: boolean
@@ -55,7 +68,7 @@ export type PlayerClaimSessionState =
   | { phase: 'connected'; playerId: string; sessionEpoch: number; expiresAt: number }
   | { phase: 'unavailable' }
 
-type Notice = 'unavailable' | 'rejected' | 'session-mismatch' | null
+type Notice = 'unavailable' | 'rejected' | 'incorrect' | 'session-mismatch' | null
 
 interface PlayerClaimContextValue {
   enabled: boolean
@@ -73,6 +86,7 @@ interface PlayerClaimContextValue {
   acknowledgeRecovery: () => void
   updateRecoveryPair: (index: number, completed: boolean) => void
   updateRecoveryCount: (completedCount: number) => void
+  updateQuizAnswer: (index: number, option: number) => void
 }
 
 const PlayerClaimContext = createContext<PlayerClaimContextValue | null>(null)
@@ -136,6 +150,35 @@ function parseInstructions(value: unknown): ClaimInstructions | null {
     totalSteps: 2,
     pairs
   }
+}
+
+function parseQuiz(value: unknown): QuizInstructions | null {
+  if (
+    !isRecord(value) ||
+    value.kind !== 'inventory_quiz' ||
+    !Array.isArray(value.questions) ||
+    value.questions.length !== 2
+  )
+    return null
+  const questions: QuizQuestion[] = []
+  const ids = new Set<string>()
+  for (const question of value.questions) {
+    if (
+      !isRecord(question) ||
+      typeof question.id !== 'string' ||
+      !question.id ||
+      ids.has(question.id) ||
+      typeof question.prompt !== 'string' ||
+      !question.prompt ||
+      !Array.isArray(question.options) ||
+      question.options.length !== 8 ||
+      !question.options.every((option): option is string => typeof option === 'string' && option.length > 0)
+    )
+      return null
+    ids.add(question.id)
+    questions.push({ id: question.id, prompt: question.prompt, options: [...question.options] })
+  }
+  return { kind: 'inventory_quiz', questions }
 }
 
 function parseRecoverySnapshot(value: unknown): RecoverySnapshot | null {
@@ -323,6 +366,19 @@ export function PlayerClaimProvider({ enabled, children }: { enabled: boolean; c
       })
     },
     [commitRecovery]
+  )
+
+  const updateQuizAnswer = useCallback(
+    (index: number, option: number) => {
+      updateChallenge((current) => {
+        if (!current?.quiz || current.phase !== 'ready' || index < 0 || index >= current.answers.length) return current
+        if (option < 0 || option >= current.quiz.questions[index].options.length) return current
+        const answers = [...current.answers]
+        answers[index] = option
+        return { ...current, answers }
+      })
+    },
+    [updateChallenge]
   )
 
   const ensureRecoveryForInstructions = useCallback(
@@ -554,8 +610,6 @@ export function PlayerClaimProvider({ enabled, children }: { enabled: boolean; c
           !isRecord(body) ||
           typeof body.challengeToken !== 'string' ||
           body.challengeToken.length === 0 ||
-          body.status !== 'arming' ||
-          body.instructions !== undefined ||
           typeof body.expiresAt !== 'string'
         ) {
           setNotice('unavailable')
@@ -566,12 +620,20 @@ export function PlayerClaimProvider({ enabled, children }: { enabled: boolean; c
           setNotice('unavailable')
           return
         }
+        const quiz = body.status === 'ready' ? parseQuiz(body.instructions) : null
+        const arming = body.status === 'arming' && body.instructions === undefined
+        if (!arming && !quiz) {
+          setNotice('unavailable')
+          return
+        }
         challengeTokenRef.current = body.challengeToken
         commitChallenge({
           playerId,
           instructions: null,
+          quiz,
+          answers: quiz ? quiz.questions.map(() => null) : [],
           expiresAt,
-          phase: 'arming',
+          phase: quiz ? 'ready' : 'arming',
           recoveryAcknowledged: false
         })
       } catch {
@@ -603,6 +665,7 @@ export function PlayerClaimProvider({ enabled, children }: { enabled: boolean; c
       )
         return
     }
+    if (challenge.quiz && challenge.answers.some((answer) => answer === null)) return
     const requestEpoch = challengeEpochRef.current
     updateChallenge((current) => (current ? { ...current, phase: 'checking' } : current))
     const requestController = controller()
@@ -616,11 +679,25 @@ export function PlayerClaimProvider({ enabled, children }: { enabled: boolean; c
     try {
       const response = await fetch(
         '/api/player-claims/verify',
-        mutationInit({ challengeToken }, requestController.signal)
+        mutationInit(
+          {
+            challengeToken,
+            ...(challenge.quiz
+              ? {
+                  answers: challenge.quiz.questions.map((question, index) => ({
+                    questionId: question.id,
+                    option: challenge.answers[index]
+                  }))
+                }
+              : {})
+          },
+          requestController.signal
+        )
       )
       const body = await responseJSON(response)
       if (!isCurrent()) return
       if (response.status === 401) {
+        if (challenge.quiz) setNotice('incorrect')
         if (challenge.instructions?.phase === 'restore') {
           const recoveredSession = await loadSession()
           if (!isCurrent()) return
@@ -726,7 +803,7 @@ export function PlayerClaimProvider({ enabled, children }: { enabled: boolean; c
         body.status !== 'verified' ||
         response.status !== 200 ||
         body.instructions !== undefined ||
-        challenge.instructions?.phase !== 'restore'
+        (!challenge.quiz && challenge.instructions?.phase !== 'restore')
       ) {
         updateChallenge((current) => (current ? { ...current, phase: 'unavailable' } : current))
         return
@@ -830,7 +907,8 @@ export function PlayerClaimProvider({ enabled, children }: { enabled: boolean; c
       disconnect,
       acknowledgeRecovery,
       updateRecoveryPair,
-      updateRecoveryCount
+      updateRecoveryCount,
+      updateQuizAnswer
     }),
     [
       acknowledgeRecovery,
@@ -847,6 +925,7 @@ export function PlayerClaimProvider({ enabled, children }: { enabled: boolean; c
       starting,
       updateRecoveryPair,
       updateRecoveryCount,
+      updateQuizAnswer,
       verifyClaim
     ]
   )
@@ -929,7 +1008,9 @@ export function PlayerClaimSessionControl({ players = [] }: { players?: readonly
           onLoadSession={claim.loadSession}
           onAcknowledgeRecovery={claim.acknowledgeRecovery}
           onUpdateRecoveryPair={claim.updateRecoveryPair}
+          onUpdateQuizAnswer={claim.updateQuizAnswer}
         />
+        {claim.notice ? <ClaimNotice notice={claim.notice} /> : null}
       </section>
     )
   }
@@ -1181,7 +1262,8 @@ function ActiveChallenge({
   onVerify,
   onLoadSession,
   onAcknowledgeRecovery,
-  onUpdateRecoveryPair
+  onUpdateRecoveryPair,
+  onUpdateQuizAnswer
 }: {
   challenge: ChallengeState
   recovery: RecoverySnapshot | null
@@ -1192,15 +1274,24 @@ function ActiveChallenge({
   onLoadSession: () => Promise<PlayerClaimSessionState | null>
   onAcknowledgeRecovery: () => void
   onUpdateRecoveryPair: (index: number, completed: boolean) => void
+  onUpdateQuizAnswer: (index: number, option: number) => void
 }) {
   const instructions = challenge.instructions
+  const quizComplete = Boolean(challenge.quiz && challenge.answers.every((answer) => answer !== null))
   const recoveryRequired = challenge.phase === 'expired' && instructions !== null && !challenge.recoveryAcknowledged
   const sequenceComplete = Boolean(
     instructions && recovery && recoveryMatchesInstructions(recovery, instructions) && recovery.completed.every(Boolean)
   )
   return (
     <>
-      {challenge.phase === 'expired' && instructions ? (
+      {challenge.quiz ? (
+        <QuizControl
+          quiz={challenge.quiz}
+          answers={challenge.answers}
+          disabled={challenge.phase !== 'ready'}
+          onAnswer={onUpdateQuizAnswer}
+        />
+      ) : challenge.phase === 'expired' && instructions ? (
         <EmergencyRecovery instructions={instructions} />
       ) : instructions ? (
         <InstructionSequence
@@ -1212,7 +1303,7 @@ function ActiveChallenge({
       ) : (
         <BaselineCopy />
       )}
-      {challenge.phase !== 'expired' ? (
+      {!challenge.quiz && challenge.phase !== 'expired' ? (
         <>
           <p className="m-0 border-l-2 border-[#64d7e7]/40 px-2 text-[11px] leading-5 text-[#9ec1c7]">
             Verification reads completed immutable backups for safety, so the baseline and each confirmed sequence can
@@ -1229,20 +1320,27 @@ function ActiveChallenge({
         <button
           type="button"
           className={buttonClass()}
-          disabled={challenge.phase === 'checking' || (challenge.phase === 'ready' && !sequenceComplete)}
+          disabled={
+            challenge.phase === 'checking' ||
+            (challenge.phase === 'ready' && !(challenge.quiz ? quizComplete : sequenceComplete))
+          }
           onClick={() => void onVerify()}
         >
           {challenge.phase === 'checking'
-            ? instructions
-              ? `Checking step ${instructions.step}…`
-              : 'Checking baseline…'
-            : challenge.phase === 'ready'
-              ? `I completed all ${CLAIM_PAIR_COUNT} swaps`
-              : challenge.phase === 'arming'
-                ? 'Check baseline now'
-                : challenge.phase === 'pending'
-                  ? `Check step ${instructions?.step || 1} now`
-                  : 'Try check again'}
+            ? challenge.quiz
+              ? 'Checking answers…'
+              : instructions
+                ? `Checking step ${instructions.step}…`
+                : 'Checking baseline…'
+            : challenge.quiz
+              ? 'Verify answers'
+              : challenge.phase === 'ready'
+                ? `I completed all ${CLAIM_PAIR_COUNT} swaps`
+                : challenge.phase === 'arming'
+                  ? 'Check baseline now'
+                  : challenge.phase === 'pending'
+                    ? `Check step ${instructions?.step || 1} now`
+                    : 'Try check again'}
         </button>
       ) : null}
       {challenge.phase === 'expired' ? (
@@ -1285,6 +1383,50 @@ function ActiveChallenge({
         </button>
       ) : null}
     </>
+  )
+}
+
+function QuizControl({
+  quiz,
+  answers,
+  disabled,
+  onAnswer
+}: {
+  quiz: QuizInstructions
+  answers: Array<number | null>
+  disabled: boolean
+  onAnswer: (index: number, option: number) => void
+}) {
+  return (
+    <div className="grid gap-3">
+      <p className="m-0 text-xs leading-5 text-[#a9bbc0]">
+        Choose the two answers that match this character’s latest completed save.
+      </p>
+      {quiz.questions.map((question, questionIndex) => (
+        <fieldset key={question.id} className="m-0 grid gap-1.5 border border-[#8bb7bd]/25 p-2.5">
+          <legend className="px-1 text-xs font-medium text-[#e5f5f7]">{question.prompt}</legend>
+          <select
+            className="pal-glass-inset min-h-11 px-2 text-xs text-[#e5f5f7]"
+            aria-label={question.prompt}
+            value={answers[questionIndex] ?? ''}
+            disabled={disabled}
+            onChange={(event) => onAnswer(questionIndex, Number(event.currentTarget.value))}
+          >
+            <option value="" disabled>
+              Choose an item…
+            </option>
+            {question.options.map((option, optionIndex) => (
+              <option key={option} value={optionIndex}>
+                {option}
+              </option>
+            ))}
+          </select>
+        </fieldset>
+      ))}
+      <p className="m-0 text-[10px] leading-4 text-[#81969c]">
+        This works for offline characters. Answers are checked once and are not stored in the browser.
+      </p>
+    </div>
   )
 }
 
@@ -1495,9 +1637,11 @@ function ClaimNotice({ notice }: { notice: Exclude<Notice, null> }) {
   const message =
     notice === 'rejected'
       ? 'This identity request was rejected. Reload the map and try again.'
-      : notice === 'session-mismatch'
-        ? 'The identity proof completed, but another player session is active. Disconnect it before trying again.'
-        : 'Identity checks are temporarily unavailable. Please try again shortly.'
+      : notice === 'incorrect'
+        ? 'Those answers did not match this character’s latest completed save. Start a new check to try again.'
+        : notice === 'session-mismatch'
+          ? 'The identity proof completed, but another player session is active. Disconnect it before trying again.'
+          : 'Identity checks are temporarily unavailable. Please try again shortly.'
   return (
     <p role="status" aria-live="polite" aria-atomic="true" className={statusClass('warning')}>
       {message}
@@ -1509,6 +1653,12 @@ function ChallengeStatus({ challenge, session }: { challenge: ChallengeState; se
   const instructions = challenge.instructions
   let message = 'Waiting for a fresh immutable baseline. We’ll check again in about 30 seconds; do not act yet.'
   let tone: 'normal' | 'success' | 'warning' = 'normal'
+  if (challenge.quiz && challenge.phase === 'ready') {
+    message = 'Answer both questions, then verify once.'
+  }
+  if (challenge.quiz && challenge.phase === 'checking') {
+    message = 'Checking both answers…'
+  }
   if (challenge.phase === 'ready' && instructions) {
     message = `Step ${instructions.step} is ready. Complete all seven swaps in order, then confirm once.`
   }
@@ -1527,11 +1677,13 @@ function ChallengeStatus({ challenge, session }: { challenge: ChallengeState; se
     tone = 'warning'
   }
   if (challenge.phase === 'expired') {
-    message = instructions
-      ? challenge.recoveryAcknowledged
-        ? 'Recovery confirmed. You can now start a new identity check.'
-        : 'This identity challenge expired. Restore the original inventory layout and confirm recovery before restarting.'
-      : 'This identity challenge expired. Start a new check to try again.'
+    message = challenge.quiz
+      ? 'This check ended. Start a new check to try another pair of questions.'
+      : instructions
+        ? challenge.recoveryAcknowledged
+          ? 'Recovery confirmed. You can now start a new identity check.'
+          : 'This identity challenge expired. Restore the original inventory layout and confirm recovery before restarting.'
+        : 'This identity challenge expired. Start a new check to try again.'
     tone = 'warning'
   }
   if (challenge.phase === 'proof-passed') {

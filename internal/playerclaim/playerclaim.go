@@ -13,6 +13,7 @@ type ProofKind string
 
 const (
 	InventorySwapSequence ProofKind = "inventory_swap_sequence"
+	InventoryQuiz         ProofKind = "inventory_quiz"
 )
 
 type ProofPhase string
@@ -33,7 +34,21 @@ var (
 	// ErrReady means a post-start immutable baseline is armed and the updated
 	// Prepared instructions may now be revealed to the claimant.
 	ErrReady = errors.New("player claim proof is ready")
+	// ErrIncorrectAnswer means a one-shot knowledge challenge did not match its
+	// private save evidence. Callers must consume the challenge on this result.
+	ErrIncorrectAnswer = errors.New("player claim answer is incorrect")
 )
+
+type QuizQuestion struct {
+	ID      string   `json:"id"`
+	Prompt  string   `json:"prompt"`
+	Options []string `json:"options"`
+}
+
+type QuizAnswer struct {
+	QuestionID string `json:"questionId"`
+	Option     int    `json:"option"`
+}
 
 // SlotPair is one reversible in-game swap. Slots are one-based to match the
 // visible inventory grid.
@@ -47,12 +62,13 @@ type SlotPair struct {
 // a separately observed reverse-order restore phase. Item identifiers, counts,
 // instance IDs, and the private save PlayerUID remain in Evidence on the server.
 type Instructions struct {
-	Kind       ProofKind  `json:"kind"`
-	Phase      ProofPhase `json:"phase"`
-	Step       int        `json:"step"`
-	TotalSteps int        `json:"totalSteps"`
-	Pairs      []SlotPair `json:"pairs"`
-	SnapshotAt time.Time  `json:"snapshotAt"`
+	Kind       ProofKind      `json:"kind"`
+	Phase      ProofPhase     `json:"phase"`
+	Step       int            `json:"step"`
+	TotalSteps int            `json:"totalSteps"`
+	Pairs      []SlotPair     `json:"pairs"`
+	Questions  []QuizQuestion `json:"questions,omitempty"`
+	SnapshotAt time.Time      `json:"snapshotAt"`
 }
 
 // Prepared is an opaque, server-only proof. Subject is a stable world-scoped
@@ -61,6 +77,7 @@ type Prepared struct {
 	Subject        string       `json:"-"`
 	PublicPlayerID string       `json:"-"`
 	Instructions   Instructions `json:"-"`
+	Answers        []QuizAnswer `json:"-"`
 	Evidence       any          `json:"-"`
 }
 
