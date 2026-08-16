@@ -211,7 +211,7 @@ describe('PlayerClaimPanel', () => {
     )
 
     await user.click(await screen.findByRole('button', { name: 'This is me' }))
-    expect(await screen.findByText(/Answer two questions from memory/)).toBeVisible()
+    expect(await screen.findByRole('heading', { name: 'Verify Offline Player' })).toBeVisible()
     await user.selectOptions(screen.getByRole('combobox', { name: 'Which item is in common-inventory slot 4?' }), '1')
     await user.selectOptions(screen.getByRole('combobox', { name: 'Which item is in common-inventory slot 9?' }), '3')
     await user.click(screen.getByRole('button', { name: 'Verify answers' }))
@@ -285,18 +285,43 @@ describe('PlayerClaimPanel', () => {
     await user.click(await screen.findByRole('button', { name: 'This is me' }))
     const q2 = screen.getByRole('combobox', { name: 'Which item is in common-inventory slot 9?' })
     await user.selectOptions(q2, '3')
-    await user.click(screen.getAllByRole('button', { name: 'Different question' })[0])
+    await user.click(screen.getByRole('button', { name: 'Change question 1' }))
     const q1Replacement = await screen.findByRole('combobox', { name: 'Which weapon was equipped in slot 1?' })
     expect(q2).toHaveValue('3')
 
     await user.selectOptions(q1Replacement, '2')
-    await user.click(screen.getAllByRole('button', { name: 'Different question' })[1])
+    await user.click(screen.getByRole('button', { name: 'Change question 2' }))
     expect(await screen.findByRole('combobox', { name: 'Which Pal was in party slot 2?' })).toBeVisible()
     expect(q1Replacement).toHaveValue('2')
     expect(requests.map((request) => request.body)).toEqual([
       { challengeToken, questionId: 'q1' },
       { challengeToken, questionId: 'q2' }
     ])
+  })
+
+  it('shows one concise result after incorrect quiz answers', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: string | URL | Request) => {
+        const path = pathOf(input)
+        if (path === '/api/me') return jsonResponse({ error: 'authentication_required' }, 401)
+        if (path === '/api/player-claims') return jsonResponse(quizStartResponse(), 201)
+        if (path === '/api/player-claims/verify') return jsonResponse({ error: 'invalid_challenge' }, 401)
+        return new Response(null, { status: 404 })
+      })
+    )
+    const user = userEvent.setup()
+    renderPanel()
+
+    await user.click(await screen.findByRole('button', { name: 'This is me' }))
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Which item is in common-inventory slot 4?' }), '0')
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Which item is in common-inventory slot 9?' }), '0')
+    await user.click(screen.getByRole('button', { name: 'Verify answers' }))
+
+    expect(await screen.findByText('Answers did not match.')).toBeVisible()
+    expect(screen.getByRole('button', { name: 'Try again' })).toBeVisible()
+    expect(screen.queryByText(/This check ended/)).not.toBeInTheDocument()
+    expect(screen.queryByText(/latest completed save/)).not.toBeInTheDocument()
   })
 
   it('offers both online and offline roster characters for verification', async () => {
@@ -377,8 +402,8 @@ describe('PlayerClaimPanel', () => {
     renderPanel()
 
     await user.click(await screen.findByRole('button', { name: 'This is me' }))
-    expect(await screen.findByRole('status')).toHaveTextContent(/waiting for a fresh immutable baseline/i)
-    expect(screen.getByText(/do not move inventory stacks yet; no action has been assigned/i)).toBeVisible()
+    expect(await screen.findByRole('status')).toHaveTextContent(/waiting for a new save backup/i)
+    expect(screen.getByText(/preparing a safe backup/i)).toBeVisible()
     expect(screen.queryByRole('list', { name: /ordered inventory swaps/i })).not.toBeInTheDocument()
     expect(document.body).not.toHaveTextContent('ClaimSecretWood')
     expect(document.body).not.toHaveTextContent('private-world-subject')
@@ -473,7 +498,7 @@ describe('PlayerClaimPanel', () => {
       await vi.advanceTimersByTimeAsync(1)
     })
     expect(verifyRequests).toBe(1)
-    expect(screen.getByRole('status')).toHaveTextContent(/waiting for a fresh immutable baseline/i)
+    expect(screen.getByRole('status')).toHaveTextContent(/waiting for a new save backup/i)
 
     await act(async () => {
       await vi.advanceTimersByTimeAsync(30_000)
@@ -596,7 +621,7 @@ describe('PlayerClaimPanel', () => {
 
     view.rerender(<Harness open={false} />)
     expect(screen.queryByText('Private progress')).not.toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: 'Active private identity check' })).toBeVisible()
+    expect(screen.getByRole('heading', { name: 'Identity check' })).toBeVisible()
     expect(screen.getByText('Step 1 of 2 · Prove control')).toBeVisible()
     expect(screen.getByRole('button', { name: 'I completed all 7 swaps' })).toBeVisible()
     expect(storedBrowserData()).not.toContain(challengeToken)
@@ -725,7 +750,7 @@ describe('PlayerClaimPanel', () => {
 
     oldVerify.resolve(jsonResponse(readyResponse('prove'), 202))
     await flushRequests()
-    expect(screen.getByText(/do not move inventory stacks yet/i)).toBeVisible()
+    expect(screen.getByText(/preparing a safe backup/i)).toBeVisible()
     expect(screen.queryByText('Step 1 of 2 · Prove control')).not.toBeInTheDocument()
 
     fireEvent.click(screen.getByRole('button', { name: 'Check baseline now' }))
@@ -1039,7 +1064,7 @@ describe('PlayerClaimPanel', () => {
     await user.click(screen.getByRole('button', { name: 'I completed all 7 swaps' }))
 
     expect(await screen.findByRole('button', { name: 'This is me' })).toBeVisible()
-    expect(screen.queryByRole('heading', { name: 'Active private identity check' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Identity check' })).not.toBeInTheDocument()
     expect(screen.queryByText(/Both ordered sequences passed/)).not.toBeInTheDocument()
     expect(meRequests).toBe(2)
   })
@@ -1081,7 +1106,7 @@ describe('PlayerClaimPanel', () => {
     expect(window.sessionStorage.getItem(PLAYER_CLAIM_RECOVERY_STORAGE_KEY)).toBeNull()
     await user.click(screen.getByRole('button', { name: 'Check session again' }))
     expect(await screen.findByRole('heading', { name: 'Connected private save' })).toBeVisible()
-    expect(screen.queryByRole('heading', { name: 'Active private identity check' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Identity check' })).not.toBeInTheDocument()
     expect(meRequests).toBe(3)
   })
 
@@ -1121,7 +1146,7 @@ describe('PlayerClaimPanel', () => {
     expect(await screen.findByRole('heading', { name: 'Connected private save' })).toBeVisible()
     expect(screen.getByText('Private save connected for player different-player.')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Disconnect' })).toBeEnabled()
-    expect(screen.queryByRole('heading', { name: 'Active private identity check' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Identity check' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Check session again' })).not.toBeInTheDocument()
     expect(screen.getByText(/another player session is active/i)).toBeVisible()
     expect(window.sessionStorage.getItem(PLAYER_CLAIM_RECOVERY_STORAGE_KEY)).toBeNull()
@@ -1163,7 +1188,7 @@ describe('PlayerClaimPanel', () => {
 
     expect(await screen.findByRole('heading', { name: 'Connected private save' })).toBeVisible()
     expect(screen.queryByRole('heading', { name: 'Restore inventory before restarting' })).not.toBeInTheDocument()
-    expect(screen.queryByRole('heading', { name: 'Active private identity check' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Identity check' })).not.toBeInTheDocument()
     expect(meRequests).toBe(2)
   })
 

@@ -137,8 +137,9 @@ describe('authenticated completion overlay', () => {
       'aria-valuenow',
       '3'
     )
-    expect(await within(progressPanel).findByText(/Save-confirmed ·/)).toBeVisible()
-    expect(within(progressPanel).getByText(/connected saves confirm bosses, bounties, fast travel/i)).toBeVisible()
+    expect(await within(progressPanel).findByText(/Save synced ·/)).toBeVisible()
+    await user.click(within(progressPanel).getByText('How progress is counted'))
+    expect(within(progressPanel).getByText(/saves confirm bosses, bounties, fast travel/i)).toBeVisible()
     expect(within(progressPanel).getByRole('heading', { name: 'Connected private save' })).toBeVisible()
 
     await user.click(within(explorer).getByRole('button', { name: 'Expand Waypoints section' }))
@@ -151,7 +152,7 @@ describe('authenticated completion overlay', () => {
     expect(within(explorer).getByRole('button', { name: 'View Manual Effigy, manual completion' })).toBeVisible()
 
     await user.click(within(progressPanel).getByRole('checkbox', { name: 'Show only missing on the map' }))
-    expect(within(progressPanel).getByText('0')).toBeVisible()
+    expect(within(progressPanel).getByText('0 missing')).toBeVisible()
     expect(within(explorer).queryByRole('button', { name: /View Save Waypoint/ })).not.toBeInTheDocument()
 
     await user.click(within(progressPanel).getByRole('button', { name: 'Disconnect' }))
@@ -162,7 +163,7 @@ describe('authenticated completion overlay', () => {
         '2'
       )
     )
-    expect(within(progressPanel).getByText('Manual checklist on this browser')).toBeVisible()
+    expect(within(progressPanel).getByText('Manual · this browser')).toBeVisible()
     expect(within(explorer).getByRole('button', { name: 'View Save Waypoint' })).toBeVisible()
     expect(within(explorer).queryByRole('button', { name: /View Combined Journal/ })).not.toBeInTheDocument()
 

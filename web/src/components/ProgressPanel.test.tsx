@@ -57,7 +57,9 @@ describe('ProgressPanel', () => {
       'aria-valuenow',
       '2'
     )
-    expect(within(panel).getByText('Manual checklist on this browser')).toBeVisible()
+    expect(within(panel).getByText('Manual · this browser')).toBeVisible()
+    expect(within(panel).getByText('2 / 5')).toBeVisible()
+    expect(within(panel).getByText('3 missing')).toBeVisible()
     expect(within(panel).getByText('Save-backed identity is not enabled on this map.', { exact: false })).toBeVisible()
 
     await user.click(within(panel).getByRole('checkbox', { name: 'Show only missing on the map' }))
@@ -87,7 +89,7 @@ describe('ProgressPanel', () => {
       />
     )
 
-    expect(screen.getByText('Save progress is temporarily unavailable. Manual marks still count.')).toBeVisible()
+    expect(screen.getByText('Save temporarily unavailable')).toBeVisible()
     await user.click(screen.getByRole('button', { name: 'Retry save progress' }))
     expect(onRetrySaveProgress).toHaveBeenCalledOnce()
   })
@@ -139,7 +141,7 @@ describe('ProgressPanel', () => {
     )
 
     await user.click(await screen.findByRole('button', { name: 'This is me' }))
-    expect(await screen.findByRole('heading', { name: 'Active private identity check' })).toBeVisible()
+    expect(await screen.findByRole('heading', { name: 'Identity check' })).toBeVisible()
     expect(screen.getByText('Moss')).toBeVisible()
     expect(document.body).not.toHaveTextContent('opaque-public-player')
     expect(document.body).not.toHaveTextContent('private-bearer-never-rendered')

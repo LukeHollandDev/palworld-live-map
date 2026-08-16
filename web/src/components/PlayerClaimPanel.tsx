@@ -1119,6 +1119,7 @@ export function PlayerClaimSessionControl({ players = [] }: { players?: readonly
   if (!claim.enabled) return null
 
   if (claim.challenge) {
+    const playerLabel = claimPlayerLabel(claim.challenge.playerId, players)
     return (
       <section
         id={PLAYER_CLAIM_GLOBAL_CONTROL_ID}
@@ -1128,11 +1129,11 @@ export function PlayerClaimSessionControl({ players = [] }: { players?: readonly
       >
         <div className="min-w-0">
           <h3 id={headingId} className="m-0 text-xs font-semibold text-[#edf9fb]">
-            Active private identity check
+            {claim.challenge.quiz ? `Verify ${playerLabel}` : 'Identity check'}
           </h3>
-          <p className="m-0 mt-0.5 truncate text-[10px] tracking-[.08em] text-[#77b9c2] uppercase">
-            {claimPlayerLabel(claim.challenge.playerId, players)}
-          </p>
+          {!claim.challenge.quiz ? (
+            <p className="m-0 mt-0.5 truncate text-[10px] tracking-[.08em] text-[#77b9c2] uppercase">{playerLabel}</p>
+          ) : null}
         </div>
         <ActiveChallenge
           challenge={claim.challenge}
@@ -1147,8 +1148,8 @@ export function PlayerClaimSessionControl({ players = [] }: { players?: readonly
           onUpdateQuizAnswer={claim.updateQuizAnswer}
           cyclingQuestionId={claim.cyclingQuestionId}
           onCycleQuizQuestion={claim.cycleQuizQuestion}
+          notice={claim.notice}
         />
-        {claim.notice ? <ClaimNotice notice={claim.notice} /> : null}
       </section>
     )
   }
@@ -1237,10 +1238,7 @@ export function PlayerClaimIdentityChooser({ players }: { players: readonly MapI
         <h3 id={headingId} className="m-0 text-xs font-semibold text-[#edf9fb]">
           Connect your character
         </h3>
-        <p className="m-0 mt-1 text-[11px] leading-5 text-[#859da2]">
-          Choose who you are, then complete a private in-game inventory check. Other players cannot open your saved
-          progress just by choosing your name.
-        </p>
+        <p className="m-0 mt-1 text-[11px] leading-5 text-[#859da2]">Choose your character to sync save progress.</p>
       </div>
       {rosterPlayers.length > 0 ? (
         <ul className="m-0 grid list-none gap-1.5 p-0" aria-label="Characters">
@@ -1403,7 +1401,8 @@ function ActiveChallenge({
   onUpdateRecoveryPair,
   onUpdateQuizAnswer,
   cyclingQuestionId,
-  onCycleQuizQuestion
+  onCycleQuizQuestion,
+  notice
 }: {
   challenge: ChallengeState
   recovery: RecoverySnapshot | null
@@ -1417,6 +1416,7 @@ function ActiveChallenge({
   onUpdateQuizAnswer: (index: number, option: number) => void
   cyclingQuestionId: string | null
   onCycleQuizQuestion: (index: number) => Promise<void>
+  notice: Notice
 }) {
   const instructions = challenge.instructions
   const quizComplete = Boolean(challenge.quiz && challenge.answers.every((answer) => answer !== null))
@@ -1448,18 +1448,15 @@ function ActiveChallenge({
         <BaselineCopy />
       )}
       {!challenge.quiz && challenge.phase !== 'expired' ? (
-        <>
-          <p className="m-0 border-l-2 border-[#64d7e7]/40 px-2 text-[11px] leading-5 text-[#9ec1c7]">
-            Verification reads completed immutable backups for safety, so the baseline and each confirmed sequence can
-            require two native backup intervals.
+        <details className="text-[10px] leading-4 text-[#81969c]">
+          <summary className="cursor-pointer text-[#789da3]">Why this can take longer</summary>
+          <p className="m-0 mt-1">
+            This fallback uses completed backups and may take two backup intervals. You can close this panel while it
+            waits.
           </p>
-          <p className="m-0 text-[10px] leading-4 text-[#81969c]">
-            You can close and reopen this player’s details; this check stays in memory and keeps waiting until it is
-            ready or expires.
-          </p>
-        </>
+        </details>
       ) : null}
-      <ChallengeStatus challenge={challenge} session={session} />
+      <ChallengeStatus challenge={challenge} session={session} notice={notice} />
       {challenge.phase !== 'expired' && challenge.phase !== 'proof-passed' ? (
         <button
           type="button"
@@ -1512,7 +1509,7 @@ function ActiveChallenge({
             disabled={starting || recoveryRequired}
             onClick={() => void onStart(challenge.playerId)}
           >
-            {starting ? 'Preparing private check…' : 'Start a new check'}
+            {starting ? 'Preparing…' : challenge.quiz ? 'Try again' : 'Start a new check'}
           </button>
         </>
       ) : null}
@@ -1546,13 +1543,12 @@ function QuizControl({
   onCycle: (index: number) => Promise<void>
 }) {
   return (
-    <div className="grid gap-3">
-      <p className="m-0 text-xs leading-5 text-[#a9bbc0]">
-        Answer two questions from memory. You can replace either one without changing the other.
-      </p>
+    <div className="grid gap-2.5">
       {quiz.questions.map((question, questionIndex) => (
-        <fieldset key={question.id} className="m-0 grid gap-1.5 border border-[#8bb7bd]/25 p-2.5">
-          <legend className="px-1 text-xs font-medium text-[#e5f5f7]">{question.prompt}</legend>
+        <fieldset key={question.id} className="m-0 grid gap-1 border-0 border-t border-[#8bb7bd]/20 px-0 pt-2.5">
+          <legend className="pr-1 text-xs font-medium text-[#e5f5f7]">
+            {questionIndex + 1}. {question.prompt}
+          </legend>
           <select
             className="pal-glass-inset min-h-11 px-2 text-xs text-[#e5f5f7]"
             aria-label={question.prompt}
@@ -1571,33 +1567,22 @@ function QuizControl({
           </select>
           <button
             type="button"
-            className="min-h-8 justify-self-start text-[11px] text-[#8fd7df] underline decoration-[#8fd7df]/40 underline-offset-4 disabled:cursor-not-allowed disabled:text-[#71878c] disabled:no-underline"
+            className="min-h-7 justify-self-start text-[10px] text-[#8fd7df] underline decoration-[#8fd7df]/40 underline-offset-4 disabled:cursor-not-allowed disabled:text-[#71878c] disabled:no-underline"
+            aria-label={`Change question ${questionIndex + 1}`}
             disabled={disabled || cyclingQuestionId !== null || !question.canCycle}
             onClick={() => void onCycle(questionIndex)}
           >
-            {cyclingQuestionId === question.id
-              ? 'Getting another question…'
-              : question.canCycle
-                ? 'Different question'
-                : 'No more questions'}
+            {cyclingQuestionId === question.id ? 'Changing…' : question.canCycle ? 'Change' : 'No more questions'}
           </button>
         </fieldset>
       ))}
-      <p className="m-0 text-[10px] leading-4 text-[#81969c]">
-        This works for offline characters. Questions can use the first two inventory rows, equipment, food, or party
-        Pals. Every choice comes from that character's saved data in the same category. Answers are checked once and are
-        not stored in the browser.
-      </p>
     </div>
   )
 }
 
 function BaselineCopy() {
   return (
-    <p className="m-0 text-xs leading-5 text-[#a9bbc0]">
-      First, the map must capture a fresh private baseline. Do not move inventory stacks yet; no action has been
-      assigned.
-    </p>
+    <p className="m-0 text-xs leading-5 text-[#a9bbc0]">Preparing a safe backup. Don’t move inventory items yet.</p>
   )
 }
 
@@ -1811,12 +1796,20 @@ function ClaimNotice({ notice }: { notice: Exclude<Notice, null> }) {
   )
 }
 
-function ChallengeStatus({ challenge, session }: { challenge: ChallengeState; session: PlayerClaimSessionState }) {
+function ChallengeStatus({
+  challenge,
+  session,
+  notice
+}: {
+  challenge: ChallengeState
+  session: PlayerClaimSessionState
+  notice: Notice
+}) {
   const instructions = challenge.instructions
-  let message = 'Waiting for a fresh immutable baseline. We’ll check again in about 30 seconds; do not act yet.'
+  let message = 'Waiting for a new save backup…'
   let tone: 'normal' | 'success' | 'warning' = 'normal'
   if (challenge.quiz && challenge.phase === 'ready') {
-    message = 'Answer both questions, then verify once.'
+    return null
   }
   if (challenge.quiz && challenge.phase === 'checking') {
     message = 'Checking both answers…'
@@ -1840,7 +1833,9 @@ function ChallengeStatus({ challenge, session }: { challenge: ChallengeState; se
   }
   if (challenge.phase === 'expired') {
     message = challenge.quiz
-      ? 'This check ended. Start a new check to try another pair of questions.'
+      ? notice === 'incorrect'
+        ? 'Answers did not match.'
+        : 'Check expired.'
       : instructions
         ? challenge.recoveryAcknowledged
           ? 'Recovery confirmed. You can now start a new identity check.'

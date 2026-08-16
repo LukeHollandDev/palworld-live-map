@@ -26,16 +26,16 @@ interface ProgressPanelProps {
 }
 
 function saveProgressDescription(progress: SaveProgressState) {
-  if (progress.phase === 'loading') return 'Loading your private save progress…'
+  if (progress.phase === 'loading') return 'Loading save progress…'
   if (progress.phase === 'unavailable')
     return progress.reason === 'catalogue-version'
-      ? 'Your save does not match this map catalogue. Manual marks still count.'
-      : 'Save progress is temporarily unavailable. Manual marks still count.'
-  if (progress.phase === 'inactive') return 'Manual checklist on this browser'
+      ? 'Save unavailable · map version mismatch'
+      : 'Save temporarily unavailable'
+  if (progress.phase === 'inactive') return 'Manual · this browser'
   const age = formatSaveProgressAge(progress.snapshot.snapshotAt)
-  if (progress.refreshing) return `Refreshing save progress; keeping the snapshot from ${age}.`
-  if (progress.refreshFailed) return `Refresh failed; keeping the snapshot from ${age}.`
-  return progress.stale ? `Save snapshot from ${age} may be stale.` : `Save-confirmed · ${age}`
+  if (progress.refreshing) return `Refreshing · showing ${age}`
+  if (progress.refreshFailed) return `Refresh failed · showing ${age}`
+  return progress.stale ? `Save may be stale · ${age}` : `Save synced · ${age}`
 }
 
 export function ProgressPanel({
@@ -86,7 +86,7 @@ export function ProgressPanel({
       />
 
       <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain py-3">
-        <section className="pal-glass-inset mx-3.5 mb-3 grid gap-3 px-3 py-3" aria-label="Exploration progress">
+        <section className="pal-glass-inset mx-3.5 mb-3 grid gap-2.5 px-3 py-3" aria-label="Exploration progress">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
               <p className="m-0 truncate text-[10px] tracking-[.1em] text-[#77b9c2] uppercase">
@@ -108,30 +108,26 @@ export function ProgressPanel({
             <span className="block h-full bg-[#65d4ad] transition-[width]" style={{ width: `${percent}%` }} />
           </div>
 
-          <div className="grid grid-cols-3 divide-x divide-[#caeaef]/15 text-center">
-            <div>
-              <strong className="block text-sm text-[#eaf7f8] tabular-nums">{checklist.completed}</strong>
-              <span className="text-[10px] text-[#78949a] uppercase">Complete</span>
-            </div>
-            <div>
-              <strong className="block text-sm text-[#efc779] tabular-nums">{checklist.remaining}</strong>
-              <span className="text-[10px] text-[#78949a] uppercase">Missing</span>
-            </div>
-            <div>
-              <strong className="block text-sm text-[#eaf7f8] tabular-nums">{checklist.total}</strong>
-              <span className="text-[10px] text-[#78949a] uppercase">Total</span>
-            </div>
+          <div className="flex items-baseline justify-between gap-3 text-[11px]">
+            <p className="m-0 text-[#9bb0b5]">
+              <strong className="text-sm font-semibold text-[#eaf7f8] tabular-nums">
+                {checklist.completed} / {checklist.total}
+              </strong>{' '}
+              complete
+            </p>
+            <p className="m-0 text-[#d8bc83] tabular-nums">{checklist.remaining} missing</p>
           </div>
 
-          <label className="flex min-h-11 cursor-pointer items-center gap-2 border-t border-[#caeaef]/15 pt-2 text-xs text-[#dcebed]">
+          <label className="flex min-h-10 cursor-pointer items-center gap-2 border-t border-[#caeaef]/15 pt-2 text-xs text-[#dcebed]">
             <input
               type="checkbox"
               className="size-4 shrink-0 accent-[#6cb4dd]"
               checked={checklist.remainingOnly}
+              aria-label="Show only missing on the map"
               aria-describedby={filterDescriptionId}
               onChange={(event) => checklist.onRemainingOnlyChange(event.currentTarget.checked)}
             />
-            <span>Show only missing on the map</span>
+            <span>Only show missing</span>
           </label>
           <p id={filterDescriptionId} className="sr-only">
             Hide landmarks completed manually or confirmed by your connected save from the map and Map filters.
@@ -146,10 +142,13 @@ export function ProgressPanel({
             >
               {saveProgressDescription(progress)}
             </p>
-            <p className="m-0 mt-1 text-[10px] leading-4 text-[#718b91]">
-              Connected saves confirm bosses, bounties, fast travel, effigies, journals, and shrine pickups. Dungeons,
-              oil rigs, and NPC locations use your manual checklist.
-            </p>
+            <details className="mt-1 text-[10px] leading-4 text-[#718b91]">
+              <summary className="cursor-pointer text-[#789da3]">How progress is counted</summary>
+              <p className="m-0 mt-1">
+                Saves confirm bosses, bounties, fast travel, effigies, journals, and shrine pickups. Other landmarks use
+                manual marks.
+              </p>
+            </details>
             {progress.phase === 'available' ? (
               <time className="sr-only" dateTime={progress.snapshot.snapshotAt}>
                 Save snapshot {progress.snapshot.snapshotAt}
