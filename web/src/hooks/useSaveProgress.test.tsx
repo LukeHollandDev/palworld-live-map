@@ -7,8 +7,14 @@ const responsePayload = {
   snapshotAt: '2026-08-15T10:00:00Z',
   catalogueVersion: 'catalogue-content-hash',
   domains: [
+    { id: 'alpha-pals', coverage: 'complete', completedIds: [], total: 0 },
+    { id: 'bosses', coverage: 'complete', completedIds: [], total: 0 },
+    { id: 'bounties', coverage: 'complete', completedIds: [], total: 0 },
+    { id: 'watchtowers', coverage: 'complete', completedIds: [], total: 0 },
     { id: 'waypoints', coverage: 'complete', completedIds: ['private-transient-waypoint'], total: 1 },
-    { id: 'journals', coverage: 'complete', completedIds: [], total: 0 }
+    { id: 'effigies', coverage: 'complete', completedIds: [], total: 0 },
+    { id: 'journals', coverage: 'complete', completedIds: [], total: 0 },
+    { id: 'ancient-shrine-pickups', coverage: 'complete', completedIds: [], total: 0 }
   ]
 }
 
@@ -146,13 +152,21 @@ describe('useSaveProgress', () => {
 
     act(() => result.current.retry())
     await waitFor(() => expect(result.current.state).toMatchObject({ phase: 'available', refreshing: true }))
-    expect(result.current.state).toHaveProperty('snapshot.domains.0.completedIds.0', 'private-transient-waypoint')
+    expect(
+      result.current.state.phase === 'available'
+        ? result.current.state.snapshot.domains.find((domain) => domain.id === 'waypoints')?.completedIds[0]
+        : undefined
+    ).toBe('private-transient-waypoint')
 
     refresh.resolve(new Response('{"error":"progress_unavailable"}', { status: 503 }))
     await waitFor(() =>
       expect(result.current.state).toMatchObject({ phase: 'available', refreshing: false, refreshFailed: true })
     )
-    expect(result.current.state).toHaveProperty('snapshot.domains.0.completedIds.0', 'private-transient-waypoint')
+    expect(
+      result.current.state.phase === 'available'
+        ? result.current.state.snapshot.domains.find((domain) => domain.id === 'waypoints')?.completedIds[0]
+        : undefined
+    ).toBe('private-transient-waypoint')
   })
 
   it('rejects progress produced for a different catalogue hash', async () => {

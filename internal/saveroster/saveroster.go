@@ -1089,6 +1089,7 @@ func cacheableClaimPlayer(player savesidecar.ClaimPlayer) bool {
 	}
 	for _, keys := range [][]string{
 		player.Progress.FastTravel, player.Progress.Areas, player.Progress.Notes,
+		player.Progress.Relics, player.Progress.ItemPickups,
 		player.Progress.NormalBosses, player.Progress.TowerBosses,
 	} {
 		size += len(keys) * 16
@@ -1110,6 +1111,8 @@ func cloneCachedClaimPlayer(player savesidecar.ClaimPlayer) savesidecar.ClaimPla
 	player.Progress.FastTravel = append([]string(nil), player.Progress.FastTravel...)
 	player.Progress.Areas = append([]string(nil), player.Progress.Areas...)
 	player.Progress.Notes = append([]string(nil), player.Progress.Notes...)
+	player.Progress.Relics = append([]string(nil), player.Progress.Relics...)
+	player.Progress.ItemPickups = append([]string(nil), player.Progress.ItemPickups...)
 	player.Progress.NormalBosses = append([]string(nil), player.Progress.NormalBosses...)
 	player.Progress.TowerBosses = append([]string(nil), player.Progress.TowerBosses...)
 	return player
@@ -1121,6 +1124,8 @@ func privateProgress(snapshotAt time.Time, progress savesidecar.ClaimProgress) p
 		FastTravelKeys: append([]string{}, progress.FastTravel...),
 		AreaKeys:       append([]string{}, progress.Areas...),
 		NoteKeys:       append([]string{}, progress.Notes...),
+		RelicKeys:      append([]string{}, progress.Relics...),
+		ItemPickupKeys: append([]string{}, progress.ItemPickups...),
 		NormalBossKeys: append([]string{}, progress.NormalBosses...),
 		TowerBossKeys:  append([]string{}, progress.TowerBosses...),
 	}

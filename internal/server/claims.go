@@ -16,6 +16,7 @@ import (
 	"unicode"
 	"unicode/utf8"
 
+	"github.com/LukeHollandDev/palworld-live-map/internal/palworld"
 	"github.com/LukeHollandDev/palworld-live-map/internal/playerclaim"
 )
 
@@ -266,10 +267,17 @@ func (s *Server) projectClaimProgress(progress playerclaim.PrivateProgress) clai
 		id       string
 		category string
 		keys     []string
+		legacy   bool
 	}
 	sources := []domainSource{
+		{id: "alpha-pals", category: "alpha-pals", keys: progress.NormalBossKeys, legacy: true},
+		{id: "bosses", category: "bosses", keys: progress.TowerBossKeys, legacy: true},
+		{id: "bounties", category: "bounties", keys: progress.NormalBossKeys},
+		{id: "watchtowers", category: "watchtowers", keys: progress.FastTravelKeys},
 		{id: "waypoints", category: "waypoints", keys: progress.FastTravelKeys},
+		{id: "effigies", category: "effigies", keys: progress.RelicKeys},
 		{id: "journals", category: "journals", keys: progress.NoteKeys},
+		{id: "ancient-shrine-pickups", category: "ancient-shrine-pickups", keys: progress.ItemPickupKeys},
 	}
 	domains := make([]claimProgressDomain, 0, len(sources))
 	for _, source := range sources {
@@ -279,13 +287,27 @@ func (s *Server) projectClaimProgress(progress playerclaim.PrivateProgress) clai
 		}
 		completedIDs := make([]string, 0, len(completedKeys))
 		total := 0
-		for _, record := range s.worldCatalogue.Completion {
-			if record.Category != source.category {
-				continue
+		if source.legacy {
+			for _, item := range s.landmarks {
+				if item.Kind != source.category {
+					continue
+				}
+				total++
+				if key := legacyCompletionKey(item); key != "" {
+					if _, complete := completedKeys[key]; complete {
+						completedIDs = append(completedIDs, item.ID)
+					}
+				}
 			}
-			total++
-			if _, complete := completedKeys[record.StateKey]; complete {
-				completedIDs = append(completedIDs, record.LocationID)
+		} else {
+			for _, record := range s.worldCatalogue.Completion {
+				if record.Category != source.category {
+					continue
+				}
+				total++
+				if _, complete := completedKeys[record.StateKey]; complete {
+					completedIDs = append(completedIDs, record.LocationID)
+				}
 			}
 		}
 		sort.Strings(completedIDs)
@@ -296,6 +318,36 @@ func (s *Server) projectClaimProgress(progress playerclaim.PrivateProgress) clai
 	return claimProgressResponse{
 		SnapshotAt: progress.SnapshotAt.UTC(), CatalogueVersion: s.worldCatalogue.ContentHash, Domains: domains,
 	}
+}
+
+var towerCompletionKeys = map[string]string{
+	"tower:REGION_Grass_Boss":      "boss_battle_name_grassboss",
+	"tower:REGION_Forest_Boss":     "boss_battle_name_forestboss",
+	"tower:REGION_Volcano_Boss":    "boss_battle_name_electricboss",
+	"tower:REGION_Desert_Boss":     "boss_battle_name_desertboss",
+	"tower:REGION_Frost_Boss":      "boss_battle_name_snowboss",
+	"tower:REGION_Sakurajima_Boss": "boss_battle_name_sakurajimaboss",
+	"tower:REGION_Darkisland_Boss": "boss_battle_name_vikingboss",
+	"tower:REGION_Skyisland_Boss":  "boss_battle_name_sorajimaboss",
+	"tower:REGION_WorldTree_Boss":  "boss_battle_name_worldtreeboss",
+}
+
+func legacyCompletionKey(item palworld.WorldObject) string {
+	if item.Kind == "alpha-pals" {
+		const prefix = "alpha:"
+		if !strings.HasPrefix(item.ID, prefix) {
+			return ""
+		}
+		stateKey, _, ok := strings.Cut(strings.TrimPrefix(item.ID, prefix), ":")
+		if !ok {
+			return ""
+		}
+		return strings.ToLower(strings.TrimSpace(stateKey))
+	}
+	if item.Kind == "bosses" {
+		return towerCompletionKeys[item.ID]
+	}
+	return ""
 }
 
 func (s *Server) logoutClaimSession(w http.ResponseWriter, r *http.Request) {

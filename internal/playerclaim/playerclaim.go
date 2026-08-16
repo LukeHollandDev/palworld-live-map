@@ -108,6 +108,8 @@ type PrivateProgress struct {
 	FastTravelKeys []string  `json:"-"`
 	AreaKeys       []string  `json:"-"`
 	NoteKeys       []string  `json:"-"`
+	RelicKeys      []string  `json:"-"`
+	ItemPickupKeys []string  `json:"-"`
 	NormalBossKeys []string  `json:"-"`
 	TowerBossKeys  []string  `json:"-"`
 }

@@ -112,8 +112,14 @@ describe('authenticated completion overlay', () => {
             snapshotAt,
             catalogueVersion: 'private-catalogue-hash',
             domains: [
+              { id: 'alpha-pals', coverage: 'complete', completedIds: [], total: 0 },
+              { id: 'bosses', coverage: 'complete', completedIds: [], total: 0 },
+              { id: 'bounties', coverage: 'complete', completedIds: [], total: 0 },
+              { id: 'watchtowers', coverage: 'complete', completedIds: [], total: 0 },
               { id: 'waypoints', coverage: 'complete', completedIds: ['waypoint-save'], total: 1 },
-              { id: 'journals', coverage: 'complete', completedIds: ['journal-both'], total: 1 }
+              { id: 'effigies', coverage: 'complete', completedIds: [], total: 0 },
+              { id: 'journals', coverage: 'complete', completedIds: ['journal-both'], total: 1 },
+              { id: 'ancient-shrine-pickups', coverage: 'complete', completedIds: [], total: 0 }
             ]
           })
         }
@@ -132,7 +138,7 @@ describe('authenticated completion overlay', () => {
       '3'
     )
     expect(await within(progressPanel).findByText(/Save-confirmed ·/)).toBeVisible()
-    expect(within(progressPanel).getByText(/connected saves confirm waypoints and journals/i)).toBeVisible()
+    expect(within(progressPanel).getByText(/connected saves confirm bosses, bounties, fast travel/i)).toBeVisible()
     expect(within(progressPanel).getByRole('heading', { name: 'Connected private save' })).toBeVisible()
 
     await user.click(within(explorer).getByRole('button', { name: 'Expand Waypoints section' }))

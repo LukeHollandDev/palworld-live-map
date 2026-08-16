@@ -1159,6 +1159,7 @@ func inventoryClaimPlayer(playerID string) savesidecar.ClaimPlayer {
 		Common:   make([]savesidecar.ClaimStack, claimCandidateFloor),
 		Progress: savesidecar.ClaimProgress{
 			Available: true, FastTravel: []string{}, Areas: []string{}, Notes: []string{},
+			Relics: []string{}, ItemPickups: []string{},
 			NormalBosses: []string{}, TowerBosses: []string{},
 		},
 	}

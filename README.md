@@ -201,8 +201,8 @@ expire after ten minutes. The fallback transition proof can require multiple
 native backup intervals and uses a 90-minute deadline per phase. Sessions are
 held only in memory in this first release, use HttpOnly, SameSite=Strict cookies
 (plus `Secure` under HTTPS), and must be re-established after a map restart.
-Connected players can
-see exact save-confirmed waypoint and journal completion through
+Connected players can see exact save-confirmed completion for field and tower
+bosses, bounties, watchtowers, waypoints, effigies, journals, and Ancient Shrine pickups through
 `/api/me/progress` only;
 raw save state keys are projected to public catalogue location IDs. Manual
 checklist marks remain in that browser and are never copied into save evidence.
@@ -210,7 +210,7 @@ checklist marks remain in that browser and are never copied into save evidence.
 Character connection does not change the map's existing public player data:
 online and offline rosters, saved locations, levels, guild relationships,
 last-seen values, aggregate progression, and leaderboards remain available as
-before. Only the new exact per-landmark waypoint and journal completion overlay
+before. Only the new exact per-landmark completion overlay
 is self-only. Restrict access to the deployment separately if its existing
 player data is sensitive.
 

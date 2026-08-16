@@ -26,6 +26,8 @@ func TestPrivateClaimSaveTypesMarshalWithoutEvidence(t *testing.T) {
 		FastTravel:   []string{"private-fast-travel-key"},
 		Areas:        []string{"private-area-key"},
 		Notes:        []string{"private-note-key"},
+		Relics:       []string{"private-relic-key"},
+		ItemPickups:  []string{"private-item-pickup-key"},
 		NormalBosses: []string{"private-normal-boss-key"},
 		TowerBosses:  []string{"private-tower-boss-key"},
 	}
@@ -390,7 +392,7 @@ func TestReaderKeepsPresetDataWhenResolveFails(t *testing.T) {
 func TestReaderResolvesPrivateClaimSlotsForOnePlayer(t *testing.T) {
 	resolved := `{"resolveVersion":4,"kind":"player","player":{
 		"playerUId":"AAAAAAAA-0000-0000-0000-000000000000",
-		"progress":{"fastTravel":["FT-Two","ft-one"],"areas":[],"notes":["Day0"],"normalBosses":[],"towerBosses":[]},
+		"progress":{"fastTravel":["FT-Two","ft-one"],"areas":[],"notes":["Day0"],"relics":["Relic-One"],"itemPickups":["Pickup-One"],"normalBosses":[],"towerBosses":[]},
 		"inventory":{"common":[
 			{"slot":7,"itemId":"Stone","count":31},
 			{"slot":2,"itemId":"Wood","count":19}
@@ -429,7 +431,8 @@ printf '%s' `+shellQuote(resolved), emptyResolveBody)
 		t.Fatalf("claim private fallback evidence = %#v", player)
 	}
 	if !player.Progress.Available || strings.Join(player.Progress.FastTravel, ",") != "ft-one,ft-two" ||
-		strings.Join(player.Progress.Notes, ",") != "day0" || player.Progress.Areas == nil {
+		strings.Join(player.Progress.Notes, ",") != "day0" || strings.Join(player.Progress.Relics, ",") != "relic-one" ||
+		strings.Join(player.Progress.ItemPickups, ",") != "pickup-one" || player.Progress.Areas == nil {
 		t.Fatalf("claim progress = %#v", player.Progress)
 	}
 	arguments, err := os.ReadFile(argFile)
@@ -452,6 +455,7 @@ func TestReaderKeepsProofInventoryWhenProgressOrCollectionsAreIncomplete(t *test
 	}
 	completeProgress := map[string]any{
 		"fastTravel": []string{}, "areas": []string{}, "notes": []string{},
+		"relics": []string{}, "itemPickups": []string{},
 		"normalBosses": []string{}, "towerBosses": []string{},
 	}
 	incompleteProgress := map[string]any{

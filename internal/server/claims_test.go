@@ -913,26 +913,41 @@ func TestAuthenticatedProgressProjectsPrivateKeysToCatalogueIDs(t *testing.T) {
 		{},
 	}}
 	server, _ := newClaimHTTPServer(t, prover, nil)
-	var waypointKey, waypointID, journalKey, journalID string
+	server.landmarks = append(server.landmarks,
+		palworld.WorldObject{ID: "alpha:TestAlpha:1:2", Kind: "alpha-pals", Name: "Test Alpha"},
+		palworld.WorldObject{ID: "tower:REGION_Grass_Boss", Kind: "bosses", Name: "Test Tower"},
+	)
+	completionKeys := map[string]string{}
+	completionIDs := map[string]string{}
 	for _, record := range server.worldCatalogue.Completion {
-		switch record.Category {
-		case "waypoints":
-			if waypointKey == "" {
-				waypointKey, waypointID = record.StateKey, record.LocationID
-			}
-		case "journals":
-			if journalKey == "" {
-				journalKey, journalID = record.StateKey, record.LocationID
+		if completionKeys[record.Category] == "" {
+			completionKeys[record.Category], completionIDs[record.Category] = record.StateKey, record.LocationID
+		}
+	}
+	for _, category := range []string{"bounties", "watchtowers", "waypoints", "effigies", "journals", "ancient-shrine-pickups"} {
+		if completionKeys[category] == "" {
+			t.Fatalf("embedded catalogue has no %s completion record", category)
+		}
+	}
+	for _, item := range server.landmarks {
+		if completionKeys[item.Kind] == "" {
+			if key := legacyCompletionKey(item); key != "" {
+				completionKeys[item.Kind], completionIDs[item.Kind] = key, item.ID
 			}
 		}
 	}
-	if waypointKey == "" || journalKey == "" {
-		t.Fatal("embedded catalogue has no completion records for progress test")
+	if completionKeys["alpha-pals"] == "" || completionKeys["bosses"] == "" {
+		t.Fatal("embedded legacy landmarks have no private completion join")
 	}
 	prover.mu.Lock()
 	prover.progress = playerclaim.PrivateProgress{
-		SnapshotAt: claimTestNow, FastTravelKeys: []string{waypointKey, "private-unmatched-fast-travel-key"},
-		NoteKeys: []string{journalKey, "private-unmatched-note-key"},
+		SnapshotAt:     claimTestNow,
+		FastTravelKeys: []string{completionKeys["watchtowers"], completionKeys["waypoints"], "private-unmatched-fast-travel-key"},
+		NoteKeys:       []string{completionKeys["journals"], "private-unmatched-note-key"},
+		RelicKeys:      []string{completionKeys["effigies"]},
+		ItemPickupKeys: []string{completionKeys["ancient-shrine-pickups"]},
+		NormalBossKeys: []string{completionKeys["alpha-pals"], completionKeys["bounties"]},
+		TowerBossKeys:  []string{completionKeys["bosses"]},
 	}
 	prover.mu.Unlock()
 
@@ -956,7 +971,7 @@ func TestAuthenticatedProgressProjectsPrivateKeysToCatalogueIDs(t *testing.T) {
 	if err := json.Unmarshal(response.Body.Bytes(), &payload); err != nil {
 		t.Fatal(err)
 	}
-	if !payload.SnapshotAt.Equal(claimTestNow) || payload.CatalogueVersion != server.worldCatalogue.ContentHash || len(payload.Domains) != 2 {
+	if !payload.SnapshotAt.Equal(claimTestNow) || payload.CatalogueVersion != server.worldCatalogue.ContentHash || len(payload.Domains) != 8 {
 		t.Fatalf("progress response = %+v", payload)
 	}
 	completed := map[string][]string{}
@@ -966,11 +981,13 @@ func TestAuthenticatedProgressProjectsPrivateKeysToCatalogueIDs(t *testing.T) {
 		}
 		completed[domain.ID] = domain.CompletedIDs
 	}
-	if !reflect.DeepEqual(completed["waypoints"], []string{waypointID}) || !reflect.DeepEqual(completed["journals"], []string{journalID}) {
-		t.Fatalf("completed IDs = %v", completed)
+	for _, category := range []string{"alpha-pals", "bosses", "bounties", "watchtowers", "waypoints", "effigies", "journals", "ancient-shrine-pickups"} {
+		if !reflect.DeepEqual(completed[category], []string{completionIDs[category]}) {
+			t.Fatalf("completed %s = %v, want %q", category, completed[category], completionIDs[category])
+		}
 	}
 	body := response.Body.String()
-	for _, forbidden := range []string{waypointKey, "private-unmatched-fast-travel-key", "private-unmatched-note-key", "stateKey", "private-world-subject"} {
+	for _, forbidden := range []string{completionKeys["waypoints"], "private-unmatched-fast-travel-key", "private-unmatched-note-key", "stateKey", "private-world-subject"} {
 		if strings.Contains(body, forbidden) {
 			t.Errorf("progress response exposed %q: %s", forbidden, body)
 		}

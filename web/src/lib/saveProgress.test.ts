@@ -21,8 +21,14 @@ function payload(snapshotAt = '2026-08-15T10:00:00Z') {
     snapshotAt,
     catalogueVersion: 'catalogue-content-hash',
     domains: [
+      { id: 'alpha-pals', coverage: 'complete', completedIds: [], total: 0 },
+      { id: 'bosses', coverage: 'complete', completedIds: [], total: 0 },
+      { id: 'bounties', coverage: 'complete', completedIds: [], total: 0 },
+      { id: 'watchtowers', coverage: 'complete', completedIds: [], total: 0 },
+      { id: 'waypoints', coverage: 'complete', completedIds: ['waypoint-save'], total: 1 },
+      { id: 'effigies', coverage: 'complete', completedIds: [], total: 0 },
       { id: 'journals', coverage: 'complete', completedIds: ['journal-both'], total: 1 },
-      { id: 'waypoints', coverage: 'complete', completedIds: ['waypoint-save'], total: 1 }
+      { id: 'ancient-shrine-pickups', coverage: 'complete', completedIds: [], total: 0 }
     ]
   }
 }
@@ -40,11 +46,20 @@ describe('save-backed completion', () => {
     expect(completionSourceLabel(completionSource('journal-both', manual, save))).toBe('Combined')
   })
 
-  it('accepts exactly complete waypoint and journal domains and rejects everything else', () => {
-    expect(parseSaveProgress(payload())?.domains.map((domain) => domain.id)).toEqual(['waypoints', 'journals'])
+  it('accepts exactly the complete save-backed landmark domains and rejects everything else', () => {
+    expect(parseSaveProgress(payload())?.domains.map((domain) => domain.id)).toEqual([
+      'alpha-pals',
+      'bosses',
+      'bounties',
+      'watchtowers',
+      'waypoints',
+      'effigies',
+      'journals',
+      'ancient-shrine-pickups'
+    ])
 
     const unknown = payload()
-    unknown.domains[0].id = 'effigies'
+    unknown.domains[0].id = 'npc-locations'
     expect(parseSaveProgress(unknown)).toBeNull()
 
     const missing = payload()
@@ -56,13 +71,15 @@ describe('save-backed completion', () => {
     expect(parseSaveProgress(partial)).toBeNull()
 
     const duplicate = payload()
-    duplicate.domains[1].id = 'journals'
+    duplicate.domains[1].id = 'alpha-pals'
     expect(parseSaveProgress(duplicate)).toBeNull()
   })
 
   it('does not let a response domain complete an item from another catalogue kind', () => {
     const crossDomain = payload()
-    crossDomain.domains[1].completedIds = ['effigy-manual']
+    const waypointDomain = crossDomain.domains.find((domain) => domain.id === 'waypoints')
+    if (!waypointDomain) throw new Error('Expected waypoint test domain')
+    waypointDomain.completedIds = ['effigy-manual']
     expect(saveCompletionIDs(parseSaveProgress(crossDomain), items)).toEqual(new Set(['journal-both']))
   })
 

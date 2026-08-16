@@ -1,6 +1,15 @@
 import type { MapItem } from '../types'
 
-export const SAVE_PROGRESS_DOMAIN_IDS = ['waypoints', 'journals'] as const
+export const SAVE_PROGRESS_DOMAIN_IDS = [
+  'alpha-pals',
+  'bosses',
+  'bounties',
+  'watchtowers',
+  'waypoints',
+  'effigies',
+  'journals',
+  'ancient-shrine-pickups'
+] as const
 export const SAVE_PROGRESS_STALE_AFTER_MS = 30 * 60_000
 
 export type SaveProgressDomainID = (typeof SAVE_PROGRESS_DOMAIN_IDS)[number]
@@ -50,8 +59,8 @@ function boundedText(value: unknown, maximum: number): string | undefined {
 
 /**
  * Treat the private endpoint as a narrow protocol, not a bag of completion
- * IDs. The server currently has exact coverage only for waypoints and
- * journals, so an added, missing, partial, or duplicate domain invalidates the
+ * IDs. The server reports only domains backed by exact per-location save
+ * evidence, so an added, missing, partial, or duplicate domain invalidates the
  * entire transient overlay instead of silently claiming unsupported progress.
  */
 export function parseSaveProgress(value: unknown): SaveProgressSnapshot | null {

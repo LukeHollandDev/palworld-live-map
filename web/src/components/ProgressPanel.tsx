@@ -147,7 +147,8 @@ export function ProgressPanel({
               {saveProgressDescription(progress)}
             </p>
             <p className="m-0 mt-1 text-[10px] leading-4 text-[#718b91]">
-              Connected saves confirm waypoints and journals. Other landmarks use your manual checklist.
+              Connected saves confirm bosses, bounties, fast travel, effigies, journals, and shrine pickups. Dungeons,
+              oil rigs, and NPC locations use your manual checklist.
             </p>
             {progress.phase === 'available' ? (
               <time className="sr-only" dateTime={progress.snapshot.snapshotAt}>

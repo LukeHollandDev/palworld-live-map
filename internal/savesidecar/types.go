@@ -47,6 +47,8 @@ type ClaimProgress struct {
 	FastTravel   []string `json:"-"`
 	Areas        []string `json:"-"`
 	Notes        []string `json:"-"`
+	Relics       []string `json:"-"`
+	ItemPickups  []string `json:"-"`
 	NormalBosses []string `json:"-"`
 	TowerBosses  []string `json:"-"`
 }
@@ -199,6 +201,8 @@ type resolvedClaimProgress struct {
 	FastTravel   []string `json:"fastTravel"`
 	Areas        []string `json:"areas"`
 	Notes        []string `json:"notes"`
+	Relics       []string `json:"relics"`
+	ItemPickups  []string `json:"itemPickups"`
 	NormalBosses []string `json:"normalBosses"`
 	TowerBosses  []string `json:"towerBosses"`
 }

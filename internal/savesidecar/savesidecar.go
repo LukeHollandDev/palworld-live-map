@@ -471,7 +471,7 @@ func validatedClaimStacks(rawStacks []resolvedClaimStack) ([]ClaimStack, error) 
 }
 
 func claimProgress(raw *resolvedClaimProgress) ClaimProgress {
-	if raw == nil || raw.FastTravel == nil || raw.Areas == nil || raw.Notes == nil ||
+	if raw == nil || raw.FastTravel == nil || raw.Areas == nil || raw.Notes == nil || raw.Relics == nil || raw.ItemPickups == nil ||
 		raw.NormalBosses == nil || raw.TowerBosses == nil {
 		return ClaimProgress{}
 	}
@@ -484,6 +484,12 @@ func claimProgress(raw *resolvedClaimProgress) ClaimProgress {
 		return ClaimProgress{}
 	}
 	if progress.Notes, err = normalizedClaimKeys(raw.Notes); err != nil {
+		return ClaimProgress{}
+	}
+	if progress.Relics, err = normalizedClaimKeys(raw.Relics); err != nil {
+		return ClaimProgress{}
+	}
+	if progress.ItemPickups, err = normalizedClaimKeys(raw.ItemPickups); err != nil {
 		return ClaimProgress{}
 	}
 	if progress.NormalBosses, err = normalizedClaimKeys(raw.NormalBosses); err != nil {

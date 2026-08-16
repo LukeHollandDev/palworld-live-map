@@ -3,7 +3,7 @@ set -eu
 
 reader_version=v0.2.0
 reader_revision=c6560931f407abcbe3398a3fc73840b51bb56974
-reader_build_version="${reader_version}+live-map.2"
+reader_build_version="${reader_version}+live-map.3"
 
 project_root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 reader_stage=$(mktemp -d "${TMPDIR:-/tmp}/palworld-live-map-reader.XXXXXX")
