@@ -66,12 +66,6 @@ function quizStartResponse(expiresInMs = 10 * 60_000, token = challengeToken) {
           prompt: 'Which item is in common-inventory slot 9?',
           options: ['Berry', 'Milk', 'Honey', 'Flour', 'Cake', 'Wool', 'Leather', 'Bone'],
           canCycle: true
-        },
-        {
-          id: 'q3',
-          prompt: 'Which Pal was in party slot 1?',
-          options: ['Lamball', 'Cattiva', 'Chikipi', 'Foxparks', 'Lifmunk', 'Pengullet', 'Tanzee', 'Daedream'],
-          canCycle: true
         }
       ]
     }
@@ -171,7 +165,7 @@ afterEach(() => {
 })
 
 describe('PlayerClaimPanel', () => {
-  it('verifies an offline character with three quick multiple-choice questions', async () => {
+  it('verifies an offline character with two quick multiple-choice questions', async () => {
     const requests: Array<{ path: string; init?: RequestInit }> = []
     let meRequests = 0
     vi.stubGlobal(
@@ -217,10 +211,9 @@ describe('PlayerClaimPanel', () => {
     )
 
     await user.click(await screen.findByRole('button', { name: 'This is me' }))
-    expect(await screen.findByText(/Answer three questions from memory/)).toBeVisible()
+    expect(await screen.findByText(/Answer two questions from memory/)).toBeVisible()
     await user.selectOptions(screen.getByRole('combobox', { name: 'Which item is in common-inventory slot 4?' }), '1')
     await user.selectOptions(screen.getByRole('combobox', { name: 'Which item is in common-inventory slot 9?' }), '3')
-    await user.selectOptions(screen.getByRole('combobox', { name: 'Which Pal was in party slot 1?' }), '5')
     await user.click(screen.getByRole('button', { name: 'Verify answers' }))
 
     const verify = requests.find((request) => request.path === '/api/player-claims/verify')
@@ -228,14 +221,13 @@ describe('PlayerClaimPanel', () => {
       challengeToken,
       answers: [
         { questionId: 'q1', option: 1 },
-        { questionId: 'q2', option: 3 },
-        { questionId: 'q3', option: 5 }
+        { questionId: 'q2', option: 3 }
       ]
     })
     expect(await screen.findByRole('heading', { name: 'Connected private save' })).toBeVisible()
   })
 
-  it('cycles Q1 and Q3 independently without clearing Q2', async () => {
+  it('cycles either question independently without clearing the other answer', async () => {
     const requests: Array<{ path: string; body: unknown }> = []
     vi.stubGlobal(
       'fetch',
@@ -255,8 +247,8 @@ describe('PlayerClaimPanel', () => {
           }
           const q5 = {
             id: 'q5',
-            prompt: 'Which armor was equipped in slot 2?',
-            options: ['Cloth', 'Pelt', 'Metal', 'Refined Metal', 'Pal Metal', 'Plasteel', 'Heat Armor', 'Cold Armor'],
+            prompt: 'Which Pal was in party slot 2?',
+            options: ['Lamball', 'Cattiva', 'Chikipi', 'Foxparks', 'Lifmunk', 'Pengullet', 'Tanzee', 'Daedream'],
             canCycle: false
           }
           return jsonResponse({
@@ -265,7 +257,7 @@ describe('PlayerClaimPanel', () => {
             instructions: {
               kind: 'inventory_quiz',
               snapshotAt: new Date(Date.now() - 1_000).toISOString(),
-              questions: body.questionId === 'q1' ? [q4, initial[1], initial[2]] : [q4, initial[1], q5]
+              questions: body.questionId === 'q1' ? [q4, initial[1]] : [q4, q5]
             }
           })
         }
@@ -294,16 +286,16 @@ describe('PlayerClaimPanel', () => {
     const q2 = screen.getByRole('combobox', { name: 'Which item is in common-inventory slot 9?' })
     await user.selectOptions(q2, '3')
     await user.click(screen.getAllByRole('button', { name: 'Different question' })[0])
-    expect(await screen.findByRole('combobox', { name: 'Which weapon was equipped in slot 1?' })).toBeVisible()
+    const q1Replacement = await screen.findByRole('combobox', { name: 'Which weapon was equipped in slot 1?' })
     expect(q2).toHaveValue('3')
 
-    await user.click(screen.getAllByRole('button', { name: 'Different question' })[2])
-    expect(await screen.findByRole('combobox', { name: 'Which armor was equipped in slot 2?' })).toBeVisible()
-    expect(q2).toHaveValue('3')
-    expect(screen.getByRole('combobox', { name: 'Which weapon was equipped in slot 1?' })).toBeVisible()
+    await user.selectOptions(q1Replacement, '2')
+    await user.click(screen.getAllByRole('button', { name: 'Different question' })[1])
+    expect(await screen.findByRole('combobox', { name: 'Which Pal was in party slot 2?' })).toBeVisible()
+    expect(q1Replacement).toHaveValue('2')
     expect(requests.map((request) => request.body)).toEqual([
       { challengeToken, questionId: 'q1' },
-      { challengeToken, questionId: 'q3' }
+      { challengeToken, questionId: 'q2' }
     ])
   })
 

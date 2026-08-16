@@ -625,7 +625,7 @@ func emptyInstructions(instructions Instructions) bool {
 
 func validQuizInstructions(instructions Instructions) bool {
 	if instructions.Kind != InventoryQuiz || instructions.Phase != "" || instructions.Step != 0 ||
-		instructions.TotalSteps != 0 || len(instructions.Pairs) != 0 || len(instructions.Questions) != 3 ||
+		instructions.TotalSteps != 0 || len(instructions.Pairs) != 0 || len(instructions.Questions) != 2 ||
 		instructions.SnapshotAt.IsZero() {
 		return false
 	}

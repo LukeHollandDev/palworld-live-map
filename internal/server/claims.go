@@ -25,7 +25,7 @@ const (
 	claimCSRFHeader        = "X-Palworld-Live-Map"
 	maxClaimBody           = 8 << 10
 	maxClaimPlayerID       = 256
-	maxClaimQuizAnswers    = 3
+	maxClaimQuizAnswers    = 2
 	maxClaimQuestionID     = 64
 )
 

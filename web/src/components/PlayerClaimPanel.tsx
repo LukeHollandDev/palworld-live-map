@@ -160,7 +160,7 @@ function parseQuiz(value: unknown): QuizInstructions | null {
     !isRecord(value) ||
     value.kind !== 'inventory_quiz' ||
     !Array.isArray(value.questions) ||
-    value.questions.length !== 3
+    value.questions.length !== 2
   )
     return null
   const questions: QuizQuestion[] = []
@@ -1547,7 +1547,7 @@ function QuizControl({
   return (
     <div className="grid gap-3">
       <p className="m-0 text-xs leading-5 text-[#a9bbc0]">
-        Answer three questions from memory. You can replace any one without changing the other two.
+        Answer two questions from memory. You can replace either one without changing the other.
       </p>
       {quiz.questions.map((question, questionIndex) => (
         <fieldset key={question.id} className="m-0 grid gap-1.5 border border-[#8bb7bd]/25 p-2.5">
@@ -1814,7 +1814,7 @@ function ChallengeStatus({ challenge, session }: { challenge: ChallengeState; se
   let message = 'Waiting for a fresh immutable baseline. We’ll check again in about 30 seconds; do not act yet.'
   let tone: 'normal' | 'success' | 'warning' = 'normal'
   if (challenge.quiz && challenge.phase === 'ready') {
-    message = 'Answer all three questions, then verify once.'
+    message = 'Answer both questions, then verify once.'
   }
   if (challenge.quiz && challenge.phase === 'checking') {
     message = 'Checking both answers…'

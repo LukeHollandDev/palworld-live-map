@@ -36,7 +36,7 @@ const (
 	maxNameBytes         = 96
 	claimCandidateFloor  = 16
 	claimCycleSlots      = 8
-	claimQuizQuestions   = 3
+	claimQuizQuestions   = 2
 	claimQuizOptions     = 8
 	maxClaimPlayerCache  = 32
 	maxCachedPlayerBytes = 1 << 20
@@ -829,7 +829,7 @@ func selectKnowledgeQuiz(player savesidecar.ClaimPlayer, selector uint64, snapsh
 	facts := make([]claimQuizFact, 0, len(player.Common)+len(player.DropSlot)+len(player.Essential)+len(player.Weapons)+len(player.Armor)+len(player.Food)+len(player.Party))
 	appendStackQuizFacts(&facts, player.Common, "Which item was in common-inventory slot %d?", itemQuizDecoys)
 	appendStackQuizFacts(&facts, player.DropSlot, "Which item was in dropped-items slot %d?", itemQuizDecoys)
-	appendStackQuizFacts(&facts, player.Essential, "Which key item was in essential slot %d?", essentialQuizDecoys)
+	appendStackQuizFacts(&facts, player.Essential, "Which key item was in key-items slot %d?", essentialQuizDecoys)
 	appendStackQuizFacts(&facts, player.Weapons, "Which weapon was equipped in slot %d?", weaponQuizDecoys)
 	appendStackQuizFacts(&facts, player.Armor, "Which armor or accessory was equipped in slot %d?", armorQuizDecoys)
 	appendStackQuizFacts(&facts, player.Food, "Which food was equipped in slot %d?", foodQuizDecoys)

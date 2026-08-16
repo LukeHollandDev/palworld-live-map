@@ -8,7 +8,7 @@ This map does not provide general viewer authentication. Anyone who can access i
 
 The optional saved-character connection authenticates only self-private routes;
 it is not an access-control layer for the live map. Its primary proof is a
-one-shot, three-question memory quiz generated from a safely completed backup.
+one-shot, two-question memory quiz generated from a safely completed backup.
 Each question exposes one save-backed answer among seven global decoys and can
 be replaced independently without changing the other cards. Questions may use
 private inventory containers, equipment, food, or party slots. A wrong submission

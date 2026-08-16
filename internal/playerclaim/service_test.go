@@ -941,7 +941,6 @@ func (knowledgeQuizProver) Prepare(_ context.Context, target string, _ uint64) (
 			Questions: []QuizQuestion{
 				{ID: "q1", Prompt: "First?", Options: []string{"A", "B", "C", "D", "E", "F", "G", "H"}},
 				{ID: "q2", Prompt: "Second?", Options: []string{"I", "J", "K", "L", "M", "N", "O", "P"}},
-				{ID: "q3", Prompt: "Third?", Options: []string{"Q", "R", "S", "T", "U", "V", "W", "X"}},
 			},
 		},
 		Evidence: "private answers",
@@ -949,9 +948,8 @@ func (knowledgeQuizProver) Prepare(_ context.Context, target string, _ uint64) (
 }
 
 func (knowledgeQuizProver) Verify(_ context.Context, prepared *Prepared) error {
-	if len(prepared.Answers) != 3 || prepared.Answers[0] != (QuizAnswer{QuestionID: "q1", Option: 1}) ||
-		prepared.Answers[1] != (QuizAnswer{QuestionID: "q2", Option: 3}) ||
-		prepared.Answers[2] != (QuizAnswer{QuestionID: "q3", Option: 5}) {
+	if len(prepared.Answers) != 2 || prepared.Answers[0] != (QuizAnswer{QuestionID: "q1", Option: 1}) ||
+		prepared.Answers[1] != (QuizAnswer{QuestionID: "q2", Option: 3}) {
 		return ErrIncorrectAnswer
 	}
 	return nil
@@ -978,8 +976,7 @@ func TestKnowledgeQuizIsReadyImmediatelyAndConsumesIncorrectAttempt(t *testing.T
 		t.Fatalf("Start() = %+v, %v", incorrect, err)
 	}
 	if _, err := service.Verify(context.Background(), incorrect.Bearer,
-		QuizAnswer{QuestionID: "q1", Option: 0}, QuizAnswer{QuestionID: "q2", Option: 3},
-		QuizAnswer{QuestionID: "q3", Option: 5}); !errors.Is(err, ErrIncorrectAnswer) {
+		QuizAnswer{QuestionID: "q1", Option: 0}, QuizAnswer{QuestionID: "q2", Option: 3}); !errors.Is(err, ErrIncorrectAnswer) {
 		t.Fatalf("incorrect Verify() error = %v", err)
 	}
 	if _, err := service.Verify(context.Background(), incorrect.Bearer); !errors.Is(err, ErrChallengeNotFound) {
@@ -991,8 +988,7 @@ func TestKnowledgeQuizIsReadyImmediatelyAndConsumesIncorrectAttempt(t *testing.T
 		t.Fatal(err)
 	}
 	verified, err := service.Verify(context.Background(), correct.Bearer,
-		QuizAnswer{QuestionID: "q1", Option: 1}, QuizAnswer{QuestionID: "q2", Option: 3},
-		QuizAnswer{QuestionID: "q3", Option: 5})
+		QuizAnswer{QuestionID: "q1", Option: 1}, QuizAnswer{QuestionID: "q2", Option: 3})
 	if err != nil || verified.Status != VerificationVerified || verified.Session == nil {
 		t.Fatalf("correct Verify() = %+v, %v", verified, err)
 	}
@@ -1008,13 +1004,12 @@ func TestKnowledgeQuizCyclesOnlyRequestedQuestion(t *testing.T) {
 		t.Fatalf("Start() = %+v, %v", challenge, err)
 	}
 	q2 := challenge.Instructions.Questions[1]
-	q3 := challenge.Instructions.Questions[2]
 	cycled, err := service.CycleQuestion(context.Background(), challenge.Bearer, "q1")
 	if err != nil || cycled.Status != VerificationReady || cycled.Instructions == nil {
 		t.Fatalf("CycleQuestion() = %+v, %v", cycled, err)
 	}
 	if cycled.Instructions.Questions[0].ID != "q4" ||
-		cycled.Instructions.Questions[1].ID != q2.ID || cycled.Instructions.Questions[2].ID != q3.ID {
+		cycled.Instructions.Questions[1].ID != q2.ID {
 		t.Fatalf("cycled questions = %+v", cycled.Instructions.Questions)
 	}
 	if _, err := service.CycleQuestion(context.Background(), challenge.Bearer, "q4"); !errors.Is(err, ErrNoAlternateQuestion) {
