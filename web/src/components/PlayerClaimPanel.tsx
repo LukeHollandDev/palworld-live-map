@@ -36,6 +36,7 @@ interface QuizQuestion {
   id: string
   prompt: string
   options: string[]
+  canCycle: boolean
 }
 
 interface QuizInstructions {
@@ -78,6 +79,7 @@ interface PlayerClaimContextValue {
   notice: Notice
   starting: boolean
   disconnecting: boolean
+  cyclingQuestionId: string | null
   startClaim: (playerId: string) => Promise<void>
   verifyClaim: () => Promise<void>
   loadSession: () => Promise<PlayerClaimSessionState | null>
@@ -87,6 +89,7 @@ interface PlayerClaimContextValue {
   updateRecoveryPair: (index: number, completed: boolean) => void
   updateRecoveryCount: (completedCount: number) => void
   updateQuizAnswer: (index: number, option: number) => void
+  cycleQuizQuestion: (index: number) => Promise<void>
 }
 
 const PlayerClaimContext = createContext<PlayerClaimContextValue | null>(null)
@@ -157,7 +160,7 @@ function parseQuiz(value: unknown): QuizInstructions | null {
     !isRecord(value) ||
     value.kind !== 'inventory_quiz' ||
     !Array.isArray(value.questions) ||
-    value.questions.length !== 2
+    value.questions.length !== 3
   )
     return null
   const questions: QuizQuestion[] = []
@@ -170,15 +173,43 @@ function parseQuiz(value: unknown): QuizInstructions | null {
       ids.has(question.id) ||
       typeof question.prompt !== 'string' ||
       !question.prompt ||
+      typeof question.canCycle !== 'boolean' ||
       !Array.isArray(question.options) ||
       question.options.length !== 8 ||
       !question.options.every((option): option is string => typeof option === 'string' && option.length > 0)
     )
       return null
     ids.add(question.id)
-    questions.push({ id: question.id, prompt: question.prompt, options: [...question.options] })
+    questions.push({
+      id: question.id,
+      prompt: question.prompt,
+      options: [...question.options],
+      canCycle: question.canCycle
+    })
   }
   return { kind: 'inventory_quiz', questions }
+}
+
+function quizQuestionMatches(left: QuizQuestion, right: QuizQuestion) {
+  return (
+    left.id === right.id &&
+    left.prompt === right.prompt &&
+    left.options.length === right.options.length &&
+    left.options.every((option, index) => option === right.options[index])
+  )
+}
+
+function validQuizReplacement(current: QuizInstructions, next: QuizInstructions, replacedIndex: number) {
+  if (
+    replacedIndex < 0 ||
+    replacedIndex >= current.questions.length ||
+    current.questions.length !== next.questions.length
+  )
+    return false
+  if (current.questions[replacedIndex].id === next.questions[replacedIndex].id) return false
+  return current.questions.every(
+    (question, index) => index === replacedIndex || quizQuestionMatches(question, next.questions[index])
+  )
 }
 
 function parseRecoverySnapshot(value: unknown): RecoverySnapshot | null {
@@ -298,11 +329,13 @@ export function PlayerClaimProvider({ enabled, children }: { enabled: boolean; c
   const [notice, setNotice] = useState<Notice>(null)
   const [starting, setStarting] = useState(false)
   const [disconnecting, setDisconnecting] = useState(false)
+  const [cyclingQuestionId, setCyclingQuestionId] = useState<string | null>(null)
   const challengeRef = useRef<ChallengeState | null>(null)
   const recoveryRef = useRef<RecoverySnapshot | null>(recovery)
   const challengeTokenRef = useRef<string | null>(null)
   const challengeEpochRef = useRef(0)
   const verifyControllerRef = useRef<AbortController | null>(null)
+  const cycleControllerRef = useRef<AbortController | null>(null)
   const startControllerRef = useRef<AbortController | null>(null)
   const sessionRef = useRef<PlayerClaimSessionState>({ phase: enabled ? 'loading' : 'anonymous' })
   const sessionEpochRef = useRef(0)
@@ -401,6 +434,9 @@ export function PlayerClaimProvider({ enabled, children }: { enabled: boolean; c
     challengeTokenRef.current = null
     verifyControllerRef.current?.abort()
     verifyControllerRef.current = null
+    cycleControllerRef.current?.abort()
+    cycleControllerRef.current = null
+    setCyclingQuestionId(null)
     startControllerRef.current?.abort()
     startControllerRef.current = null
     commitChallenge(null)
@@ -534,6 +570,9 @@ export function PlayerClaimProvider({ enabled, children }: { enabled: boolean; c
     challengeTokenRef.current = null
     verifyControllerRef.current?.abort()
     verifyControllerRef.current = null
+    cycleControllerRef.current?.abort()
+    cycleControllerRef.current = null
+    setCyclingQuestionId(null)
     startControllerRef.current?.abort()
     startControllerRef.current = null
     commitChallenge(null)
@@ -573,6 +612,82 @@ export function PlayerClaimProvider({ enabled, children }: { enabled: boolean; c
     return () => window.clearTimeout(timeout)
   }, [challenge, expireChallenge])
 
+  const cycleQuizQuestion = useCallback(
+    async (questionIndex: number) => {
+      const current = challengeRef.current
+      const challengeToken = challengeTokenRef.current
+      const question = current?.quiz?.questions[questionIndex]
+      if (
+        !current?.quiz ||
+        current.phase !== 'ready' ||
+        !question?.canCycle ||
+        !challengeToken ||
+        cycleControllerRef.current
+      )
+        return
+      const requestEpoch = challengeEpochRef.current
+      const requestController = controller()
+      cycleControllerRef.current = requestController
+      setCyclingQuestionId(question.id)
+      const isCurrent = () =>
+        mountedRef.current &&
+        !requestController.signal.aborted &&
+        challengeEpochRef.current === requestEpoch &&
+        challengeTokenRef.current === challengeToken &&
+        cycleControllerRef.current === requestController
+      try {
+        const response = await fetch(
+          '/api/player-claims/questions/cycle',
+          mutationInit({ challengeToken, questionId: question.id }, requestController.signal)
+        )
+        const body = await responseJSON(response)
+        if (!isCurrent()) return
+        if (response.status === 401) {
+          expireChallenge()
+          return
+        }
+        if (!response.ok || !isRecord(body) || body.status !== 'ready') {
+          setNotice('unavailable')
+          return
+        }
+        const nextQuiz = parseQuiz(body.instructions)
+        const refreshedExpiresAt = typeof body.expiresAt === 'string' ? Date.parse(body.expiresAt) : Number.NaN
+        const latest = challengeRef.current
+        if (
+          !nextQuiz ||
+          !latest?.quiz ||
+          !Number.isFinite(refreshedExpiresAt) ||
+          refreshedExpiresAt <= Date.now() ||
+          !validQuizReplacement(latest.quiz, nextQuiz, questionIndex)
+        ) {
+          setNotice('unavailable')
+          return
+        }
+        const answersByID = new Map(latest.quiz.questions.map((item, index) => [item.id, latest.answers[index]]))
+        updateChallenge((active) =>
+          active
+            ? {
+                ...active,
+                quiz: nextQuiz,
+                answers: nextQuiz.questions.map((item) => answersByID.get(item.id) ?? null),
+                expiresAt: refreshedExpiresAt
+              }
+            : active
+        )
+        setNotice(null)
+      } catch {
+        if (isCurrent()) setNotice('unavailable')
+      } finally {
+        releaseController(requestController)
+        if (cycleControllerRef.current === requestController) {
+          cycleControllerRef.current = null
+          if (mountedRef.current) setCyclingQuestionId(null)
+        }
+      }
+    },
+    [controller, expireChallenge, releaseController, updateChallenge]
+  )
+
   const startClaim = useCallback(
     async (playerId: string) => {
       if (
@@ -587,6 +702,9 @@ export function PlayerClaimProvider({ enabled, children }: { enabled: boolean; c
       challengeTokenRef.current = null
       verifyControllerRef.current?.abort()
       verifyControllerRef.current = null
+      cycleControllerRef.current?.abort()
+      cycleControllerRef.current = null
+      setCyclingQuestionId(null)
       setStarting(true)
       setNotice(null)
       commitChallenge(null)
@@ -651,7 +769,14 @@ export function PlayerClaimProvider({ enabled, children }: { enabled: boolean; c
 
   const verifyClaim = useCallback(async () => {
     const challengeToken = challengeTokenRef.current
-    if (!challenge || challenge.phase === 'checking' || !challengeToken || verifyControllerRef.current) return
+    if (
+      !challenge ||
+      challenge.phase === 'checking' ||
+      !challengeToken ||
+      verifyControllerRef.current ||
+      cycleControllerRef.current
+    )
+      return
     if (challenge.expiresAt <= Date.now()) {
       expireChallenge()
       return
@@ -863,6 +988,9 @@ export function PlayerClaimProvider({ enabled, children }: { enabled: boolean; c
       challengeTokenRef.current = null
       verifyControllerRef.current?.abort()
       verifyControllerRef.current = null
+      cycleControllerRef.current?.abort()
+      cycleControllerRef.current = null
+      setCyclingQuestionId(null)
       startControllerRef.current?.abort()
       startControllerRef.current = null
       commitChallenge(null)
@@ -885,6 +1013,9 @@ export function PlayerClaimProvider({ enabled, children }: { enabled: boolean; c
     challengeTokenRef.current = null
     verifyControllerRef.current?.abort()
     verifyControllerRef.current = null
+    cycleControllerRef.current?.abort()
+    cycleControllerRef.current = null
+    setCyclingQuestionId(null)
     startControllerRef.current?.abort()
     startControllerRef.current = null
     commitRecovery(null)
@@ -900,6 +1031,7 @@ export function PlayerClaimProvider({ enabled, children }: { enabled: boolean; c
       notice,
       starting,
       disconnecting,
+      cyclingQuestionId,
       startClaim,
       verifyClaim,
       loadSession,
@@ -908,11 +1040,14 @@ export function PlayerClaimProvider({ enabled, children }: { enabled: boolean; c
       acknowledgeRecovery,
       updateRecoveryPair,
       updateRecoveryCount,
-      updateQuizAnswer
+      updateQuizAnswer,
+      cycleQuizQuestion
     }),
     [
       acknowledgeRecovery,
       challenge,
+      cycleQuizQuestion,
+      cyclingQuestionId,
       disconnect,
       disconnecting,
       enabled,
@@ -1009,6 +1144,8 @@ export function PlayerClaimSessionControl({ players = [] }: { players?: readonly
           onAcknowledgeRecovery={claim.acknowledgeRecovery}
           onUpdateRecoveryPair={claim.updateRecoveryPair}
           onUpdateQuizAnswer={claim.updateQuizAnswer}
+          cyclingQuestionId={claim.cyclingQuestionId}
+          onCycleQuizQuestion={claim.cycleQuizQuestion}
         />
         {claim.notice ? <ClaimNotice notice={claim.notice} /> : null}
       </section>
@@ -1263,7 +1400,9 @@ function ActiveChallenge({
   onLoadSession,
   onAcknowledgeRecovery,
   onUpdateRecoveryPair,
-  onUpdateQuizAnswer
+  onUpdateQuizAnswer,
+  cyclingQuestionId,
+  onCycleQuizQuestion
 }: {
   challenge: ChallengeState
   recovery: RecoverySnapshot | null
@@ -1275,6 +1414,8 @@ function ActiveChallenge({
   onAcknowledgeRecovery: () => void
   onUpdateRecoveryPair: (index: number, completed: boolean) => void
   onUpdateQuizAnswer: (index: number, option: number) => void
+  cyclingQuestionId: string | null
+  onCycleQuizQuestion: (index: number) => Promise<void>
 }) {
   const instructions = challenge.instructions
   const quizComplete = Boolean(challenge.quiz && challenge.answers.every((answer) => answer !== null))
@@ -1290,6 +1431,8 @@ function ActiveChallenge({
           answers={challenge.answers}
           disabled={challenge.phase !== 'ready'}
           onAnswer={onUpdateQuizAnswer}
+          cyclingQuestionId={cyclingQuestionId}
+          onCycle={onCycleQuizQuestion}
         />
       ) : challenge.phase === 'expired' && instructions ? (
         <EmergencyRecovery instructions={instructions} />
@@ -1390,17 +1533,21 @@ function QuizControl({
   quiz,
   answers,
   disabled,
-  onAnswer
+  onAnswer,
+  cyclingQuestionId,
+  onCycle
 }: {
   quiz: QuizInstructions
   answers: Array<number | null>
   disabled: boolean
   onAnswer: (index: number, option: number) => void
+  cyclingQuestionId: string | null
+  onCycle: (index: number) => Promise<void>
 }) {
   return (
     <div className="grid gap-3">
       <p className="m-0 text-xs leading-5 text-[#a9bbc0]">
-        Choose the two answers that match this character’s latest completed save.
+        Answer three questions from memory. You can replace any one without changing the other two.
       </p>
       {quiz.questions.map((question, questionIndex) => (
         <fieldset key={question.id} className="m-0 grid gap-1.5 border border-[#8bb7bd]/25 p-2.5">
@@ -1409,11 +1556,11 @@ function QuizControl({
             className="pal-glass-inset min-h-11 px-2 text-xs text-[#e5f5f7]"
             aria-label={question.prompt}
             value={answers[questionIndex] ?? ''}
-            disabled={disabled}
+            disabled={disabled || cyclingQuestionId === question.id}
             onChange={(event) => onAnswer(questionIndex, Number(event.currentTarget.value))}
           >
             <option value="" disabled>
-              Choose an item…
+              Choose an answer…
             </option>
             {question.options.map((option, optionIndex) => (
               <option key={option} value={optionIndex}>
@@ -1421,10 +1568,23 @@ function QuizControl({
               </option>
             ))}
           </select>
+          <button
+            type="button"
+            className="min-h-8 justify-self-start text-[11px] text-[#8fd7df] underline decoration-[#8fd7df]/40 underline-offset-4 disabled:cursor-not-allowed disabled:text-[#71878c] disabled:no-underline"
+            disabled={disabled || cyclingQuestionId !== null || !question.canCycle}
+            onClick={() => void onCycle(questionIndex)}
+          >
+            {cyclingQuestionId === question.id
+              ? 'Getting another question…'
+              : question.canCycle
+                ? 'Different question'
+                : 'No more questions'}
+          </button>
         </fieldset>
       ))}
       <p className="m-0 text-[10px] leading-4 text-[#81969c]">
-        This works for offline characters. Answers are checked once and are not stored in the browser.
+        This works for offline characters. Questions can use inventory, dropped items, equipment, food, or party Pals.
+        Answers are checked once and are not stored in the browser.
       </p>
     </div>
   )
@@ -1654,7 +1814,7 @@ function ChallengeStatus({ challenge, session }: { challenge: ChallengeState; se
   let message = 'Waiting for a fresh immutable baseline. We’ll check again in about 30 seconds; do not act yet.'
   let tone: 'normal' | 'success' | 'warning' = 'normal'
   if (challenge.quiz && challenge.phase === 'ready') {
-    message = 'Answer both questions, then verify once.'
+    message = 'Answer all three questions, then verify once.'
   }
   if (challenge.quiz && challenge.phase === 'checking') {
     message = 'Checking both answers…'

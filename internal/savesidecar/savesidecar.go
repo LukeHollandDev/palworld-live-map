@@ -383,37 +383,34 @@ func (r *Reader) ReadClaimPlayer(ctx context.Context, dir, playerID string) (Cla
 		return ClaimPlayer{}, errors.New("save decoder resolved a different claim player")
 	}
 
-	claim := ClaimPlayer{PlayerID: requestedID, Common: []ClaimStack{}, Party: []ClaimPal{}}
+	claim := ClaimPlayer{
+		PlayerID: requestedID,
+		Common:   []ClaimStack{}, DropSlot: []ClaimStack{}, Essential: []ClaimStack{},
+		Weapons: []ClaimStack{}, Armor: []ClaimStack{}, Food: []ClaimStack{}, Party: []ClaimPal{},
+	}
 	// Resolver warnings can describe unrelated collections or one unavailable
 	// progress domain. Inventory proof remains safe as long as the selected
 	// common stacks themselves validate. Exact progress is exposed separately
 	// only when every domain is complete and valid.
 	claim.Progress = claimProgress(document.Player.Progress)
-	if len(document.Player.Inventory.Common) > maxClaimInventoryStacks {
-		return ClaimPlayer{}, errors.New("resolved claim inventory contains too many stacks")
+	containers := []struct {
+		raw         []resolvedClaimStack
+		destination *[]ClaimStack
+	}{
+		{document.Player.Inventory.Common, &claim.Common},
+		{document.Player.Inventory.DropSlot, &claim.DropSlot},
+		{document.Player.Inventory.Essential, &claim.Essential},
+		{document.Player.Inventory.Weapons, &claim.Weapons},
+		{document.Player.Inventory.Armor, &claim.Armor},
+		{document.Player.Inventory.Food, &claim.Food},
 	}
-	seenSlots := make(map[uint32]struct{}, len(document.Player.Inventory.Common))
-	for _, raw := range document.Player.Inventory.Common {
-		itemID := strings.TrimSpace(raw.ItemID)
-		if itemID == "" || len(itemID) > maxClaimIdentifierBytes || !utf8.ValidString(itemID) || raw.Count == 0 || raw.Slot > maxClaimSlot {
-			return ClaimPlayer{}, errors.New("resolved claim inventory contains an invalid stack")
+	for _, container := range containers {
+		stacks, err := validatedClaimStacks(container.raw)
+		if err != nil {
+			return ClaimPlayer{}, err
 		}
-		if _, duplicate := seenSlots[raw.Slot]; duplicate {
-			return ClaimPlayer{}, errors.New("resolved claim inventory repeats a slot")
-		}
-		seenSlots[raw.Slot] = struct{}{}
-		dynamicID := ""
-		if raw.DynamicItemID != nil {
-			dynamicID = strings.TrimSpace(*raw.DynamicItemID)
-			if dynamicID == "" || len(dynamicID) > maxClaimIdentifierBytes || !utf8.ValidString(dynamicID) {
-				return ClaimPlayer{}, errors.New("resolved claim inventory contains an empty dynamic item ID")
-			}
-		}
-		claim.Common = append(claim.Common, ClaimStack{
-			Slot: raw.Slot, ItemID: itemID, Count: raw.Count, DynamicItemID: dynamicID,
-		})
+		*container.destination = stacks
 	}
-	sort.Slice(claim.Common, func(i, j int) bool { return claim.Common[i].Slot < claim.Common[j].Slot })
 
 	seenPartySlots := make(map[int32]struct{})
 	seenInstances := make(map[string]struct{})
@@ -425,7 +422,10 @@ func (r *Reader) ReadClaimPlayer(ctx context.Context, dir, playerID string) (Cla
 			return ClaimPlayer{}, errors.New("resolved claim player contains too many party Pals")
 		}
 		instanceID := strings.TrimSpace(raw.InstanceID)
-		if instanceID == "" || len(instanceID) > maxClaimIdentifierBytes || !utf8.ValidString(instanceID) || raw.Slot < 0 || raw.Slot > maxClaimSlot {
+		species := strings.TrimSpace(raw.Species)
+		if instanceID == "" || len(instanceID) > maxClaimIdentifierBytes || !utf8.ValidString(instanceID) ||
+			len(species) > maxClaimIdentifierBytes || !utf8.ValidString(species) ||
+			raw.Slot < 0 || raw.Slot > maxClaimSlot {
 			return ClaimPlayer{}, errors.New("resolved claim party contains an invalid Pal")
 		}
 		if _, duplicate := seenPartySlots[raw.Slot]; duplicate {
@@ -436,10 +436,38 @@ func (r *Reader) ReadClaimPlayer(ctx context.Context, dir, playerID string) (Cla
 		}
 		seenPartySlots[raw.Slot] = struct{}{}
 		seenInstances[strings.ToLower(instanceID)] = struct{}{}
-		claim.Party = append(claim.Party, ClaimPal{Slot: raw.Slot, InstanceID: instanceID})
+		claim.Party = append(claim.Party, ClaimPal{Slot: raw.Slot, InstanceID: instanceID, Species: species})
 	}
 	sort.Slice(claim.Party, func(i, j int) bool { return claim.Party[i].Slot < claim.Party[j].Slot })
 	return claim, nil
+}
+
+func validatedClaimStacks(rawStacks []resolvedClaimStack) ([]ClaimStack, error) {
+	if len(rawStacks) > maxClaimInventoryStacks {
+		return nil, errors.New("resolved claim inventory contains too many stacks")
+	}
+	result := make([]ClaimStack, 0, len(rawStacks))
+	seenSlots := make(map[uint32]struct{}, len(rawStacks))
+	for _, raw := range rawStacks {
+		itemID := strings.TrimSpace(raw.ItemID)
+		if itemID == "" || len(itemID) > maxClaimIdentifierBytes || !utf8.ValidString(itemID) || raw.Count == 0 || raw.Slot > maxClaimSlot {
+			return nil, errors.New("resolved claim inventory contains an invalid stack")
+		}
+		if _, duplicate := seenSlots[raw.Slot]; duplicate {
+			return nil, errors.New("resolved claim inventory repeats a slot")
+		}
+		seenSlots[raw.Slot] = struct{}{}
+		dynamicID := ""
+		if raw.DynamicItemID != nil {
+			dynamicID = strings.TrimSpace(*raw.DynamicItemID)
+			if dynamicID == "" || len(dynamicID) > maxClaimIdentifierBytes || !utf8.ValidString(dynamicID) {
+				return nil, errors.New("resolved claim inventory contains an empty dynamic item ID")
+			}
+		}
+		result = append(result, ClaimStack{Slot: raw.Slot, ItemID: itemID, Count: raw.Count, DynamicItemID: dynamicID})
+	}
+	sort.Slice(result, func(i, j int) bool { return result[i].Slot < result[j].Slot })
+	return result, nil
 }
 
 func claimProgress(raw *resolvedClaimProgress) ClaimProgress {

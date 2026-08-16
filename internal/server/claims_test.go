@@ -51,9 +51,11 @@ type claimHTTPProver struct {
 
 	prepareCalls int
 	verifyCalls  int
+	cycleCalls   int
 	lastTarget   string
 	lastSelector uint64
 	lastAnswers  []playerclaim.QuizAnswer
+	lastQuestion string
 }
 
 type claimHTTPVerifyStep struct {
@@ -121,6 +123,21 @@ func (p *claimHTTPProver) Verify(_ context.Context, prepared *playerclaim.Prepar
 		prepared.Instructions = step.instructions
 	}
 	return step.err
+}
+
+func (p *claimHTTPProver) CycleQuestion(_ context.Context, prepared *playerclaim.Prepared, questionID string) error {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.cycleCalls++
+	p.lastQuestion = questionID
+	if prepared == nil || prepared.Instructions.Kind != playerclaim.InventoryQuiz || questionID != "q1" {
+		return playerclaim.ErrNoAlternateQuestion
+	}
+	prepared.Instructions.Questions = append([]playerclaim.QuizQuestion(nil), prepared.Instructions.Questions...)
+	prepared.Instructions.Questions[0] = playerclaim.QuizQuestion{
+		ID: "q4", Prompt: "Replacement item?", Options: []string{"Q", "R", "S", "T", "U", "V", "W", "X"},
+	}
+	return nil
 }
 
 func (p *claimHTTPProver) Progress(_ context.Context, subject string) (playerclaim.PrivateProgress, error) {
@@ -702,6 +719,7 @@ func TestOfflineInventoryQuizAnswersIssuePrivateSession(t *testing.T) {
 		Questions: []playerclaim.QuizQuestion{
 			{ID: "q1", Prompt: "First item?", Options: []string{"Wood", "Stone", "Fiber", "Ore", "Coal", "Sulfur", "Quartz", "Pal Sphere"}},
 			{ID: "q2", Prompt: "Second item?", Options: []string{"A", "B", "C", "D", "E", "F", "G", "H"}},
+			{ID: "q3", Prompt: "Third item?", Options: []string{"I", "J", "K", "L", "M", "N", "O", "P"}},
 		},
 	}
 	prover := &claimHTTPProver{prepareInstructions: quiz}
@@ -719,7 +737,7 @@ func TestOfflineInventoryQuizAnswersIssuePrivateSession(t *testing.T) {
 	if err := json.Unmarshal(started.Body.Bytes(), &challenge); err != nil {
 		t.Fatal(err)
 	}
-	answers := []playerclaim.QuizAnswer{{QuestionID: "q1", Option: 1}, {QuestionID: "q2", Option: 3}}
+	answers := []playerclaim.QuizAnswer{{QuestionID: "q1", Option: 1}, {QuestionID: "q2", Option: 3}, {QuestionID: "q3", Option: 5}}
 	verifyBody, err := json.Marshal(verifyClaimRequest{ChallengeToken: challenge.Bearer, Answers: answers})
 	if err != nil {
 		t.Fatal(err)
@@ -730,6 +748,37 @@ func TestOfflineInventoryQuizAnswersIssuePrivateSession(t *testing.T) {
 	}
 	if !reflect.DeepEqual(prover.lastAnswers, answers) {
 		t.Fatalf("quiz answers = %+v, want %+v", prover.lastAnswers, answers)
+	}
+}
+
+func TestOfflineQuizCyclesOneQuestionWithoutChangingTheOthers(t *testing.T) {
+	quiz := playerclaim.Instructions{
+		Kind: playerclaim.InventoryQuiz, SnapshotAt: claimTestNow,
+		Questions: []playerclaim.QuizQuestion{
+			{ID: "q1", Prompt: "First?", Options: []string{"A", "B", "C", "D", "E", "F", "G", "H"}, CanCycle: true},
+			{ID: "q2", Prompt: "Second?", Options: []string{"I", "J", "K", "L", "M", "N", "O", "P"}, CanCycle: true},
+			{ID: "q3", Prompt: "Third?", Options: []string{"Y", "Z", "AA", "BB", "CC", "DD", "EE", "FF"}, CanCycle: true},
+		},
+	}
+	prover := &claimHTTPProver{prepareInstructions: quiz}
+	server, _ := newClaimHTTPServer(t, prover, nil)
+	started := serveClaim(t, server, newClaimMutation(http.MethodPost, "/api/player-claims", `{"playerId":"offline-player"}`))
+	var challenge playerclaim.Challenge
+	if started.Code != http.StatusCreated || json.Unmarshal(started.Body.Bytes(), &challenge) != nil {
+		t.Fatalf("start = status %d, body %s", started.Code, started.Body.String())
+	}
+	body, err := json.Marshal(cycleClaimQuestionRequest{ChallengeToken: challenge.Bearer, QuestionID: "q1"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	cycled := serveClaim(t, server, newClaimMutation(http.MethodPost, "/api/player-claims/questions/cycle", string(body)))
+	if cycled.Code != http.StatusOK || !strings.Contains(cycled.Body.String(), `"id":"q4"`) ||
+		!strings.Contains(cycled.Body.String(), `"id":"q2"`) || !strings.Contains(cycled.Body.String(), `"id":"q3"`) ||
+		strings.Contains(cycled.Body.String(), "correct") {
+		t.Fatalf("cycle = status %d, body %s", cycled.Code, cycled.Body.String())
+	}
+	if prover.cycleCalls != 1 || prover.lastQuestion != "q1" {
+		t.Fatalf("cycle calls = %d, question = %q", prover.cycleCalls, prover.lastQuestion)
 	}
 }
 

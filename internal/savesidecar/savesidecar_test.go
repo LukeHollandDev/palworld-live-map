@@ -20,7 +20,7 @@ const (
 
 func TestPrivateClaimSaveTypesMarshalWithoutEvidence(t *testing.T) {
 	stack := ClaimStack{Slot: 7, ItemID: "private-item-id", Count: 31, DynamicItemID: "private-instance-id"}
-	pal := ClaimPal{Slot: 3, InstanceID: "private-pal-id"}
+	pal := ClaimPal{Slot: 3, InstanceID: "private-pal-id", Species: "private-pal-species"}
 	progress := ClaimProgress{
 		Available:    true,
 		FastTravel:   []string{"private-fast-travel-key"},
@@ -32,6 +32,8 @@ func TestPrivateClaimSaveTypesMarshalWithoutEvidence(t *testing.T) {
 	player := ClaimPlayer{
 		PlayerID: "aaaaaaaa000000000000000000000000",
 		Common:   []ClaimStack{stack},
+		DropSlot: []ClaimStack{stack}, Essential: []ClaimStack{stack}, Weapons: []ClaimStack{stack},
+		Armor: []ClaimStack{stack}, Food: []ClaimStack{stack},
 		Party:    []ClaimPal{pal},
 		Progress: progress,
 	}
@@ -392,11 +394,15 @@ func TestReaderResolvesPrivateClaimSlotsForOnePlayer(t *testing.T) {
 		"inventory":{"common":[
 			{"slot":7,"itemId":"Stone","count":31},
 			{"slot":2,"itemId":"Wood","count":19}
-		]},
+		],"dropSlot":[{"slot":0,"itemId":"DroppedOre","count":2}],
+		"essential":[{"slot":0,"itemId":"Lantern","count":1}],
+		"weapons":[{"slot":1,"itemId":"AssaultRifle","count":1}],
+		"armor":[{"slot":2,"itemId":"PalMetalArmor","count":1}],
+		"food":[{"slot":3,"itemId":"Salad","count":4}]},
 		"pals":[
-			{"instanceId":"pal-two","location":"party","slot":3},
-			{"instanceId":"stored","location":"storage","slot":0},
-			{"instanceId":"pal-one","location":"party","slot":1}
+			{"instanceId":"pal-two","species":"Anubis","location":"party","slot":3},
+			{"instanceId":"stored","species":"Lamball","location":"storage","slot":0},
+			{"instanceId":"pal-one","species":"Grizzbolt","location":"party","slot":1}
 		]
 	}}`
 	argFile := filepath.Join(t.TempDir(), "claim-arguments")
@@ -417,6 +423,10 @@ printf '%s' `+shellQuote(resolved), emptyResolveBody)
 	}
 	if len(player.Party) != 2 || player.Party[0].Slot != 1 || player.Party[1].Slot != 3 {
 		t.Fatalf("claim party = %#v", player.Party)
+	}
+	if player.Party[0].Species != "Grizzbolt" || len(player.DropSlot) != 1 || len(player.Essential) != 1 ||
+		len(player.Weapons) != 1 || len(player.Armor) != 1 || len(player.Food) != 1 {
+		t.Fatalf("claim private fallback evidence = %#v", player)
 	}
 	if !player.Progress.Available || strings.Join(player.Progress.FastTravel, ",") != "ft-one,ft-two" ||
 		strings.Join(player.Progress.Notes, ",") != "day0" || player.Progress.Areas == nil {

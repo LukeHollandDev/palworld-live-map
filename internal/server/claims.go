@@ -25,6 +25,8 @@ const (
 	claimCSRFHeader        = "X-Palworld-Live-Map"
 	maxClaimBody           = 8 << 10
 	maxClaimPlayerID       = 256
+	maxClaimQuizAnswers    = 3
+	maxClaimQuestionID     = 64
 )
 
 type startClaimRequest struct {
@@ -34,6 +36,11 @@ type startClaimRequest struct {
 type verifyClaimRequest struct {
 	ChallengeToken string                   `json:"challengeToken"`
 	Answers        []playerclaim.QuizAnswer `json:"answers,omitempty"`
+}
+
+type cycleClaimQuestionRequest struct {
+	ChallengeToken string `json:"challengeToken"`
+	QuestionID     string `json:"questionId"`
 }
 
 type claimErrorResponse struct {
@@ -123,7 +130,7 @@ func (s *Server) verifyPlayerClaim(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer s.releaseClaimWork()
-	if len(request.Answers) > 2 {
+	if len(request.Answers) > maxClaimQuizAnswers {
 		writeJSON(w, r, http.StatusBadRequest, claimErrorResponse{Error: "invalid_request"})
 		return
 	}
@@ -161,6 +168,44 @@ func (s *Server) verifyPlayerClaim(w http.ResponseWriter, r *http.Request) {
 		Status:            verification.Status,
 		IdleExpiresAt:     verification.Session.IdleExpiresAt,
 		AbsoluteExpiresAt: verification.Session.AbsoluteExpiresAt,
+	})
+}
+
+func (s *Server) cyclePlayerClaimQuestion(w http.ResponseWriter, r *http.Request) {
+	privateResponse(w)
+	if !s.validClaimMutation(w, r) {
+		return
+	}
+	if !s.claimVerifyLimiter.Allow(claimSource(r, s.settings.playerClaimsTrustedProxies), time.Now()) {
+		writeClaimRateLimit(w, r)
+		return
+	}
+	var request cycleClaimQuestionRequest
+	if !decodeClaimJSON(w, r, &request) || !validClaimBearer(request.ChallengeToken) ||
+		!validClaimQuestionID(request.QuestionID) {
+		writeJSON(w, r, http.StatusBadRequest, claimErrorResponse{Error: "invalid_request"})
+		return
+	}
+	verification, err := s.claims.CycleQuestion(r.Context(), request.ChallengeToken, request.QuestionID)
+	if err != nil {
+		switch {
+		case errors.Is(err, playerclaim.ErrChallengeNotFound), errors.Is(err, playerclaim.ErrChallengeExpired):
+			writeJSON(w, r, http.StatusUnauthorized, claimErrorResponse{Error: "invalid_or_expired_challenge"})
+		case errors.Is(err, playerclaim.ErrNoAlternateQuestion):
+			writeJSON(w, r, http.StatusConflict, claimErrorResponse{Error: "no_alternate_question"})
+		case errors.Is(err, playerclaim.ErrVerificationInFlight):
+			writeJSON(w, r, http.StatusConflict, claimErrorResponse{Error: "question_busy"})
+		default:
+			writeJSON(w, r, http.StatusServiceUnavailable, claimErrorResponse{Error: "claim_unavailable"})
+		}
+		return
+	}
+	if verification.Status != playerclaim.VerificationReady || verification.Instructions == nil {
+		writeJSON(w, r, http.StatusServiceUnavailable, claimErrorResponse{Error: "claim_unavailable"})
+		return
+	}
+	writeJSON(w, r, http.StatusOK, claimVerificationResponse{
+		Status: verification.Status, Instructions: verification.Instructions, ExpiresAt: verification.ExpiresAt,
 	})
 }
 
@@ -333,6 +378,18 @@ func decodeClaimJSON(w http.ResponseWriter, r *http.Request, destination any) bo
 
 func validPublicPlayerID(value string) bool {
 	if value == "" || value != strings.TrimSpace(value) || len(value) > maxClaimPlayerID || !utf8.ValidString(value) {
+		return false
+	}
+	for _, character := range value {
+		if unicode.IsControl(character) {
+			return false
+		}
+	}
+	return true
+}
+
+func validClaimQuestionID(value string) bool {
+	if value == "" || value != strings.TrimSpace(value) || len(value) > maxClaimQuestionID || !utf8.ValidString(value) {
 		return false
 	}
 	for _, character := range value {

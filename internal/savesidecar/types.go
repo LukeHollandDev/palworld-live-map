@@ -28,10 +28,15 @@ type Snapshot struct {
 // identifiers and Pal instance identifiers are save-authored secrets and must
 // remain server-side.
 type ClaimPlayer struct {
-	PlayerID string        `json:"-"`
-	Common   []ClaimStack  `json:"-"`
-	Party    []ClaimPal    `json:"-"`
-	Progress ClaimProgress `json:"-"`
+	PlayerID  string        `json:"-"`
+	Common    []ClaimStack  `json:"-"`
+	DropSlot  []ClaimStack  `json:"-"`
+	Essential []ClaimStack  `json:"-"`
+	Weapons   []ClaimStack  `json:"-"`
+	Armor     []ClaimStack  `json:"-"`
+	Food      []ClaimStack  `json:"-"`
+	Party     []ClaimPal    `json:"-"`
+	Progress  ClaimProgress `json:"-"`
 }
 
 // ClaimProgress contains exact, private state keys used only after a character
@@ -46,8 +51,8 @@ type ClaimProgress struct {
 	TowerBosses  []string `json:"-"`
 }
 
-// ClaimStack identifies one occupied normal-inventory slot exactly enough to
-// observe the ordered proof and exact restore across immutable generations.
+// ClaimStack identifies one occupied private inventory-container slot. Common
+// stacks also retain enough information for the ordered proof and restore.
 type ClaimStack struct {
 	Slot          uint32 `json:"-"`
 	ItemID        string `json:"-"`
@@ -56,10 +61,11 @@ type ClaimStack struct {
 }
 
 // ClaimPal identifies one occupied party slot retained by the narrow private
-// resolver. The current proof uses only the normal inventory.
+// resolver. Species is used only as a knowledge-question candidate.
 type ClaimPal struct {
 	Slot       int32  `json:"-"`
 	InstanceID string `json:"-"`
+	Species    string `json:"-"`
 }
 
 // Player combines both decoder calls for one save record. Identity is private
@@ -198,7 +204,12 @@ type resolvedClaimProgress struct {
 }
 
 type resolvedClaimInventory struct {
-	Common []resolvedClaimStack `json:"common"`
+	Common    []resolvedClaimStack `json:"common"`
+	DropSlot  []resolvedClaimStack `json:"dropSlot"`
+	Essential []resolvedClaimStack `json:"essential"`
+	Weapons   []resolvedClaimStack `json:"weapons"`
+	Armor     []resolvedClaimStack `json:"armor"`
+	Food      []resolvedClaimStack `json:"food"`
 }
 
 type resolvedClaimStack struct {
@@ -210,6 +221,7 @@ type resolvedClaimStack struct {
 
 type resolvedClaimPal struct {
 	InstanceID string `json:"instanceId"`
+	Species    string `json:"species"`
 	Location   string `json:"location"`
 	Slot       int32  `json:"slot"`
 }

@@ -212,6 +212,7 @@ func (s *Server) routes() http.Handler {
 	mux.HandleFunc("GET /api/state", s.state)
 	if s.claims != nil {
 		mux.HandleFunc("POST /api/player-claims", s.startPlayerClaim)
+		mux.HandleFunc("POST /api/player-claims/questions/cycle", s.cyclePlayerClaimQuestion)
 		mux.HandleFunc("POST /api/player-claims/verify", s.verifyPlayerClaim)
 		mux.HandleFunc("GET /api/me", s.claimSession)
 		mux.HandleFunc("GET /api/me/progress", s.claimProgress)

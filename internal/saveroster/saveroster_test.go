@@ -9,6 +9,7 @@ import (
 	"math"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -1073,6 +1074,25 @@ func TestNonTimestampGenerationsFallBackToModificationTime(t *testing.T) {
 	}
 }
 
+func TestCompleteGenerationsAcceptsLargeNativeBackupHistories(t *testing.T) {
+	root := t.TempDir()
+	generationsPath := filepath.Join(root, testWorldOne, "backup", "world")
+	if err := os.MkdirAll(generationsPath, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	for index := 0; index < 513; index++ {
+		if err := os.Mkdir(filepath.Join(generationsPath, fmt.Sprintf("old-%04d", index)), 0o700); err != nil {
+			t.Fatal(err)
+		}
+	}
+	makeGeneration(t, root, testWorldOne, "2026.08.16-12.00.00")
+	makeGeneration(t, root, testWorldOne, "2026.08.16-12.05.00")
+	generations, err := completeGenerations(context.Background(), filepath.Join(root, testWorldOne))
+	if err != nil || len(generations) != 2 {
+		t.Fatalf("completeGenerations() = %d generations, %v; want two complete generations", len(generations), err)
+	}
+}
+
 func TestRosterTimeoutCoversDecoder(t *testing.T) {
 	root := t.TempDir()
 	makeGeneration(t, root, testWorldOne, "generation")
@@ -1311,19 +1331,25 @@ func testPlayerProjector(raw string) (string, bool) {
 	return "player:test", true
 }
 
-func TestSelectInventoryQuizBuildsTwoBoundedMultipleChoiceQuestions(t *testing.T) {
-	stacks := make([]savesidecar.ClaimStack, 18)
+func TestSelectKnowledgeQuizBuildsThreeCyclableQuestionsWithGlobalDecoys(t *testing.T) {
+	stacks := make([]savesidecar.ClaimStack, 8)
 	for index := range stacks {
 		stacks[index] = savesidecar.ClaimStack{Slot: uint32(index), ItemID: fmt.Sprintf("TestItem%d", index+1), Count: 1}
 	}
+	player := savesidecar.ClaimPlayer{
+		Common:  stacks,
+		Weapons: []savesidecar.ClaimStack{{Slot: 0, ItemID: "PrivateWeapon", Count: 1}},
+		Party:   []savesidecar.ClaimPal{{Slot: 0, InstanceID: "private-instance", Species: "PrivatePal"}},
+	}
 	snapshotAt := time.Date(2026, time.August, 16, 1, 0, 0, 0, time.UTC)
-	instructions, correct, ok := selectInventoryQuiz(stacks, 42, snapshotAt)
-	if !ok || instructions.Kind != playerclaim.InventoryQuiz || len(instructions.Questions) != 2 || len(correct) != 2 {
-		t.Fatalf("selectInventoryQuiz() = %+v, %v, %v", instructions, correct, ok)
+	instructions, correct, remaining, ok := selectKnowledgeQuiz(player, 42, snapshotAt)
+	if !ok || instructions.Kind != playerclaim.InventoryQuiz || len(instructions.Questions) != 3 || len(correct) != 3 || len(remaining) == 0 {
+		t.Fatalf("selectKnowledgeQuiz() = %+v, %v, %v, %v", instructions, correct, remaining, ok)
 	}
 	for index, question := range instructions.Questions {
-		if len(question.Options) != 8 || correct[index] < 0 || correct[index] >= len(question.Options) {
-			t.Fatalf("question %d = %+v, correct %d", index, question, correct[index])
+		answer, exists := correct[question.ID]
+		if len(question.Options) != 8 || !question.CanCycle || !exists || answer < 0 || answer >= len(question.Options) {
+			t.Fatalf("question %d = %+v, correct %d", index, question, answer)
 		}
 		seen := make(map[string]struct{}, len(question.Options))
 		for _, option := range question.Options {
@@ -1332,6 +1358,17 @@ func TestSelectInventoryQuizBuildsTwoBoundedMultipleChoiceQuestions(t *testing.T
 		if len(seen) != 8 {
 			t.Fatalf("question %d options are not unique: %v", index, question.Options)
 		}
+	}
+	privateOptions := 0
+	for _, question := range instructions.Questions {
+		for _, option := range question.Options {
+			if strings.HasPrefix(option, "Test Item") || strings.HasPrefix(option, "Private") {
+				privateOptions++
+			}
+		}
+	}
+	if privateOptions != len(instructions.Questions) {
+		t.Fatalf("public questions exposed %d private values across %d cards", privateOptions, len(instructions.Questions))
 	}
 	encoded, err := json.Marshal(instructions)
 	if err != nil {
@@ -1342,6 +1379,45 @@ func TestSelectInventoryQuizBuildsTwoBoundedMultipleChoiceQuestions(t *testing.T
 	}
 	if got := humanizeItemID("MegaPalSphere"); got != "Mega Pal Sphere" {
 		t.Fatalf("humanizeItemID() = %q", got)
+	}
+}
+
+func TestCycleQuestionReplacesOnlyTheRequestedCard(t *testing.T) {
+	stacks := make([]savesidecar.ClaimStack, 8)
+	for index := range stacks {
+		stacks[index] = savesidecar.ClaimStack{Slot: uint32(index), ItemID: fmt.Sprintf("PrivateItem%d", index+1), Count: 1}
+	}
+	player := savesidecar.ClaimPlayer{
+		Common:  stacks,
+		Weapons: []savesidecar.ClaimStack{{Slot: 0, ItemID: "PrivateWeapon", Count: 1}},
+		Armor:   []savesidecar.ClaimStack{{Slot: 0, ItemID: "PrivateArmor", Count: 1}},
+	}
+	instructions, correct, remaining, ok := selectKnowledgeQuiz(player, 99, time.Now().UTC())
+	if !ok || len(remaining) < 2 {
+		t.Fatalf("selectKnowledgeQuiz() remaining = %d, ok = %v", len(remaining), ok)
+	}
+	prepared := playerclaim.Prepared{
+		Subject: "subject", PublicPlayerID: "player", Instructions: instructions,
+		Evidence: &claimQuizEvidence{target: claimTarget{}, correct: correct, remaining: remaining},
+	}
+	q2Before := prepared.Instructions.Questions[1]
+	q3Before := prepared.Instructions.Questions[2]
+	q1ID := prepared.Instructions.Questions[0].ID
+	if err := (&Source{}).CycleQuestion(context.Background(), &prepared, q1ID); err != nil {
+		t.Fatalf("CycleQuestion(q1) error = %v", err)
+	}
+	if prepared.Instructions.Questions[0].ID == q1ID ||
+		!reflect.DeepEqual(prepared.Instructions.Questions[1].Options, q2Before.Options) ||
+		prepared.Instructions.Questions[1].ID != q2Before.ID || prepared.Instructions.Questions[2].ID != q3Before.ID {
+		t.Fatalf("Q1 cycle changed another card: %+v", prepared.Instructions.Questions)
+	}
+	q1After := prepared.Instructions.Questions[0]
+	if err := (&Source{}).CycleQuestion(context.Background(), &prepared, q3Before.ID); err != nil {
+		t.Fatalf("CycleQuestion(q3) error = %v", err)
+	}
+	if prepared.Instructions.Questions[0].ID != q1After.ID || prepared.Instructions.Questions[1].ID != q2Before.ID ||
+		prepared.Instructions.Questions[2].ID == q3Before.ID {
+		t.Fatalf("Q3 cycle changed another card: %+v", prepared.Instructions.Questions)
 	}
 }
 

@@ -37,12 +37,16 @@ var (
 	// ErrIncorrectAnswer means a one-shot knowledge challenge did not match its
 	// private save evidence. Callers must consume the challenge on this result.
 	ErrIncorrectAnswer = errors.New("player claim answer is incorrect")
+	// ErrNoAlternateQuestion means an otherwise valid knowledge challenge has
+	// exhausted its private question pool.
+	ErrNoAlternateQuestion = errors.New("player claim has no alternate question")
 )
 
 type QuizQuestion struct {
-	ID      string   `json:"id"`
-	Prompt  string   `json:"prompt"`
-	Options []string `json:"options"`
+	ID       string   `json:"id"`
+	Prompt   string   `json:"prompt"`
+	Options  []string `json:"options"`
+	CanCycle bool     `json:"canCycle"`
 }
 
 type QuizAnswer struct {
@@ -86,6 +90,14 @@ type Prepared struct {
 type Prover interface {
 	Prepare(context.Context, string, uint64) (Prepared, error)
 	Verify(context.Context, *Prepared) error
+}
+
+// QuestionCycler optionally replaces one knowledge question without changing
+// the other questions or their answers. Implementations must clone private
+// evidence before mutation because Service retains the previous Prepared value
+// until the replacement has been validated.
+type QuestionCycler interface {
+	CycleQuestion(context.Context, *Prepared, string) error
 }
 
 // PrivateProgress is exact save evidence for the authenticated subject only.

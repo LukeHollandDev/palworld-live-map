@@ -31,12 +31,12 @@ import (
 
 const (
 	maxWorldEntries      = 128
-	maxGenerationEntries = 512
+	maxGenerationEntries = 2048
 	maxPublicIDBytes     = 256
 	maxNameBytes         = 96
 	claimCandidateFloor  = 16
 	claimCycleSlots      = 8
-	claimQuizQuestions   = 2
+	claimQuizQuestions   = 3
 	claimQuizOptions     = 8
 	maxClaimPlayerCache  = 32
 	maxCachedPlayerBytes = 1 << 20
@@ -582,8 +582,14 @@ type claimEvidence struct {
 }
 
 type claimQuizEvidence struct {
-	target  claimTarget
-	correct []int
+	target    claimTarget
+	correct   map[string]int
+	remaining []claimQuizCandidate
+}
+
+type claimQuizCandidate struct {
+	question playerclaim.QuizQuestion
+	correct  int
 }
 
 type claimPhase uint8
@@ -635,11 +641,11 @@ func (s *Source) Prepare(ctx context.Context, publicPlayerID string, selector ui
 	if quizReader, ok := s.claimReader.(knowledgeQuizReader); ok && quizReader.KnowledgeQuizEnabled() {
 		player, readErr := s.readClaimPlayerCached(ctx, baseline, target)
 		if readErr == nil && player.PlayerID == target.playerID {
-			instructions, correct, selected := selectInventoryQuiz(player.Common, selector, baseline.snapshotAt)
+			instructions, correct, remaining, selected := selectKnowledgeQuiz(player, selector, baseline.snapshotAt)
 			if selected {
 				return playerclaim.Prepared{
 					Subject: target.subject, PublicPlayerID: strings.TrimSpace(publicPlayerID), Instructions: instructions,
-					Evidence: &claimQuizEvidence{target: target, correct: correct},
+					Evidence: &claimQuizEvidence{target: target, correct: correct, remaining: remaining},
 				}, nil
 			}
 		}
@@ -668,7 +674,7 @@ func (s *Source) Verify(ctx context.Context, prepared *playerclaim.Prepared) err
 	}
 	if quiz, ok := prepared.Evidence.(*claimQuizEvidence); ok {
 		if quiz == nil || prepared.Subject == "" || prepared.Subject != quiz.target.subject ||
-			prepared.Instructions.Kind != playerclaim.InventoryQuiz || len(prepared.Answers) != len(quiz.correct) {
+			prepared.Instructions.Kind != playerclaim.InventoryQuiz || len(prepared.Answers) != len(prepared.Instructions.Questions) {
 			return playerclaim.ErrUnavailable
 		}
 		s.claimMu.RLock()
@@ -678,7 +684,8 @@ func (s *Source) Verify(ctx context.Context, prepared *playerclaim.Prepared) err
 			return playerclaim.ErrUnavailable
 		}
 		for index, answer := range prepared.Answers {
-			if answer.QuestionID != prepared.Instructions.Questions[index].ID || answer.Option != quiz.correct[index] {
+			correct, exists := quiz.correct[answer.QuestionID]
+			if !exists || answer.QuestionID != prepared.Instructions.Questions[index].ID || answer.Option != correct {
 				return playerclaim.ErrIncorrectAnswer
 			}
 		}
@@ -755,64 +762,218 @@ func (s *Source) Verify(ctx context.Context, prepared *playerclaim.Prepared) err
 	}
 }
 
-func selectInventoryQuiz(stacks []savesidecar.ClaimStack, selector uint64, snapshotAt time.Time) (playerclaim.Instructions, []int, bool) {
-	type candidate struct {
-		slot  uint32
-		label string
+// CycleQuestion replaces only the requested knowledge question. The remaining
+// questions and their answer keys stay unchanged, so a claimant can skip one
+// uncertain memory without re-answering the other cards.
+func (s *Source) CycleQuestion(ctx context.Context, prepared *playerclaim.Prepared, questionID string) error {
+	if ctx == nil || prepared == nil || strings.TrimSpace(questionID) == "" {
+		return playerclaim.ErrUnavailable
 	}
-	seen := make(map[string]struct{}, len(stacks))
-	candidates := make([]candidate, 0, len(stacks))
+	evidence, ok := prepared.Evidence.(*claimQuizEvidence)
+	if !ok || evidence == nil || prepared.Instructions.Kind != playerclaim.InventoryQuiz {
+		return playerclaim.ErrUnavailable
+	}
+	questionIndex := -1
+	for index, question := range prepared.Instructions.Questions {
+		if question.ID == questionID {
+			questionIndex = index
+			break
+		}
+	}
+	if questionIndex < 0 {
+		return playerclaim.ErrUnavailable
+	}
+	if len(evidence.remaining) == 0 {
+		return playerclaim.ErrNoAlternateQuestion
+	}
+
+	nextEvidence := cloneClaimQuizEvidence(evidence)
+	next := nextEvidence.remaining[0]
+	nextEvidence.remaining = nextEvidence.remaining[1:]
+	delete(nextEvidence.correct, questionID)
+	nextEvidence.correct[next.question.ID] = next.correct
+	canCycle := len(nextEvidence.remaining) > 0
+
+	questions := append([]playerclaim.QuizQuestion(nil), prepared.Instructions.Questions...)
+	for index := range questions {
+		questions[index].Options = append([]string(nil), questions[index].Options...)
+		questions[index].CanCycle = canCycle
+	}
+	next.question.Options = append([]string(nil), next.question.Options...)
+	next.question.CanCycle = canCycle
+	questions[questionIndex] = next.question
+	prepared.Instructions.Questions = questions
+	prepared.Evidence = nextEvidence
+	return nil
+}
+
+func cloneClaimQuizEvidence(source *claimQuizEvidence) *claimQuizEvidence {
+	result := &claimQuizEvidence{
+		target: source.target, correct: make(map[string]int, len(source.correct)),
+		remaining: make([]claimQuizCandidate, len(source.remaining)),
+	}
+	for id, correct := range source.correct {
+		result.correct[id] = correct
+	}
+	for index, candidate := range source.remaining {
+		candidate.question.Options = append([]string(nil), candidate.question.Options...)
+		result.remaining[index] = candidate
+	}
+	return result
+}
+
+func selectKnowledgeQuiz(player savesidecar.ClaimPlayer, selector uint64, snapshotAt time.Time) (playerclaim.Instructions, map[string]int, []claimQuizCandidate, bool) {
+	if snapshotAt.IsZero() {
+		return playerclaim.Instructions{}, nil, nil, false
+	}
+	facts := make([]claimQuizFact, 0, len(player.Common)+len(player.DropSlot)+len(player.Essential)+len(player.Weapons)+len(player.Armor)+len(player.Food)+len(player.Party))
+	appendStackQuizFacts(&facts, player.Common, "Which item was in common-inventory slot %d?", itemQuizDecoys)
+	appendStackQuizFacts(&facts, player.DropSlot, "Which item was in dropped-items slot %d?", itemQuizDecoys)
+	appendStackQuizFacts(&facts, player.Essential, "Which key item was in essential slot %d?", essentialQuizDecoys)
+	appendStackQuizFacts(&facts, player.Weapons, "Which weapon was equipped in slot %d?", weaponQuizDecoys)
+	appendStackQuizFacts(&facts, player.Armor, "Which armor or accessory was equipped in slot %d?", armorQuizDecoys)
+	appendStackQuizFacts(&facts, player.Food, "Which food was equipped in slot %d?", foodQuizDecoys)
+	for _, pal := range player.Party {
+		label := humanizeItemID(pal.Species)
+		if pal.Slot < 0 || label == "" {
+			continue
+		}
+		facts = append(facts, claimQuizFact{
+			prompt: fmt.Sprintf("Which Pal was in party slot %d?", pal.Slot+1), value: label, decoys: palQuizDecoys,
+		})
+	}
+	if len(facts) < claimQuizQuestions {
+		return playerclaim.Instructions{}, nil, nil, false
+	}
+	state := selector ^ 0xd1b54a32d192ed03
+	for index := len(facts) - 1; index > 0; index-- {
+		state = claimRandom(state)
+		other := int(state % uint64(index+1))
+		facts[index], facts[other] = facts[other], facts[index]
+	}
+	if len(facts) > 24 {
+		facts = facts[:24]
+	}
+	candidates := make([]claimQuizCandidate, 0, len(facts))
+	for index, fact := range facts {
+		candidate, ok := makeQuizCandidate(fact, fmt.Sprintf("q%d", index+1), &state)
+		if ok {
+			candidates = append(candidates, candidate)
+		}
+	}
+	if len(candidates) < claimQuizQuestions {
+		return playerclaim.Instructions{}, nil, nil, false
+	}
+	questions := make([]playerclaim.QuizQuestion, claimQuizQuestions)
+	correct := make(map[string]int, claimQuizQuestions)
+	remaining := append([]claimQuizCandidate(nil), candidates[claimQuizQuestions:]...)
+	canCycle := len(remaining) > 0
+	for index, candidate := range candidates[:claimQuizQuestions] {
+		candidate.question.CanCycle = canCycle
+		questions[index] = candidate.question
+		correct[candidate.question.ID] = candidate.correct
+	}
+	return playerclaim.Instructions{Kind: playerclaim.InventoryQuiz, Questions: questions, SnapshotAt: snapshotAt}, correct, remaining, true
+}
+
+type claimQuizFact struct {
+	prompt string
+	value  string
+	decoys []string
+}
+
+func appendStackQuizFacts(destination *[]claimQuizFact, stacks []savesidecar.ClaimStack, prompt string, decoys []string) {
 	for _, stack := range stacks {
 		label := humanizeItemID(stack.ItemID)
 		if !validClaimStack(stack) || label == "" {
 			continue
 		}
-		key := strings.ToLower(label)
+		*destination = append(*destination, claimQuizFact{
+			prompt: fmt.Sprintf(prompt, stack.Slot+1), value: label, decoys: decoys,
+		})
+	}
+}
+
+func makeQuizCandidate(fact claimQuizFact, id string, state *uint64) (claimQuizCandidate, bool) {
+	options := make([]string, 0, claimQuizOptions)
+	seen := make(map[string]struct{}, claimQuizOptions)
+	appendOption := func(option string) {
+		option = strings.TrimSpace(option)
+		key := strings.ToLower(option)
+		if option == "" {
+			return
+		}
 		if _, exists := seen[key]; exists {
-			continue
+			return
 		}
 		seen[key] = struct{}{}
-		candidates = append(candidates, candidate{slot: stack.Slot, label: label})
+		options = append(options, option)
 	}
-	required := claimQuizQuestions * claimQuizOptions
-	if len(candidates) < required || snapshotAt.IsZero() {
-		return playerclaim.Instructions{}, nil, false
+	appendOption(fact.value)
+	decoys := append([]string(nil), fact.decoys...)
+	for index := len(decoys) - 1; index > 0; index-- {
+		*state = claimRandom(*state)
+		other := int(*state % uint64(index+1))
+		decoys[index], decoys[other] = decoys[other], decoys[index]
 	}
-	state := selector ^ 0xd1b54a32d192ed03
-	for index := len(candidates) - 1; index > 0; index-- {
-		state = claimRandom(state)
-		other := int(state % uint64(index+1))
-		candidates[index], candidates[other] = candidates[other], candidates[index]
-	}
-	questions := make([]playerclaim.QuizQuestion, 0, claimQuizQuestions)
-	correct := make([]int, 0, claimQuizQuestions)
-	for questionIndex := 0; questionIndex < claimQuizQuestions; questionIndex++ {
-		group := append([]candidate(nil), candidates[questionIndex*claimQuizOptions:(questionIndex+1)*claimQuizOptions]...)
-		target := group[0]
-		for index := len(group) - 1; index > 0; index-- {
-			state = claimRandom(state)
-			other := int(state % uint64(index+1))
-			group[index], group[other] = group[other], group[index]
+	for _, decoy := range decoys {
+		appendOption(decoy)
+		if len(options) == claimQuizOptions {
+			break
 		}
-		options := make([]string, len(group))
-		answer := -1
-		for index, option := range group {
-			options[index] = option.label
-			if option.slot == target.slot {
-				answer = index
-			}
-		}
-		if answer < 0 {
-			return playerclaim.Instructions{}, nil, false
-		}
-		questions = append(questions, playerclaim.QuizQuestion{
-			ID:      fmt.Sprintf("q%d", questionIndex+1),
-			Prompt:  fmt.Sprintf("Which item is in common-inventory slot %d?", target.slot+1),
-			Options: options,
-		})
-		correct = append(correct, answer)
 	}
-	return playerclaim.Instructions{Kind: playerclaim.InventoryQuiz, Questions: questions, SnapshotAt: snapshotAt}, correct, true
+	if len(options) != claimQuizOptions {
+		return claimQuizCandidate{}, false
+	}
+	for index := len(options) - 1; index > 0; index-- {
+		*state = claimRandom(*state)
+		other := int(*state % uint64(index+1))
+		options[index], options[other] = options[other], options[index]
+	}
+	correct := -1
+	for index, option := range options {
+		if strings.EqualFold(option, fact.value) {
+			correct = index
+			break
+		}
+	}
+	if correct < 0 {
+		return claimQuizCandidate{}, false
+	}
+	return claimQuizCandidate{question: playerclaim.QuizQuestion{ID: id, Prompt: fact.prompt, Options: options}, correct: correct}, true
+}
+
+var itemQuizDecoys = []string{
+	"Wood", "Stone", "Fiber", "Paldium Fragment", "Ore", "Coal", "Sulfur", "Quartz", "Polymer",
+	"High Quality Pal Oil", "Ancient Civilization Parts", "Dog Coin", "Gold Coin", "Pal Sphere",
+	"Mega Pal Sphere", "Giga Pal Sphere", "Hyper Pal Sphere", "Ultra Pal Sphere", "Legendary Sphere",
+	"Repair Kit", "Medical Supplies", "Gunpowder", "Circuit Board", "Carbon Fiber",
+}
+
+var weaponQuizDecoys = []string{
+	"Old Bow", "Crossbow", "Handgun", "Makeshift Handgun", "Single Shot Rifle", "Double Barreled Shotgun",
+	"Pump Action Shotgun", "Assault Rifle", "Rocket Launcher", "Laser Rifle", "Gatling Gun", "Grenade Launcher",
+}
+
+var armorQuizDecoys = []string{
+	"Cloth Outfit", "Pelt Armor", "Metal Armor", "Refined Metal Armor", "Pal Metal Armor", "Heat Resistant Armor",
+	"Cold Resistant Armor", "Plasteel Armor", "Lightweight Plasteel Armor", "Life Pendant", "Attack Pendant", "Defense Pendant",
+}
+
+var foodQuizDecoys = []string{
+	"Baked Berries", "Jam Filled Bun", "Salad", "Omelet", "Pancake", "Pizza", "Cake", "Grilled Lamball",
+	"Fried Chikipi", "Marinated Mushrooms", "Mozzarina Cheeseburger", "Carbonara",
+}
+
+var essentialQuizDecoys = []string{
+	"Normal Parachute", "Mega Glider", "Giga Glider", "Hyper Glider", "Grappling Gun", "Mega Grappling Gun",
+	"Giga Grappling Gun", "Hyper Grappling Gun", "Lockpicking Tool", "Feed Bag", "Lantern", "Pal Essence Condenser",
+}
+
+var palQuizDecoys = []string{
+	"Lamball", "Cattiva", "Chikipi", "Foxparks", "Lifmunk", "Pengullet", "Tanzee", "Daedream", "Direhowl",
+	"Tocotoco", "Eikthyrdeer", "Nitewing", "Dumud", "Dinossom", "Mossanda", "Anubis", "Grizzbolt",
+	"Jetragon", "Frostallion", "Orserk", "Lyleen", "Shadowbeak", "Blazamut", "Knocklem",
 }
 
 func humanizeItemID(value string) string {
@@ -913,12 +1074,18 @@ func (s *Source) readClaimPlayerCached(ctx context.Context, generation generatio
 }
 
 func cacheableClaimPlayer(player savesidecar.ClaimPlayer) bool {
-	size := len(player.PlayerID) + len(player.Common)*64 + len(player.Party)*32
-	for _, stack := range player.Common {
-		size += len(stack.ItemID) + len(stack.DynamicItemID)
+	containers := [][]savesidecar.ClaimStack{
+		player.Common, player.DropSlot, player.Essential, player.Weapons, player.Armor, player.Food,
+	}
+	size := len(player.PlayerID) + len(player.Party)*32
+	for _, container := range containers {
+		size += len(container) * 64
+		for _, stack := range container {
+			size += len(stack.ItemID) + len(stack.DynamicItemID)
+		}
 	}
 	for _, pal := range player.Party {
-		size += len(pal.InstanceID)
+		size += len(pal.InstanceID) + len(pal.Species)
 	}
 	for _, keys := range [][]string{
 		player.Progress.FastTravel, player.Progress.Areas, player.Progress.Notes,
@@ -934,6 +1101,11 @@ func cacheableClaimPlayer(player savesidecar.ClaimPlayer) bool {
 
 func cloneCachedClaimPlayer(player savesidecar.ClaimPlayer) savesidecar.ClaimPlayer {
 	player.Common = append([]savesidecar.ClaimStack(nil), player.Common...)
+	player.DropSlot = append([]savesidecar.ClaimStack(nil), player.DropSlot...)
+	player.Essential = append([]savesidecar.ClaimStack(nil), player.Essential...)
+	player.Weapons = append([]savesidecar.ClaimStack(nil), player.Weapons...)
+	player.Armor = append([]savesidecar.ClaimStack(nil), player.Armor...)
+	player.Food = append([]savesidecar.ClaimStack(nil), player.Food...)
 	player.Party = append([]savesidecar.ClaimPal(nil), player.Party...)
 	player.Progress.FastTravel = append([]string(nil), player.Progress.FastTravel...)
 	player.Progress.Areas = append([]string(nil), player.Progress.Areas...)

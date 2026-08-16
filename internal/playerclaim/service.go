@@ -281,6 +281,66 @@ func (s *Service) Start(ctx context.Context, publicPlayerID string) (Challenge, 
 	}, nil
 }
 
+// CycleQuestion replaces one uncertain knowledge question while preserving
+// the other question IDs and their client-side answers.
+func (s *Service) CycleQuestion(ctx context.Context, challengeBearer, questionID string) (Verification, error) {
+	cycler, ok := s.prover.(QuestionCycler)
+	if !ok || strings.TrimSpace(questionID) == "" {
+		return Verification{}, ErrUnavailable
+	}
+	key := hashBearer(challengeBearer)
+	now := s.now()
+
+	s.mu.Lock()
+	entry, exists := s.challenges[key]
+	if !exists {
+		s.mu.Unlock()
+		return Verification{}, ErrChallengeNotFound
+	}
+	if expired(now, entry.expiresAt) {
+		s.deleteChallengeLocked(key, entry)
+		s.mu.Unlock()
+		return Verification{}, ErrChallengeExpired
+	}
+	if entry.verifying {
+		s.mu.Unlock()
+		return Verification{}, ErrVerificationInFlight
+	}
+	if entry.phase != challengeProving || entry.prepared.Instructions.Kind != InventoryQuiz {
+		s.mu.Unlock()
+		return Verification{}, ErrInvalidProof
+	}
+	entry.verifying = true
+	prepared := clonePrepared(entry.prepared)
+	s.mu.Unlock()
+
+	cycleErr := cycler.CycleQuestion(ctx, &prepared, questionID)
+	now = s.now()
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	entry, exists = s.challenges[key]
+	if !exists {
+		return Verification{}, ErrChallengeExpired
+	}
+	if expired(now, entry.expiresAt) {
+		s.deleteChallengeLocked(key, entry)
+		return Verification{}, ErrChallengeExpired
+	}
+	if cycleErr != nil {
+		entry.verifying = false
+		return Verification{}, cycleErr
+	}
+	if !matchesPreparedBinding(prepared, entry) ||
+		!validQuizReplacement(entry.prepared.Instructions, prepared.Instructions, questionID) {
+		entry.verifying = false
+		return Verification{}, ErrInvalidProof
+	}
+	entry.prepared = clonePrepared(prepared)
+	entry.verifying = false
+	instructions := cloneInstructions(prepared.Instructions)
+	return Verification{Status: VerificationReady, Instructions: &instructions, ExpiresAt: entry.expiresAt}, nil
+}
+
 // Verify checks an active challenge. ErrPending becomes a Pending status so a
 // client may poll without learning why the next safe save is not ready. A
 // successful transition consumes the challenge and creates exactly one
@@ -565,7 +625,7 @@ func emptyInstructions(instructions Instructions) bool {
 
 func validQuizInstructions(instructions Instructions) bool {
 	if instructions.Kind != InventoryQuiz || instructions.Phase != "" || instructions.Step != 0 ||
-		instructions.TotalSteps != 0 || len(instructions.Pairs) != 0 || len(instructions.Questions) != 2 ||
+		instructions.TotalSteps != 0 || len(instructions.Pairs) != 0 || len(instructions.Questions) != 3 ||
 		instructions.SnapshotAt.IsZero() {
 		return false
 	}
@@ -587,6 +647,44 @@ func validQuizInstructions(instructions Instructions) bool {
 				return false
 			}
 			optionSeen[option] = struct{}{}
+		}
+	}
+	return true
+}
+
+func validQuizReplacement(previous, next Instructions, questionID string) bool {
+	if !validQuizInstructions(next) || previous.Kind != InventoryQuiz || previous.SnapshotAt != next.SnapshotAt ||
+		len(previous.Questions) != len(next.Questions) {
+		return false
+	}
+	replaced := -1
+	for index, question := range previous.Questions {
+		if question.ID == questionID {
+			replaced = index
+			break
+		}
+	}
+	if replaced < 0 || next.Questions[replaced].ID == questionID {
+		return false
+	}
+	for index := range previous.Questions {
+		if index == replaced {
+			continue
+		}
+		if !sameQuizQuestion(previous.Questions[index], next.Questions[index]) {
+			return false
+		}
+	}
+	return true
+}
+
+func sameQuizQuestion(left, right QuizQuestion) bool {
+	if left.ID != right.ID || left.Prompt != right.Prompt || len(left.Options) != len(right.Options) {
+		return false
+	}
+	for index := range left.Options {
+		if left.Options[index] != right.Options[index] {
+			return false
 		}
 	}
 	return true

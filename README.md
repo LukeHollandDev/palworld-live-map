@@ -142,16 +142,19 @@ temporarily unavailable.
 ### Connect a saved character privately
 
 Character connection is opt-in and requires save integration. Online and
-offline characters use the same quick check: the map asks two multiple-choice
-questions about which item display label occupies a randomly selected common
-inventory slot in the latest completed backup. Each compact question has eight choices,
-both answers are submitted once, and a wrong submission consumes the challenge.
-Correct answers, counts, dynamic instance IDs, raw item IDs, account IDs, and
-save identifiers never reach the browser or logs. Challenges and submissions
-remain bounded by the built-in per-client and process-wide rate limits.
+offline characters use the same quick check: the map asks three multiple-choice
+questions from the latest completed backup. Questions can cover common or
+dropped items, equipped weapons, armor, food, essential items, and party Pals.
+Each card can be replaced independently without clearing answers on the other
+cards. Every question has one save-backed answer and seven global decoys, so
+starting a check does not disclose a list of the character's real items. All
+three answers are submitted once, and a wrong submission consumes the challenge.
+Correct option indexes, counts, dynamic instance IDs, raw item IDs, account IDs, and
+save identifiers never reach the browser or logs. Challenges, question cycling,
+and submissions remain bounded by the built-in per-client and process-wide rate limits.
 
-If a save cannot supply eight distinct safe item labels, the older reversible
-inventory-swap proof remains available as a fallback. Its recovery slot pairs,
+If a save cannot supply three safe private facts, the older reversible
+inventory-swap proof is attempted when the common inventory can support it. Its recovery slot pairs,
 proof phase, and advisory per-swap progress are the only claim data that may be
 kept in `sessionStorage`; quiz questions and answers are never persisted.
 

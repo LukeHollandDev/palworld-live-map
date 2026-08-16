@@ -58,12 +58,20 @@ function quizStartResponse(expiresInMs = 10 * 60_000, token = challengeToken) {
         {
           id: 'q1',
           prompt: 'Which item is in common-inventory slot 4?',
-          options: ['Wood', 'Stone', 'Fiber', 'Ore', 'Coal', 'Sulfur', 'Quartz', 'Pal Sphere']
+          options: ['Wood', 'Stone', 'Fiber', 'Ore', 'Coal', 'Sulfur', 'Quartz', 'Pal Sphere'],
+          canCycle: true
         },
         {
           id: 'q2',
           prompt: 'Which item is in common-inventory slot 9?',
-          options: ['Berry', 'Milk', 'Honey', 'Flour', 'Cake', 'Wool', 'Leather', 'Bone']
+          options: ['Berry', 'Milk', 'Honey', 'Flour', 'Cake', 'Wool', 'Leather', 'Bone'],
+          canCycle: true
+        },
+        {
+          id: 'q3',
+          prompt: 'Which Pal was in party slot 1?',
+          options: ['Lamball', 'Cattiva', 'Chikipi', 'Foxparks', 'Lifmunk', 'Pengullet', 'Tanzee', 'Daedream'],
+          canCycle: true
         }
       ]
     }
@@ -163,7 +171,7 @@ afterEach(() => {
 })
 
 describe('PlayerClaimPanel', () => {
-  it('verifies an offline character with two quick multiple-choice questions', async () => {
+  it('verifies an offline character with three quick multiple-choice questions', async () => {
     const requests: Array<{ path: string; init?: RequestInit }> = []
     let meRequests = 0
     vi.stubGlobal(
@@ -209,11 +217,10 @@ describe('PlayerClaimPanel', () => {
     )
 
     await user.click(await screen.findByRole('button', { name: 'This is me' }))
-    expect(
-      await screen.findByText('Choose the two answers that match this character’s latest completed save.')
-    ).toBeVisible()
+    expect(await screen.findByText(/Answer three questions from memory/)).toBeVisible()
     await user.selectOptions(screen.getByRole('combobox', { name: 'Which item is in common-inventory slot 4?' }), '1')
     await user.selectOptions(screen.getByRole('combobox', { name: 'Which item is in common-inventory slot 9?' }), '3')
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Which Pal was in party slot 1?' }), '5')
     await user.click(screen.getByRole('button', { name: 'Verify answers' }))
 
     const verify = requests.find((request) => request.path === '/api/player-claims/verify')
@@ -221,10 +228,83 @@ describe('PlayerClaimPanel', () => {
       challengeToken,
       answers: [
         { questionId: 'q1', option: 1 },
-        { questionId: 'q2', option: 3 }
+        { questionId: 'q2', option: 3 },
+        { questionId: 'q3', option: 5 }
       ]
     })
     expect(await screen.findByRole('heading', { name: 'Connected private save' })).toBeVisible()
+  })
+
+  it('cycles Q1 and Q3 independently without clearing Q2', async () => {
+    const requests: Array<{ path: string; body: unknown }> = []
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
+        const path = pathOf(input)
+        if (path === '/api/me') return jsonResponse({ error: 'authentication_required' }, 401)
+        if (path === '/api/player-claims') return jsonResponse(quizStartResponse(), 201)
+        if (path === '/api/player-claims/questions/cycle') {
+          const body = JSON.parse(String(init?.body)) as { questionId: string }
+          requests.push({ path, body })
+          const initial = quizStartResponse().instructions.questions
+          const q4 = {
+            id: 'q4',
+            prompt: 'Which weapon was equipped in slot 1?',
+            options: ['Old Bow', 'Crossbow', 'Handgun', 'Shotgun', 'Assault Rifle', 'Musket', 'Spear', 'Sword'],
+            canCycle: true
+          }
+          const q5 = {
+            id: 'q5',
+            prompt: 'Which armor was equipped in slot 2?',
+            options: ['Cloth', 'Pelt', 'Metal', 'Refined Metal', 'Pal Metal', 'Plasteel', 'Heat Armor', 'Cold Armor'],
+            canCycle: false
+          }
+          return jsonResponse({
+            status: 'ready',
+            expiresAt: new Date(Date.now() + 10 * 60_000).toISOString(),
+            instructions: {
+              kind: 'inventory_quiz',
+              snapshotAt: new Date(Date.now() - 1_000).toISOString(),
+              questions: body.questionId === 'q1' ? [q4, initial[1], initial[2]] : [q4, initial[1], q5]
+            }
+          })
+        }
+        return new Response(null, { status: 404 })
+      })
+    )
+    const player = {
+      id: 'offline-player',
+      kind: 'players' as const,
+      name: 'Offline Player',
+      level: 40,
+      online: false,
+      x: 3,
+      y: 4,
+      map: 'palpagos'
+    }
+    const user = userEvent.setup()
+    render(
+      <PlayerClaimProvider enabled>
+        <PlayerClaimSessionControl players={[player]} />
+        <PlayerClaimIdentityChooser players={[player]} />
+      </PlayerClaimProvider>
+    )
+
+    await user.click(await screen.findByRole('button', { name: 'This is me' }))
+    const q2 = screen.getByRole('combobox', { name: 'Which item is in common-inventory slot 9?' })
+    await user.selectOptions(q2, '3')
+    await user.click(screen.getAllByRole('button', { name: 'Different question' })[0])
+    expect(await screen.findByRole('combobox', { name: 'Which weapon was equipped in slot 1?' })).toBeVisible()
+    expect(q2).toHaveValue('3')
+
+    await user.click(screen.getAllByRole('button', { name: 'Different question' })[2])
+    expect(await screen.findByRole('combobox', { name: 'Which armor was equipped in slot 2?' })).toBeVisible()
+    expect(q2).toHaveValue('3')
+    expect(screen.getByRole('combobox', { name: 'Which weapon was equipped in slot 1?' })).toBeVisible()
+    expect(requests.map((request) => request.body)).toEqual([
+      { challengeToken, questionId: 'q1' },
+      { challengeToken, questionId: 'q3' }
+    ])
   })
 
   it('offers both online and offline roster characters for verification', async () => {
