@@ -37,7 +37,8 @@ const (
 	claimCandidateFloor  = 16
 	claimCycleSlots      = 8
 	claimQuizQuestions   = 2
-	claimQuizOptions     = 8
+	claimQuizMinOptions  = 3
+	claimQuizMaxOptions  = 8
 	maxClaimPlayerCache  = 32
 	maxCachedPlayerBytes = 1 << 20
 )
@@ -827,19 +828,20 @@ func selectKnowledgeQuiz(player savesidecar.ClaimPlayer, selector uint64, snapsh
 		return playerclaim.Instructions{}, nil, nil, false
 	}
 	facts := make([]claimQuizFact, 0, len(player.Common)+len(player.DropSlot)+len(player.Essential)+len(player.Weapons)+len(player.Armor)+len(player.Food)+len(player.Party))
-	appendStackQuizFacts(&facts, player.Common, "Which item was in common-inventory slot %d?", itemQuizDecoys)
-	appendStackQuizFacts(&facts, player.DropSlot, "Which item was in dropped-items slot %d?", itemQuizDecoys)
-	appendStackQuizFacts(&facts, player.Essential, "Which key item was in key-items slot %d?", essentialQuizDecoys)
-	appendStackQuizFacts(&facts, player.Weapons, "Which weapon was equipped in slot %d?", weaponQuizDecoys)
-	appendStackQuizFacts(&facts, player.Armor, "Which armor or accessory was equipped in slot %d?", armorQuizDecoys)
-	appendStackQuizFacts(&facts, player.Food, "Which food was equipped in slot %d?", foodQuizDecoys)
+	appendStackQuizFacts(&facts, player.Common, "Which item was in common-inventory slot %d?")
+	appendStackQuizFacts(&facts, player.DropSlot, "Which item was in dropped-items slot %d?")
+	appendStackQuizFacts(&facts, player.Essential, "Which key item was in key-items slot %d?")
+	appendStackQuizFacts(&facts, player.Weapons, "Which weapon was equipped in slot %d?")
+	appendStackQuizFacts(&facts, player.Armor, "Which armor or accessory was equipped in slot %d?")
+	appendStackQuizFacts(&facts, player.Food, "Which food was equipped in slot %d?")
+	partyOptions := quizOptionsFromParty(player.Party)
 	for _, pal := range player.Party {
 		label := humanizeItemID(pal.Species)
-		if pal.Slot < 0 || label == "" {
+		if pal.Slot < 0 || label == "" || len(partyOptions) < claimQuizMinOptions {
 			continue
 		}
 		facts = append(facts, claimQuizFact{
-			prompt: fmt.Sprintf("Which Pal was in party slot %d?", pal.Slot+1), value: label, decoys: palQuizDecoys,
+			prompt: fmt.Sprintf("Which Pal was in party slot %d?", pal.Slot+1), value: label, options: partyOptions,
 		})
 	}
 	if len(facts) < claimQuizQuestions {
@@ -877,26 +879,63 @@ func selectKnowledgeQuiz(player savesidecar.ClaimPlayer, selector uint64, snapsh
 }
 
 type claimQuizFact struct {
-	prompt string
-	value  string
-	decoys []string
+	prompt  string
+	value   string
+	options []string
 }
 
-func appendStackQuizFacts(destination *[]claimQuizFact, stacks []savesidecar.ClaimStack, prompt string, decoys []string) {
+func appendStackQuizFacts(destination *[]claimQuizFact, stacks []savesidecar.ClaimStack, prompt string) {
+	options := quizOptionsFromStacks(stacks)
+	if len(options) < claimQuizMinOptions {
+		return
+	}
 	for _, stack := range stacks {
 		label := humanizeItemID(stack.ItemID)
 		if !validClaimStack(stack) || label == "" {
 			continue
 		}
 		*destination = append(*destination, claimQuizFact{
-			prompt: fmt.Sprintf(prompt, stack.Slot+1), value: label, decoys: decoys,
+			prompt: fmt.Sprintf(prompt, stack.Slot+1), value: label, options: options,
 		})
 	}
 }
 
+func quizOptionsFromStacks(stacks []savesidecar.ClaimStack) []string {
+	options := make([]string, 0, len(stacks))
+	for _, stack := range stacks {
+		if validClaimStack(stack) {
+			options = appendUniqueQuizOption(options, humanizeItemID(stack.ItemID))
+		}
+	}
+	return options
+}
+
+func quizOptionsFromParty(party []savesidecar.ClaimPal) []string {
+	options := make([]string, 0, len(party))
+	for _, pal := range party {
+		if pal.Slot >= 0 {
+			options = appendUniqueQuizOption(options, humanizeItemID(pal.Species))
+		}
+	}
+	return options
+}
+
+func appendUniqueQuizOption(options []string, option string) []string {
+	option = strings.TrimSpace(option)
+	if option == "" {
+		return options
+	}
+	for _, existing := range options {
+		if strings.EqualFold(existing, option) {
+			return options
+		}
+	}
+	return append(options, option)
+}
+
 func makeQuizCandidate(fact claimQuizFact, id string, state *uint64) (claimQuizCandidate, bool) {
-	options := make([]string, 0, claimQuizOptions)
-	seen := make(map[string]struct{}, claimQuizOptions)
+	options := make([]string, 0, claimQuizMaxOptions)
+	seen := make(map[string]struct{}, claimQuizMaxOptions)
 	appendOption := func(option string) {
 		option = strings.TrimSpace(option)
 		key := strings.ToLower(option)
@@ -910,7 +949,12 @@ func makeQuizCandidate(fact claimQuizFact, id string, state *uint64) (claimQuizC
 		options = append(options, option)
 	}
 	appendOption(fact.value)
-	decoys := append([]string(nil), fact.decoys...)
+	decoys := make([]string, 0, len(fact.options))
+	for _, option := range fact.options {
+		if !strings.EqualFold(strings.TrimSpace(option), strings.TrimSpace(fact.value)) {
+			decoys = append(decoys, option)
+		}
+	}
 	for index := len(decoys) - 1; index > 0; index-- {
 		*state = claimRandom(*state)
 		other := int(*state % uint64(index+1))
@@ -918,11 +962,11 @@ func makeQuizCandidate(fact claimQuizFact, id string, state *uint64) (claimQuizC
 	}
 	for _, decoy := range decoys {
 		appendOption(decoy)
-		if len(options) == claimQuizOptions {
+		if len(options) == claimQuizMaxOptions {
 			break
 		}
 	}
-	if len(options) != claimQuizOptions {
+	if len(options) < claimQuizMinOptions {
 		return claimQuizCandidate{}, false
 	}
 	for index := len(options) - 1; index > 0; index-- {
@@ -941,39 +985,6 @@ func makeQuizCandidate(fact claimQuizFact, id string, state *uint64) (claimQuizC
 		return claimQuizCandidate{}, false
 	}
 	return claimQuizCandidate{question: playerclaim.QuizQuestion{ID: id, Prompt: fact.prompt, Options: options}, correct: correct}, true
-}
-
-var itemQuizDecoys = []string{
-	"Wood", "Stone", "Fiber", "Paldium Fragment", "Ore", "Coal", "Sulfur", "Quartz", "Polymer",
-	"High Quality Pal Oil", "Ancient Civilization Parts", "Dog Coin", "Gold Coin", "Pal Sphere",
-	"Mega Pal Sphere", "Giga Pal Sphere", "Hyper Pal Sphere", "Ultra Pal Sphere", "Legendary Sphere",
-	"Repair Kit", "Medical Supplies", "Gunpowder", "Circuit Board", "Carbon Fiber",
-}
-
-var weaponQuizDecoys = []string{
-	"Old Bow", "Crossbow", "Handgun", "Makeshift Handgun", "Single Shot Rifle", "Double Barreled Shotgun",
-	"Pump Action Shotgun", "Assault Rifle", "Rocket Launcher", "Laser Rifle", "Gatling Gun", "Grenade Launcher",
-}
-
-var armorQuizDecoys = []string{
-	"Cloth Outfit", "Pelt Armor", "Metal Armor", "Refined Metal Armor", "Pal Metal Armor", "Heat Resistant Armor",
-	"Cold Resistant Armor", "Plasteel Armor", "Lightweight Plasteel Armor", "Life Pendant", "Attack Pendant", "Defense Pendant",
-}
-
-var foodQuizDecoys = []string{
-	"Baked Berries", "Jam Filled Bun", "Salad", "Omelet", "Pancake", "Pizza", "Cake", "Grilled Lamball",
-	"Fried Chikipi", "Marinated Mushrooms", "Mozzarina Cheeseburger", "Carbonara",
-}
-
-var essentialQuizDecoys = []string{
-	"Normal Parachute", "Mega Glider", "Giga Glider", "Hyper Glider", "Grappling Gun", "Mega Grappling Gun",
-	"Giga Grappling Gun", "Hyper Grappling Gun", "Lockpicking Tool", "Feed Bag", "Lantern", "Pal Essence Condenser",
-}
-
-var palQuizDecoys = []string{
-	"Lamball", "Cattiva", "Chikipi", "Foxparks", "Lifmunk", "Pengullet", "Tanzee", "Daedream", "Direhowl",
-	"Tocotoco", "Eikthyrdeer", "Nitewing", "Dumud", "Dinossom", "Mossanda", "Anubis", "Grizzbolt",
-	"Jetragon", "Frostallion", "Orserk", "Lyleen", "Shadowbeak", "Blazamut", "Knocklem",
 }
 
 func humanizeItemID(value string) string {

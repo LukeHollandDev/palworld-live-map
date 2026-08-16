@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -1332,7 +1333,7 @@ func testPlayerProjector(raw string) (string, bool) {
 	return "player:test", true
 }
 
-func TestSelectKnowledgeQuizBuildsTwoCyclableQuestionsWithGlobalDecoys(t *testing.T) {
+func TestSelectKnowledgeQuizBuildsTwoCyclableQuestionsWithCharacterOptions(t *testing.T) {
 	stacks := make([]savesidecar.ClaimStack, 8)
 	for index := range stacks {
 		stacks[index] = savesidecar.ClaimStack{Slot: uint32(index), ItemID: fmt.Sprintf("TestItem%d", index+1), Count: 1}
@@ -1360,16 +1361,12 @@ func TestSelectKnowledgeQuizBuildsTwoCyclableQuestionsWithGlobalDecoys(t *testin
 			t.Fatalf("question %d options are not unique: %v", index, question.Options)
 		}
 	}
-	privateOptions := 0
 	for _, question := range instructions.Questions {
 		for _, option := range question.Options {
-			if strings.HasPrefix(option, "Test Item") || strings.HasPrefix(option, "Private") {
-				privateOptions++
+			if !strings.HasPrefix(option, "Test Item") {
+				t.Fatalf("question options were not grounded in the character's common inventory: %v", question.Options)
 			}
 		}
-	}
-	if privateOptions != len(instructions.Questions) {
-		t.Fatalf("public questions exposed %d private values across %d cards", privateOptions, len(instructions.Questions))
 	}
 	encoded, err := json.Marshal(instructions)
 	if err != nil {
@@ -1399,7 +1396,41 @@ func TestSelectKnowledgeQuizAllowsBothQuestionsToUsePartyPals(t *testing.T) {
 		if !strings.HasPrefix(question.Prompt, "Which Pal was in party slot ") {
 			t.Fatalf("question %d prompt = %q", index, question.Prompt)
 		}
+		if !reflect.DeepEqual(sortedStrings(question.Options), []string{"Cattiva", "Foxparks", "Lamball"}) {
+			t.Fatalf("question %d options = %v; want only the character's party", index, question.Options)
+		}
 	}
+}
+
+func TestSelectKnowledgeQuizSkipsContainersWithoutThreeDistinctRealOptions(t *testing.T) {
+	player := savesidecar.ClaimPlayer{
+		Weapons: []savesidecar.ClaimStack{
+			{Slot: 0, ItemID: "LaserRifle", Count: 1},
+			{Slot: 1, ItemID: "RocketLauncher", Count: 1},
+		},
+		Armor: []savesidecar.ClaimStack{
+			{Slot: 0, ItemID: "PalMetalArmor", Count: 1},
+			{Slot: 1, ItemID: "LifePendant", Count: 1},
+			{Slot: 2, ItemID: "AttackPendant", Count: 1},
+		},
+	}
+	instructions, _, remaining, ok := selectKnowledgeQuiz(
+		player, 17, time.Date(2026, time.August, 16, 1, 0, 0, 0, time.UTC),
+	)
+	if !ok || len(instructions.Questions) != 2 || len(remaining) != 1 {
+		t.Fatalf("selectKnowledgeQuiz() = %+v, remaining %d, ok %v", instructions, len(remaining), ok)
+	}
+	for _, question := range instructions.Questions {
+		if !strings.HasPrefix(question.Prompt, "Which armor or accessory") || len(question.Options) != 3 {
+			t.Fatalf("question used an undersized or unrelated container: %+v", question)
+		}
+	}
+}
+
+func sortedStrings(values []string) []string {
+	result := append([]string(nil), values...)
+	slices.Sort(result)
+	return result
 }
 
 func TestCycleQuestionReplacesOnlyTheRequestedCard(t *testing.T) {

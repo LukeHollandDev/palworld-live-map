@@ -933,6 +933,27 @@ func (errorReader) Read([]byte) (int, error) { return 0, io.ErrUnexpectedEOF }
 
 type knowledgeQuizProver struct{}
 
+func TestValidQuizInstructionsAcceptsThreeToEightGroundedOptions(t *testing.T) {
+	base := Instructions{
+		Kind: InventoryQuiz, SnapshotAt: time.Now(),
+		Questions: []QuizQuestion{
+			{ID: "q1", Prompt: "First?", Options: []string{"A", "B", "C"}},
+			{ID: "q2", Prompt: "Second?", Options: []string{"D", "E", "F"}},
+		},
+	}
+	if !validQuizInstructions(base) {
+		t.Fatal("three real options should be accepted")
+	}
+	base.Questions[0].Options = []string{"A", "B"}
+	if validQuizInstructions(base) {
+		t.Fatal("two options should not meet the guessing floor")
+	}
+	base.Questions[0].Options = []string{"A", "B", "C", "D", "E", "F", "G", "H", "I"}
+	if validQuizInstructions(base) {
+		t.Fatal("more than eight options should exceed the disclosure bound")
+	}
+}
+
 func (knowledgeQuizProver) Prepare(_ context.Context, target string, _ uint64) (Prepared, error) {
 	return Prepared{
 		Subject: "subject:" + target, PublicPlayerID: target,

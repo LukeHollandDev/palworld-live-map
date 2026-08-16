@@ -631,7 +631,8 @@ func validQuizInstructions(instructions Instructions) bool {
 	}
 	seen := make(map[string]struct{}, len(instructions.Questions))
 	for _, question := range instructions.Questions {
-		if strings.TrimSpace(question.ID) == "" || strings.TrimSpace(question.Prompt) == "" || len(question.Options) != 8 {
+		if strings.TrimSpace(question.ID) == "" || strings.TrimSpace(question.Prompt) == "" ||
+			len(question.Options) < 3 || len(question.Options) > 8 {
 			return false
 		}
 		if _, exists := seen[question.ID]; exists {

@@ -146,9 +146,11 @@ offline characters use the same quick check: the map asks two multiple-choice
 questions from the latest completed backup. Questions can cover common or
 dropped items, equipped weapons, armor, food, key items, and party Pals.
 Each card can be replaced independently without clearing answers on the other
-cards. Every question has one save-backed answer and seven global decoys, so
-starting a check does not disclose a list of the character's real items. All
-two answers are submitted once, and a wrong submission consumes the challenge.
+cards. Each card presents three to eight choices drawn from the same real saved
+container as its answer; for example, a weapon-slot question offers that
+character's equipped weapons. Starting or cycling a check can therefore disclose
+a bounded set of the character's item or party-Pal names before verification.
+Both answers are submitted once, and a wrong submission consumes the challenge.
 Correct option indexes, counts, dynamic instance IDs, raw item IDs, account IDs, and
 save identifiers never reach the browser or logs. Challenges, question cycling,
 and submissions remain bounded by the built-in per-client and process-wide rate limits.

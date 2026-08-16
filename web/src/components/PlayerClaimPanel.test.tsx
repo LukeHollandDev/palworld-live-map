@@ -58,13 +58,13 @@ function quizStartResponse(expiresInMs = 10 * 60_000, token = challengeToken) {
         {
           id: 'q1',
           prompt: 'Which item is in common-inventory slot 4?',
-          options: ['Wood', 'Stone', 'Fiber', 'Ore', 'Coal', 'Sulfur', 'Quartz', 'Pal Sphere'],
+          options: ['Wood', 'Stone', 'Fiber'],
           canCycle: true
         },
         {
           id: 'q2',
           prompt: 'Which item is in common-inventory slot 9?',
-          options: ['Berry', 'Milk', 'Honey', 'Flour', 'Cake', 'Wool', 'Leather', 'Bone'],
+          options: ['Berry', 'Milk', 'Honey', 'Flour'],
           canCycle: true
         }
       ]
@@ -242,13 +242,13 @@ describe('PlayerClaimPanel', () => {
           const q4 = {
             id: 'q4',
             prompt: 'Which weapon was equipped in slot 1?',
-            options: ['Old Bow', 'Crossbow', 'Handgun', 'Shotgun', 'Assault Rifle', 'Musket', 'Spear', 'Sword'],
+            options: ['Old Bow', 'Crossbow', 'Handgun'],
             canCycle: true
           }
           const q5 = {
             id: 'q5',
             prompt: 'Which Pal was in party slot 2?',
-            options: ['Lamball', 'Cattiva', 'Chikipi', 'Foxparks', 'Lifmunk', 'Pengullet', 'Tanzee', 'Daedream'],
+            options: ['Lamball', 'Cattiva', 'Chikipi', 'Foxparks', 'Lifmunk'],
             canCycle: false
           }
           return jsonResponse({

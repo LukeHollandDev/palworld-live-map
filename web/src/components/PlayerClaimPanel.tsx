@@ -175,7 +175,8 @@ function parseQuiz(value: unknown): QuizInstructions | null {
       !question.prompt ||
       typeof question.canCycle !== 'boolean' ||
       !Array.isArray(question.options) ||
-      question.options.length !== 8 ||
+      question.options.length < 3 ||
+      question.options.length > 8 ||
       !question.options.every((option): option is string => typeof option === 'string' && option.length > 0)
     )
       return null
@@ -1584,7 +1585,8 @@ function QuizControl({
       ))}
       <p className="m-0 text-[10px] leading-4 text-[#81969c]">
         This works for offline characters. Questions can use inventory, dropped items, equipment, food, or party Pals.
-        Answers are checked once and are not stored in the browser.
+        Every choice comes from that character's saved data in the same category. Answers are checked once and are not
+        stored in the browser.
       </p>
     </div>
   )
