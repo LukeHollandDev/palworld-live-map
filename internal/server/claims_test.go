@@ -914,8 +914,8 @@ func TestAuthenticatedProgressProjectsPrivateKeysToCatalogueIDs(t *testing.T) {
 	}}
 	server, _ := newClaimHTTPServer(t, prover, nil)
 	server.landmarks = append(server.landmarks,
-		palworld.WorldObject{ID: "alpha:TestAlpha:1:2", Kind: "alpha-pals", Name: "Test Alpha"},
-		palworld.WorldObject{ID: "tower:REGION_Grass_Boss", Kind: "bosses", Name: "Test Tower"},
+		palworld.WorldObject{ID: "landmark:alpha:TestAlpha:1:2", Kind: "alpha-pals", Name: "Test Alpha"},
+		palworld.WorldObject{ID: "landmark:tower:REGION_Grass_Boss", Kind: "bosses", Name: "Test Tower"},
 	)
 	completionKeys := map[string]string{}
 	completionIDs := map[string]string{}
@@ -991,6 +991,38 @@ func TestAuthenticatedProgressProjectsPrivateKeysToCatalogueIDs(t *testing.T) {
 		if strings.Contains(body, forbidden) {
 			t.Errorf("progress response exposed %q: %s", forbidden, body)
 		}
+	}
+}
+
+func TestLegacyCompletionKeyAcceptsProjectedLandmarkIDs(t *testing.T) {
+	tests := []struct {
+		name string
+		item palworld.WorldObject
+		want string
+	}{
+		{
+			name: "alpha pal",
+			item: palworld.WorldObject{
+				ID:   "landmark:alpha:81_1_grass_FBOSS_1:-343155.00:244585.00",
+				Kind: "alpha-pals",
+			},
+			want: "81_1_grass_fboss_1",
+		},
+		{
+			name: "tower boss",
+			item: palworld.WorldObject{
+				ID:   "landmark:tower:REGION_Grass_Boss",
+				Kind: "bosses",
+			},
+			want: "boss_battle_name_grassboss",
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			if got := legacyCompletionKey(test.item); got != test.want {
+				t.Fatalf("legacyCompletionKey(%q) = %q, want %q", test.item.ID, got, test.want)
+			}
+		})
 	}
 }
 

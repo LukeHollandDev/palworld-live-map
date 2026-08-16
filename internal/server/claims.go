@@ -333,19 +333,23 @@ var towerCompletionKeys = map[string]string{
 }
 
 func legacyCompletionKey(item palworld.WorldObject) string {
+	// Embedded landmarks are projected with a public namespace so they cannot
+	// collide with live or world-catalogue objects. Completion matching still
+	// needs the original game-facing ID that follows that namespace.
+	id := strings.TrimPrefix(item.ID, "landmark:")
 	if item.Kind == "alpha-pals" {
 		const prefix = "alpha:"
-		if !strings.HasPrefix(item.ID, prefix) {
+		if !strings.HasPrefix(id, prefix) {
 			return ""
 		}
-		stateKey, _, ok := strings.Cut(strings.TrimPrefix(item.ID, prefix), ":")
+		stateKey, _, ok := strings.Cut(strings.TrimPrefix(id, prefix), ":")
 		if !ok {
 			return ""
 		}
 		return strings.ToLower(strings.TrimSpace(stateKey))
 	}
 	if item.Kind == "bosses" {
-		return towerCompletionKeys[item.ID]
+		return towerCompletionKeys[id]
 	}
 	return ""
 }
