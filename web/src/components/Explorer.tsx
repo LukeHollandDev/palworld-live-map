@@ -571,6 +571,13 @@ export function Explorer(props: ExplorerProps) {
     FILTERABLE_KINDS.every((kind) => props.enabledKinds.has(kind)) &&
     DEFAULT_ENABLED_PLAYER_STATUSES.every((status) => props.enabledPlayerStatuses.has(status)) &&
     props.hiddenIds.size === 0
+  const visibleMapItemCount = props.items.filter((item) => {
+    if (item.map !== props.activeLayer.id || item.kind === 'companions') return false
+    if (!props.enabledKinds.has(item.kind) || props.hiddenIds.has(item.id)) return false
+    if (item.kind === 'players' && !props.enabledPlayerStatuses.has(item.online === false ? 'offline' : 'online'))
+      return false
+    return !query || matches(item)
+  }).length
 
   return (
     // biome-ignore lint/complexity/noUselessFragments: the stable wrapper keeps this large panel's markup isolated from its external header trigger
@@ -667,23 +674,36 @@ export function Explorer(props: ExplorerProps) {
                 )
               })}
             </fieldset>
-            <div className="mx-3.5 mb-2 flex shrink-0 justify-end gap-1.5">
-              <button
-                type="button"
-                className="pal-interactive min-h-7 cursor-pointer border border-[#8bb7bd]/25 bg-[#26363b]/55 px-2.5 text-[11px] text-[#b7cdd1] transition-colors enabled:hover:border-[#7fd7e3]/50 enabled:hover:text-[#e5f8fa] disabled:cursor-default disabled:opacity-40"
-                disabled={allFiltersChecked}
-                onClick={props.onCheckAll}
+            <div className="mx-3.5 mb-2 flex shrink-0 items-center justify-between gap-2">
+              <span
+                aria-live="polite"
+                aria-atomic="true"
+                className="min-w-0 overflow-hidden text-[11px] text-ellipsis whitespace-nowrap text-[#789097]"
               >
-                Show all
-              </button>
-              <button
-                type="button"
-                className="pal-interactive min-h-7 cursor-pointer border border-[#8bb7bd]/25 bg-[#26363b]/55 px-2.5 text-[11px] text-[#b7cdd1] transition-colors enabled:hover:border-[#7fd7e3]/50 enabled:hover:text-[#e5f8fa] disabled:cursor-default disabled:opacity-40"
-                disabled={props.enabledKinds.size === 0 && props.enabledPlayerStatuses.size === 0}
-                onClick={props.onUncheckAll}
-              >
-                Hide all
-              </button>
+                {visibleMapItemCount.toLocaleString()} map {visibleMapItemCount === 1 ? 'item' : 'items'} shown
+              </span>
+              <div className="flex shrink-0 gap-1.5">
+                <button
+                  type="button"
+                  className="pal-interactive min-h-7 cursor-pointer border border-[#8bb7bd]/25 bg-[#26363b]/55 px-2.5 text-[11px] text-[#b7cdd1] transition-colors enabled:hover:border-[#7fd7e3]/50 enabled:hover:text-[#e5f8fa] disabled:cursor-default disabled:opacity-40"
+                  aria-label="Show all map categories"
+                  title="Show every map category; My Progress still controls completed landmarks"
+                  disabled={allFiltersChecked}
+                  onClick={props.onCheckAll}
+                >
+                  Show all
+                </button>
+                <button
+                  type="button"
+                  className="pal-interactive min-h-7 cursor-pointer border border-[#8bb7bd]/25 bg-[#26363b]/55 px-2.5 text-[11px] text-[#b7cdd1] transition-colors enabled:hover:border-[#7fd7e3]/50 enabled:hover:text-[#e5f8fa] disabled:cursor-default disabled:opacity-40"
+                  aria-label="Hide all map categories"
+                  title="Hide every map category"
+                  disabled={props.enabledKinds.size === 0 && props.enabledPlayerStatuses.size === 0}
+                  onClick={props.onUncheckAll}
+                >
+                  Hide all
+                </button>
+              </div>
             </div>
 
             <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain border-t border-[#caeaef]/20 px-3.5 pt-1.5 pb-3.5">

@@ -1309,7 +1309,7 @@ describe('App', () => {
     let explorer = screen.getByRole('complementary', { name: 'Map filters' })
     await waitFor(() => expect(within(explorer).getByRole('checkbox', { name: 'Show Guilds' })).toBeChecked())
 
-    const uncheckAll = within(explorer).getByRole('button', { name: 'Hide all' })
+    const uncheckAll = within(explorer).getByRole('button', { name: 'Hide all map categories' })
     await user.click(uncheckAll)
     for (const checkbox of within(explorer).getAllByRole('checkbox')) expect(checkbox).not.toBeChecked()
     expect(uncheckAll).toBeDisabled()
@@ -1351,9 +1351,9 @@ describe('App', () => {
     const playerVisibility = within(explorer).getByRole('checkbox', { name: 'Show Luke · Lv 55' })
     const siblingVisibility = within(explorer).getByRole('checkbox', { name: 'Show Anne · Lv 20' })
     const categoryVisibility = within(explorer).getByRole('checkbox', { name: 'Show Online Players' })
-    const checkAll = within(explorer).getByRole('button', { name: 'Show all' })
+    const checkAll = within(explorer).getByRole('button', { name: 'Show all map categories' })
 
-    await user.click(within(explorer).getByRole('button', { name: 'Hide all' }))
+    await user.click(within(explorer).getByRole('button', { name: 'Hide all map categories' }))
     expect(checkAll).toBeEnabled()
     expect(playerVisibility).toBeEnabled()
     expect(playerVisibility).not.toBeChecked()
@@ -1396,7 +1396,7 @@ describe('App', () => {
     render(<App />)
     await screen.findByRole('heading', { name: 'Test Realm' })
     const restoredExplorer = screen.getByRole('complementary', { name: 'Map filters' })
-    expect(within(restoredExplorer).getByRole('button', { name: 'Show all' })).toBeDisabled()
+    expect(within(restoredExplorer).getByRole('button', { name: 'Show all map categories' })).toBeDisabled()
     expect(within(restoredExplorer).getByRole('checkbox', { name: 'Show Online Players' })).toBeChecked()
     expect(within(restoredExplorer).getByRole('checkbox', { name: 'Show Luke · Lv 55' })).toBeChecked()
     expect(within(restoredExplorer).getByRole('checkbox', { name: 'Show Anne · Lv 20' })).toBeChecked()
@@ -1677,6 +1677,16 @@ describe('App', () => {
     expect(screen.getByRole('button', { name: 'Penking · Lv 15' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Zoe & Grizzbolt · Lv 10' })).toBeInTheDocument()
 
+    await user.click(within(explorer).getByRole('button', { name: 'Show all map categories' }))
+    await user.click(within(explorer).getByRole('button', { name: 'Hide all map categories' }))
+    await user.click(within(explorer).getByRole('checkbox', { name: 'Show Alpha Pals' }))
+    await user.click(within(explorer).getByRole('checkbox', { name: 'Show Tower Bosses' }))
+    expect(within(explorer).getByText('2 map items shown')).toBeVisible()
+    expect(screen.getByRole('button', { name: 'Penking · Lv 15' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Zoe & Grizzbolt · Lv 10' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Luke · Lv 55' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Home' })).not.toBeInTheDocument()
+
     await user.click(within(explorer).getByRole('button', { name: 'Expand Alpha Pals section' }))
     await user.click(within(explorer).getByRole('button', { name: 'Expand Tower Bosses section' }))
     expect(
@@ -1945,6 +1955,15 @@ describe('App', () => {
     expect(within(explorer).queryByRole('button', { name: /View First Effigy/ })).not.toBeInTheDocument()
     expect(within(explorer).getByRole('button', { name: 'View Second Effigy' })).toBeVisible()
     expect(screen.queryByRole('button', { name: 'First Effigy · Manual completion' })).not.toBeInTheDocument()
+
+    await user.click(within(explorer).getByRole('button', { name: 'Show all map categories' }))
+    expect(within(explorer).queryByRole('button', { name: /View First Effigy/ })).not.toBeInTheDocument()
+    await user.click(within(explorer).getByRole('button', { name: 'Hide all map categories' }))
+    expect(within(explorer).getByText('0 map items shown')).toBeVisible()
+    await user.click(within(explorer).getByRole('checkbox', { name: 'Show Pal Effigies' }))
+    expect(within(explorer).queryByRole('button', { name: /View First Effigy/ })).not.toBeInTheDocument()
+    expect(within(explorer).getByRole('button', { name: 'View Second Effigy' })).toBeVisible()
+    expect(within(explorer).getByText('1 map item shown')).toBeVisible()
     await waitFor(() => {
       const stored = JSON.parse(
         window.localStorage.getItem('palworld-live-map.completion-profiles.v1') || '{}'
