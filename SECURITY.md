@@ -12,8 +12,9 @@ one-shot, two-question memory quiz generated from a safely completed backup.
 Each question exposes three to eight real item or Pal names from the answer's
 saved container and can be replaced independently without changing the other
 card. Starting or cycling a challenge can therefore disclose this bounded set
-before identity is verified. Questions may use private inventory containers,
-equipment, food, or party slots. A wrong submission
+before identity is verified. Questions may use the first two rows of common
+inventory, equipment, food, or party slots. Dropped-item and key-item containers
+are excluded. A wrong submission
 consumes the challenge, and existing per-client and global limits bound guessing and private
 decoder work. Correct option indexes, counts, dynamic instance IDs, raw item IDs, raw
 save identifiers, proof evidence, completion state keys, and the installation

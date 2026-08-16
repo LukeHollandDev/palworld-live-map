@@ -1427,6 +1427,40 @@ func TestSelectKnowledgeQuizSkipsContainersWithoutThreeDistinctRealOptions(t *te
 	}
 }
 
+func TestSelectKnowledgeQuizUsesOnlyTheFirstTwoCommonInventoryRows(t *testing.T) {
+	privateStacks := func(prefix string) []savesidecar.ClaimStack {
+		result := make([]savesidecar.ClaimStack, 8)
+		for index := range result {
+			result[index] = savesidecar.ClaimStack{Slot: uint32(index), ItemID: fmt.Sprintf("%s%d", prefix, index), Count: 1}
+		}
+		return result
+	}
+	player := savesidecar.ClaimPlayer{
+		Common: []savesidecar.ClaimStack{
+			{Slot: 0, ItemID: "Wood", Count: 1},
+			{Slot: 5, ItemID: "Stone", Count: 1},
+			{Slot: 11, ItemID: "Fiber", Count: 1},
+			{Slot: 12, ItemID: "LateRowOre", Count: 1},
+			{Slot: 20, ItemID: "LateRowCoal", Count: 1},
+		},
+		DropSlot:  privateStacks("DroppedSecret"),
+		Essential: privateStacks("KeyItemSecret"),
+	}
+	instructions, _, remaining, ok := selectKnowledgeQuiz(
+		player, 23, time.Date(2026, time.August, 16, 1, 0, 0, 0, time.UTC),
+	)
+	if !ok || len(instructions.Questions) != 2 || len(remaining) != 1 {
+		t.Fatalf("selectKnowledgeQuiz() = %+v, remaining %d, ok %v", instructions, len(remaining), ok)
+	}
+	wantOptions := []string{"Fiber", "Stone", "Wood"}
+	for _, question := range instructions.Questions {
+		if !strings.HasPrefix(question.Prompt, "Which item was in common-inventory slot ") ||
+			!reflect.DeepEqual(sortedStrings(question.Options), wantOptions) {
+			t.Fatalf("question included a later row, dropped item, or key item: %+v", question)
+		}
+	}
+}
+
 func sortedStrings(values []string) []string {
 	result := append([]string(nil), values...)
 	slices.Sort(result)

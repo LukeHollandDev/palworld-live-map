@@ -143,8 +143,8 @@ temporarily unavailable.
 
 Character connection is opt-in and requires save integration. Online and
 offline characters use the same quick check: the map asks two multiple-choice
-questions from the latest completed backup. Questions can cover common or
-dropped items, equipped weapons, armor, food, key items, and party Pals.
+questions from the latest completed backup. Questions can cover the first two
+six-slot rows of common inventory, equipped weapons, armor, food, and party Pals.
 Each card can be replaced independently without clearing answers on the other
 cards. Each card presents three to eight choices drawn from the same real saved
 container as its answer; for example, a weapon-slot question offers that

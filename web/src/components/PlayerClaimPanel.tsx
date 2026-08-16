@@ -1584,9 +1584,9 @@ function QuizControl({
         </fieldset>
       ))}
       <p className="m-0 text-[10px] leading-4 text-[#81969c]">
-        This works for offline characters. Questions can use inventory, dropped items, equipment, food, or party Pals.
-        Every choice comes from that character's saved data in the same category. Answers are checked once and are not
-        stored in the browser.
+        This works for offline characters. Questions can use the first two inventory rows, equipment, food, or party
+        Pals. Every choice comes from that character's saved data in the same category. Answers are checked once and are
+        not stored in the browser.
       </p>
     </div>
   )

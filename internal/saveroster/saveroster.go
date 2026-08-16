@@ -39,6 +39,7 @@ const (
 	claimQuizQuestions   = 2
 	claimQuizMinOptions  = 3
 	claimQuizMaxOptions  = 8
+	claimCommonQuizSlots = 12 // The first two six-column rows in the in-game inventory.
 	maxClaimPlayerCache  = 32
 	maxCachedPlayerBytes = 1 << 20
 )
@@ -827,10 +828,9 @@ func selectKnowledgeQuiz(player savesidecar.ClaimPlayer, selector uint64, snapsh
 	if snapshotAt.IsZero() {
 		return playerclaim.Instructions{}, nil, nil, false
 	}
-	facts := make([]claimQuizFact, 0, len(player.Common)+len(player.DropSlot)+len(player.Essential)+len(player.Weapons)+len(player.Armor)+len(player.Food)+len(player.Party))
-	appendStackQuizFacts(&facts, player.Common, "Which item was in common-inventory slot %d?")
-	appendStackQuizFacts(&facts, player.DropSlot, "Which item was in dropped-items slot %d?")
-	appendStackQuizFacts(&facts, player.Essential, "Which key item was in key-items slot %d?")
+	facts := make([]claimQuizFact, 0, len(player.Common)+len(player.Weapons)+len(player.Armor)+len(player.Food)+len(player.Party))
+	commonFirstRows := claimStacksBeforeSlot(player.Common, claimCommonQuizSlots)
+	appendStackQuizFacts(&facts, commonFirstRows, "Which item was in common-inventory slot %d?")
 	appendStackQuizFacts(&facts, player.Weapons, "Which weapon was equipped in slot %d?")
 	appendStackQuizFacts(&facts, player.Armor, "Which armor or accessory was equipped in slot %d?")
 	appendStackQuizFacts(&facts, player.Food, "Which food was equipped in slot %d?")
@@ -876,6 +876,16 @@ func selectKnowledgeQuiz(player savesidecar.ClaimPlayer, selector uint64, snapsh
 		correct[candidate.question.ID] = candidate.correct
 	}
 	return playerclaim.Instructions{Kind: playerclaim.InventoryQuiz, Questions: questions, SnapshotAt: snapshotAt}, correct, remaining, true
+}
+
+func claimStacksBeforeSlot(stacks []savesidecar.ClaimStack, limit uint32) []savesidecar.ClaimStack {
+	result := make([]savesidecar.ClaimStack, 0, len(stacks))
+	for _, stack := range stacks {
+		if stack.Slot < limit {
+			result = append(result, stack)
+		}
+	}
+	return result
 }
 
 type claimQuizFact struct {
