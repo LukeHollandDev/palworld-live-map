@@ -185,7 +185,7 @@ export function PlayerClaimProvider({ enabled, children }: { enabled: boolean; c
     setCycling(true)
     setNotice(null)
     try {
-      const response = await postJSON('/api/player-claims/question', {
+      const response = await postJSON('/api/player-claims/questions/cycle', {
         challengeToken: challenge.token,
         questionId: challenge.question.id
       })
