@@ -12,31 +12,19 @@ import (
 type ProofKind string
 
 const (
-	InventorySwapSequence ProofKind = "inventory_swap_sequence"
-	InventoryQuiz         ProofKind = "inventory_quiz"
-)
-
-type ProofPhase string
-
-const (
-	ProofPhaseProve   ProofPhase = "prove"
-	ProofPhaseRestore ProofPhase = "restore"
+	InventoryQuiz ProofKind = "inventory_quiz"
 )
 
 var (
 	// ErrUnavailable indicates that the save-backed proof source cannot safely
 	// prepare or verify a claim at the moment.
 	ErrUnavailable = errors.New("player claim proof is unavailable")
-	// ErrPending is returned by a Prover when no post-challenge immutable save
-	// generation is available yet. Service.Verify translates it into the public
-	// Pending status rather than returning it to the caller as an error.
-	ErrPending = errors.New("player claim proof is pending")
-	// ErrReady means a post-start immutable baseline is armed and the updated
-	// Prepared instructions may now be revealed to the claimant.
-	ErrReady = errors.New("player claim proof is ready")
 	// ErrIncorrectAnswer means a one-shot knowledge challenge did not match its
 	// private save evidence. Callers must consume the challenge on this result.
 	ErrIncorrectAnswer = errors.New("player claim answer is incorrect")
+	// ErrNoSuitableQuestion means the save was readable but did not contain
+	// enough distinct private facts to construct a useful multiple-choice check.
+	ErrNoSuitableQuestion = errors.New("player claim has no suitable question")
 	// ErrNoAlternateQuestion means an otherwise valid knowledge challenge has
 	// exhausted its private question pool.
 	ErrNoAlternateQuestion = errors.New("player claim has no alternate question")
@@ -54,29 +42,17 @@ type QuizAnswer struct {
 	Option     int    `json:"option"`
 }
 
-// SlotPair is one reversible in-game swap. Slots are one-based to match the
-// visible inventory grid.
-type SlotPair struct {
-	SlotA int `json:"slotA"`
-	SlotB int `json:"slotB"`
-}
-
-// Instructions are the only save-derived proof details that may be returned
-// to a claimant. A proof uses seven nonce-selected anchored swaps followed by
-// a separately observed reverse-order restore phase. Item identifiers, counts,
-// instance IDs, and the private save PlayerUID remain in Evidence on the server.
+// Instructions contain the single safe question shown to the claimant. Item
+// identifiers, counts, instance IDs, and the private save PlayerUID remain in
+// Evidence on the server.
 type Instructions struct {
 	Kind       ProofKind      `json:"kind"`
-	Phase      ProofPhase     `json:"phase"`
-	Step       int            `json:"step"`
-	TotalSteps int            `json:"totalSteps"`
-	Pairs      []SlotPair     `json:"pairs"`
-	Questions  []QuizQuestion `json:"questions,omitempty"`
+	Questions  []QuizQuestion `json:"questions"`
 	SnapshotAt time.Time      `json:"snapshotAt"`
 }
 
-// Prepared is an opaque, server-only proof. Subject is a stable world-scoped
-// HMAC and Evidence is implementation-private baseline state.
+// Prepared is an opaque, server-only proof. Subject is a process-scoped,
+// world-bound HMAC and Evidence is implementation-private baseline state.
 type Prepared struct {
 	Subject        string       `json:"-"`
 	PublicPlayerID string       `json:"-"`
@@ -85,17 +61,15 @@ type Prepared struct {
 	Evidence       any          `json:"-"`
 }
 
-// Prover prepares a reversible, nonce-selected state transition and later
-// verifies it against a newly published immutable save generation.
+// Prover prepares one knowledge question and verifies a one-shot answer.
 type Prover interface {
 	Prepare(context.Context, string, uint64) (Prepared, error)
 	Verify(context.Context, *Prepared) error
 }
 
-// QuestionCycler optionally replaces one knowledge question without changing
-// the other questions or their answers. Implementations must clone private
-// evidence before mutation because Service retains the previous Prepared value
-// until the replacement has been validated.
+// QuestionCycler optionally replaces the current knowledge question.
+// Implementations must clone private evidence before mutation because Service
+// retains the previous Prepared value until the replacement has been validated.
 type QuestionCycler interface {
 	CycleQuestion(context.Context, *Prepared, string) error
 }

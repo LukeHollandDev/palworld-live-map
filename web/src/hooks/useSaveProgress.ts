@@ -29,7 +29,7 @@ export type SaveProgressState =
 
 export type SaveProgressSession =
   | { phase: 'loading' | 'anonymous' | 'unavailable' }
-  | { phase: 'connected'; playerId: string; sessionEpoch: number }
+  | { phase: 'connected'; playerId: string; sessionEpoch: number; bearer: string }
 
 interface SaveProgressOptions {
   expectedCatalogueVersion: string | null
@@ -50,6 +50,7 @@ export function useSaveProgress(session: SaveProgressSession, options: SaveProgr
   const loadedRef = useRef<SaveProgressState>(loaded)
   const connectedPlayerId = session.phase === 'connected' ? session.playerId : null
   const connectedSessionEpoch = session.phase === 'connected' ? session.sessionEpoch : null
+  const connectedBearer = session.phase === 'connected' ? session.bearer : null
 
   const commit = useCallback((next: SaveProgressState) => {
     loadedRef.current = next
@@ -57,7 +58,7 @@ export function useSaveProgress(session: SaveProgressSession, options: SaveProgr
   }, [])
 
   useEffect(() => {
-    if (connectedPlayerId === null || connectedSessionEpoch === null) {
+    if (connectedPlayerId === null || connectedSessionEpoch === null || connectedBearer === null) {
       commit({ phase: 'inactive' })
       return
     }
@@ -121,8 +122,8 @@ export function useSaveProgress(session: SaveProgressSession, options: SaveProgr
     const load = async () => {
       try {
         const response = await fetch('/api/me/progress', {
-          credentials: 'same-origin',
           cache: 'no-store',
+          headers: { Authorization: `Bearer ${connectedBearer}` },
           signal: controller.signal
         })
         if (!currentRequest()) return
@@ -194,6 +195,7 @@ export function useSaveProgress(session: SaveProgressSession, options: SaveProgr
     commit,
     connectedPlayerId,
     connectedSessionEpoch,
+    connectedBearer,
     options.expectedCatalogueVersion,
     options.onUnauthorized
   ])

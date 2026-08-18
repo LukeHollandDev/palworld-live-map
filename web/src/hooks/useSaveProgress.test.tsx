@@ -43,13 +43,18 @@ describe('useSaveProgress', () => {
     window.localStorage.setItem(LOCAL_COMPLETION_STORAGE_KEY, '{"manual":"keep"}')
     const fetchMock = vi.fn(async () => new Response(JSON.stringify(responsePayload), { status: 200 }))
     vi.stubGlobal('fetch', fetchMock)
-    let session: SaveProgressSession = { phase: 'connected', playerId: 'public-player', sessionEpoch: 1 }
+    let session: SaveProgressSession = {
+      phase: 'connected',
+      playerId: 'public-player',
+      sessionEpoch: 1,
+      bearer: 'session-token'
+    }
     const { result, rerender } = renderHook(() => useSaveProgress(session, options))
 
     await waitFor(() => expect(result.current.state.phase).toBe('available'))
     expect(fetchMock).toHaveBeenCalledWith(
       '/api/me/progress',
-      expect.objectContaining({ credentials: 'same-origin', cache: 'no-store' })
+      expect.objectContaining({ cache: 'no-store', headers: { Authorization: 'Bearer session-token' } })
     )
 
     session = { phase: 'anonymous' }
@@ -66,7 +71,10 @@ describe('useSaveProgress', () => {
       .mockResolvedValueOnce(new Response(JSON.stringify(responsePayload), { status: 200 }))
     vi.stubGlobal('fetch', fetchMock)
     const { result } = renderHook(() =>
-      useSaveProgress({ phase: 'connected', playerId: 'public-player', sessionEpoch: 1 }, options)
+      useSaveProgress(
+        { phase: 'connected', playerId: 'public-player', sessionEpoch: 1, bearer: 'session-token' },
+        options
+      )
     )
 
     await waitFor(() => expect(result.current.state).toMatchObject({ phase: 'unavailable' }))
@@ -83,7 +91,10 @@ describe('useSaveProgress', () => {
       vi.fn(async () => new Response(JSON.stringify(responsePayload), { status: 200 }))
     )
     const { result } = renderHook(() =>
-      useSaveProgress({ phase: 'connected', playerId: 'public-player', sessionEpoch: 1 }, options)
+      useSaveProgress(
+        { phase: 'connected', playerId: 'public-player', sessionEpoch: 1, bearer: 'session-token' },
+        options
+      )
     )
 
     await act(async () => {
@@ -105,7 +116,7 @@ describe('useSaveProgress', () => {
     )
     const { result } = renderHook(() =>
       useSaveProgress(
-        { phase: 'connected', playerId: 'public-player', sessionEpoch: 1 },
+        { phase: 'connected', playerId: 'public-player', sessionEpoch: 1, bearer: 'session-token' },
         { ...options, onUnauthorized }
       )
     )
@@ -121,7 +132,12 @@ describe('useSaveProgress', () => {
       .mockResolvedValueOnce(new Response(JSON.stringify(responsePayload), { status: 200 }))
       .mockImplementationOnce(() => second.promise)
     vi.stubGlobal('fetch', fetchMock)
-    let session: SaveProgressSession = { phase: 'connected', playerId: 'public-player', sessionEpoch: 1 }
+    let session: SaveProgressSession = {
+      phase: 'connected',
+      playerId: 'public-player',
+      sessionEpoch: 1,
+      bearer: 'session-token'
+    }
     const { result, rerender } = renderHook(() => useSaveProgress(session, options))
     await waitFor(() => expect(result.current.state.phase).toBe('available'))
 
@@ -129,7 +145,7 @@ describe('useSaveProgress', () => {
     rerender()
     expect(result.current.state).toEqual({ phase: 'inactive' })
 
-    session = { phase: 'connected', playerId: 'public-player', sessionEpoch: 2 }
+    session = { phase: 'connected', playerId: 'public-player', sessionEpoch: 2, bearer: 'new-session-token' }
     rerender()
     expect(result.current.state).toMatchObject({ phase: 'loading', sessionEpoch: 2 })
     expect(result.current.state).not.toHaveProperty('snapshot')
@@ -146,7 +162,10 @@ describe('useSaveProgress', () => {
       .mockImplementationOnce(() => refresh.promise)
     vi.stubGlobal('fetch', fetchMock)
     const { result } = renderHook(() =>
-      useSaveProgress({ phase: 'connected', playerId: 'public-player', sessionEpoch: 1 }, options)
+      useSaveProgress(
+        { phase: 'connected', playerId: 'public-player', sessionEpoch: 1, bearer: 'session-token' },
+        options
+      )
     )
     await waitFor(() => expect(result.current.state.phase).toBe('available'))
 
@@ -178,7 +197,10 @@ describe('useSaveProgress', () => {
       )
     )
     const { result } = renderHook(() =>
-      useSaveProgress({ phase: 'connected', playerId: 'public-player', sessionEpoch: 1 }, options)
+      useSaveProgress(
+        { phase: 'connected', playerId: 'public-player', sessionEpoch: 1, bearer: 'session-token' },
+        options
+      )
     )
 
     await waitFor(() =>

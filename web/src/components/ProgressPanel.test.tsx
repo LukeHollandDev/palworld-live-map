@@ -74,7 +74,7 @@ describe('ProgressPanel', () => {
     expect(within(panel).getByText('Lifmunk Effigies')).toBeVisible()
     expect(within(panel).getByText('Save + manual')).toBeVisible()
     expect(within(panel).getAllByText('Manual only')).toHaveLength(1)
-    expect(within(panel).getByText('Save-backed identity is not enabled on this map.', { exact: false })).toBeVisible()
+    expect(within(panel).getByText('Save-backed character connection is not enabled.', { exact: false })).toBeVisible()
 
     await user.click(within(panel).getByRole('checkbox', { name: 'Show only missing on the map' }))
     expect(value.onRemainingOnlyChange).toHaveBeenCalledWith(true)
@@ -116,13 +116,16 @@ describe('ProgressPanel', () => {
         const path =
           typeof input === 'string' ? input : input instanceof URL ? input.pathname : new URL(input.url).pathname
         requests.push({ path, init })
-        if (path === '/api/me') return new Response('{}', { status: 401 })
         if (path === '/api/player-claims')
           return new Response(
             JSON.stringify({
-              status: 'arming',
+              status: 'ready',
               challengeToken: 'private-bearer-never-rendered',
-              expiresAt: new Date(Date.now() + 10 * 60_000).toISOString()
+              expiresAt: new Date(Date.now() + 10 * 60_000).toISOString(),
+              instructions: {
+                kind: 'inventory_quiz',
+                questions: [{ id: 'q1', prompt: 'What was equipped?', options: ['A', 'B', 'C'], canCycle: false }]
+              }
             }),
             { status: 201, headers: { 'Content-Type': 'application/json' } }
           )
@@ -155,8 +158,7 @@ describe('ProgressPanel', () => {
     )
 
     await user.click(await screen.findByRole('button', { name: 'This is me' }))
-    expect(await screen.findByRole('heading', { name: 'Identity check' })).toBeVisible()
-    expect(screen.getByText('Moss')).toBeVisible()
+    expect(await screen.findByRole('heading', { name: 'Connect Moss' })).toBeVisible()
     expect(document.body).not.toHaveTextContent('opaque-public-player')
     expect(document.body).not.toHaveTextContent('private-bearer-never-rendered')
     const start = requests.find((request) => request.path === '/api/player-claims')

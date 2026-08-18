@@ -62,11 +62,11 @@ describe('DetailsDialog player claims', () => {
 
     const nonPlayer = renderDetails(base, true)
     expect(screen.queryByText('Private progress')).not.toBeInTheDocument()
-    expect(fetch).toHaveBeenCalledTimes(1)
+    expect(fetch).not.toHaveBeenCalled()
     nonPlayer.unmount()
 
     renderDetails(player, true)
     expect(await screen.findByRole('button', { name: 'This is me' })).toBeVisible()
-    expect(fetch).toHaveBeenCalledTimes(2)
+    expect(fetch).not.toHaveBeenCalled()
   })
 })

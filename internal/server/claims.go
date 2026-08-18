@@ -8,7 +8,6 @@ import (
 	"mime"
 	"net/http"
 	"net/netip"
-	"net/url"
 	"sort"
 	"strings"
 	"sync"
@@ -21,13 +20,10 @@ import (
 )
 
 const (
-	claimSessionCookie     = "__Host-palworld_live_map_session"
-	httpClaimSessionCookie = "palworld_live_map_http_session"
-	claimCSRFHeader        = "X-Palworld-Live-Map"
-	maxClaimBody           = 8 << 10
-	maxClaimPlayerID       = 256
-	maxClaimQuizAnswers    = 2
-	maxClaimQuestionID     = 64
+	maxClaimBody        = 8 << 10
+	maxClaimPlayerID    = 256
+	maxClaimQuizAnswers = 1
+	maxClaimQuestionID  = 64
 )
 
 type startClaimRequest struct {
@@ -54,6 +50,7 @@ type claimVerificationResponse struct {
 	ExpiresAt         time.Time                      `json:"expiresAt,omitzero"`
 	IdleExpiresAt     time.Time                      `json:"idleExpiresAt,omitzero"`
 	AbsoluteExpiresAt time.Time                      `json:"absoluteExpiresAt,omitzero"`
+	SessionToken      string                         `json:"sessionToken,omitempty"`
 }
 
 type claimProgressDomain struct {
@@ -71,10 +68,10 @@ type claimProgressResponse struct {
 
 func (s *Server) startPlayerClaim(w http.ResponseWriter, r *http.Request) {
 	privateResponse(w)
-	if !s.validClaimMutation(w, r) {
+	if !validClaimJSON(w, r) {
 		return
 	}
-	if !s.claimStartLimiter.Allow(claimSource(r, s.settings.playerClaimsTrustedProxies), time.Now()) {
+	if !s.claimStartLimiter.Allow(claimSource(r), time.Now()) {
 		writeClaimRateLimit(w, r)
 		return
 	}
@@ -114,10 +111,10 @@ func (s *Server) isPublicPlayer(publicPlayerID string) bool {
 
 func (s *Server) verifyPlayerClaim(w http.ResponseWriter, r *http.Request) {
 	privateResponse(w)
-	if !s.validClaimMutation(w, r) {
+	if !validClaimJSON(w, r) {
 		return
 	}
-	if !s.claimVerifyLimiter.Allow(claimSource(r, s.settings.playerClaimsTrustedProxies), time.Now()) {
+	if !s.claimVerifyLimiter.Allow(claimSource(r), time.Now()) {
 		writeClaimRateLimit(w, r)
 		return
 	}
@@ -138,7 +135,7 @@ func (s *Server) verifyPlayerClaim(w http.ResponseWriter, r *http.Request) {
 	verification, err := s.claims.Verify(r.Context(), request.ChallengeToken, request.Answers...)
 	if err != nil {
 		if errors.Is(err, playerclaim.ErrVerificationInFlight) {
-			writeJSON(w, r, http.StatusAccepted, claimVerificationResponse{Status: playerclaim.VerificationPending})
+			writeJSON(w, r, http.StatusConflict, claimErrorResponse{Error: "question_busy"})
 			return
 		}
 		if errors.Is(err, playerclaim.ErrChallengeNotFound) || errors.Is(err, playerclaim.ErrChallengeExpired) {
@@ -152,32 +149,24 @@ func (s *Server) verifyPlayerClaim(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, r, http.StatusServiceUnavailable, claimErrorResponse{Error: "claim_unavailable"})
 		return
 	}
-	if verification.Status == playerclaim.VerificationArming ||
-		verification.Status == playerclaim.VerificationPending ||
-		verification.Status == playerclaim.VerificationReady {
-		writeJSON(w, r, http.StatusAccepted, claimVerificationResponse{
-			Status: verification.Status, Instructions: verification.Instructions, ExpiresAt: verification.ExpiresAt,
-		})
-		return
-	}
 	if verification.Status != playerclaim.VerificationVerified || verification.Session == nil || !validClaimBearer(verification.Session.Bearer) {
 		writeJSON(w, r, http.StatusServiceUnavailable, claimErrorResponse{Error: "claim_unavailable"})
 		return
 	}
-	s.setClaimCookie(w, verification.Session.Bearer, verification.Session.AbsoluteExpiresAt)
 	writeJSON(w, r, http.StatusOK, claimVerificationResponse{
 		Status:            verification.Status,
 		IdleExpiresAt:     verification.Session.IdleExpiresAt,
 		AbsoluteExpiresAt: verification.Session.AbsoluteExpiresAt,
+		SessionToken:      verification.Session.Bearer,
 	})
 }
 
 func (s *Server) cyclePlayerClaimQuestion(w http.ResponseWriter, r *http.Request) {
 	privateResponse(w)
-	if !s.validClaimMutation(w, r) {
+	if !validClaimJSON(w, r) {
 		return
 	}
-	if !s.claimVerifyLimiter.Allow(claimSource(r, s.settings.playerClaimsTrustedProxies), time.Now()) {
+	if !s.claimVerifyLimiter.Allow(claimSource(r), time.Now()) {
 		writeClaimRateLimit(w, r)
 		return
 	}
@@ -230,7 +219,7 @@ func (s *Server) claimProgress(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	if !s.claimVerifyLimiter.Allow(claimSource(r, s.settings.playerClaimsTrustedProxies), time.Now()) {
+	if !s.claimVerifyLimiter.Allow(claimSource(r), time.Now()) {
 		writeClaimRateLimit(w, r)
 		return
 	}
@@ -248,14 +237,13 @@ func (s *Server) claimProgress(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) claimPrincipal(w http.ResponseWriter, r *http.Request) (playerclaim.Principal, bool) {
-	cookie, err := r.Cookie(s.claimCookieName())
-	if err != nil || !validClaimBearer(cookie.Value) {
+	bearer := claimAuthorizationBearer(r.Header.Get("Authorization"))
+	if !validClaimBearer(bearer) {
 		writeJSON(w, r, http.StatusUnauthorized, claimErrorResponse{Error: "authentication_required"})
 		return playerclaim.Principal{}, false
 	}
-	principal, err := s.claims.ValidateSession(cookie.Value)
+	principal, err := s.claims.ValidateSession(bearer)
 	if err != nil {
-		s.clearClaimCookie(w)
 		writeJSON(w, r, http.StatusUnauthorized, claimErrorResponse{Error: "authentication_required"})
 		return playerclaim.Principal{}, false
 	}
@@ -356,13 +344,9 @@ func legacyCompletionKey(item palworld.WorldObject) string {
 
 func (s *Server) logoutClaimSession(w http.ResponseWriter, r *http.Request) {
 	privateResponse(w)
-	if !s.validClaimMutation(w, r) {
-		return
+	if bearer := claimAuthorizationBearer(r.Header.Get("Authorization")); validClaimBearer(bearer) {
+		s.claims.RevokeSession(bearer)
 	}
-	if cookie, err := r.Cookie(s.claimCookieName()); err == nil && validClaimBearer(cookie.Value) {
-		s.claims.RevokeSession(cookie.Value)
-	}
-	s.clearClaimCookie(w)
 	writeJSON(w, r, http.StatusOK, map[string]bool{"authenticated": false})
 }
 
@@ -373,6 +357,8 @@ func (s *Server) writeStartClaimError(w http.ResponseWriter, r *http.Request, er
 	case errors.Is(err, playerclaim.ErrStoreFull):
 		w.Header().Set("Retry-After", "60")
 		writeJSON(w, r, http.StatusTooManyRequests, claimErrorResponse{Error: "claim_unavailable"})
+	case errors.Is(err, playerclaim.ErrNoSuitableQuestion):
+		writeJSON(w, r, http.StatusConflict, claimErrorResponse{Error: "no_suitable_question"})
 	default:
 		// Unknown players, stale rosters, decoder failures, and invalid private
 		// evidence deliberately share one response to avoid an enumeration oracle.
@@ -380,43 +366,13 @@ func (s *Server) writeStartClaimError(w http.ResponseWriter, r *http.Request, er
 	}
 }
 
-func (s *Server) validClaimMutation(w http.ResponseWriter, r *http.Request) bool {
-	originOK, insecureHTTP := validClaimOrigin(r.Header.Get("Origin"), s.settings.playerClaimsOrigin, r.Host)
-	site := r.Header.Get("Sec-Fetch-Site")
-	if !originOK ||
-		(site != "same-origin" && !(insecureHTTP && site == "")) ||
-		r.Header.Get(claimCSRFHeader) != "1" {
-		writeJSON(w, r, http.StatusForbidden, claimErrorResponse{Error: "request_rejected"})
-		return false
-	}
+func validClaimJSON(w http.ResponseWriter, r *http.Request) bool {
 	mediaType, _, err := mime.ParseMediaType(r.Header.Get("Content-Type"))
 	if err != nil || mediaType != "application/json" {
 		writeJSON(w, r, http.StatusUnsupportedMediaType, claimErrorResponse{Error: "invalid_request"})
 		return false
 	}
 	return true
-}
-
-func validClaimOrigin(origin, configuredOrigin, requestHost string) (bool, bool) {
-	configured, err := url.Parse(configuredOrigin)
-	if err != nil || configured.Scheme == "" || configured.Host == "" {
-		return false, false
-	}
-	insecureHTTP := configured.Scheme == "http"
-	if !insecureHTTP {
-		return origin == configuredOrigin, false
-	}
-
-	// HTTP claims are an explicit compatibility mode for direct-IP and local
-	// deployments. Keep the request same-origin, but use the browser-facing Host
-	// rather than forcing every alias (for example localhost and 127.0.0.1) into
-	// configuration. The non-simple CSRF header remains mandatory.
-	parsed, err := url.Parse(origin)
-	if err != nil || parsed.Scheme != "http" || parsed.Host == "" || parsed.Host != requestHost ||
-		parsed.User != nil || parsed.Path != "" || parsed.RawQuery != "" || parsed.Fragment != "" {
-		return false, true
-	}
-	return true, true
 }
 
 func decodeClaimJSON(w http.ResponseWriter, r *http.Request, destination any) bool {
@@ -464,25 +420,12 @@ func validClaimBearer(value string) bool {
 	return err == nil && len(decoded) == 32
 }
 
-func (s *Server) claimCookieName() string {
-	if s.settings.playerClaimsHTTP {
-		return httpClaimSessionCookie
+func claimAuthorizationBearer(value string) string {
+	const prefix = "Bearer "
+	if !strings.HasPrefix(value, prefix) || strings.ContainsAny(value[len(prefix):], " \t\r\n") {
+		return ""
 	}
-	return claimSessionCookie
-}
-
-func (s *Server) setClaimCookie(w http.ResponseWriter, bearer string, expiresAt time.Time) {
-	http.SetCookie(w, &http.Cookie{
-		Name: s.claimCookieName(), Value: bearer, Path: "/", Expires: expiresAt.UTC(),
-		Secure: !s.settings.playerClaimsHTTP, HttpOnly: true, SameSite: http.SameSiteStrictMode,
-	})
-}
-
-func (s *Server) clearClaimCookie(w http.ResponseWriter) {
-	http.SetCookie(w, &http.Cookie{
-		Name: s.claimCookieName(), Value: "", Path: "/", MaxAge: -1, Expires: time.Unix(1, 0).UTC(),
-		Secure: !s.settings.playerClaimsHTTP, HttpOnly: true, SameSite: http.SameSiteStrictMode,
-	})
+	return value[len(prefix):]
 }
 
 func privateResponse(w http.ResponseWriter) {
@@ -495,9 +438,8 @@ type claimLimitWindow struct {
 	count   int
 }
 
-// claimRequestLimiter bounds decoder work per resolved client network and
-// process-wide. Forwarding headers are used only through explicitly trusted
-// proxy CIDRs.
+// claimRequestLimiter bounds decoder work per direct client network and
+// process-wide. Reverse proxies should apply their own edge rate limits.
 type claimRequestLimiter struct {
 	mu             sync.Mutex
 	perSource      map[string]claimLimitWindow
@@ -547,24 +489,10 @@ func (l *claimRequestLimiter) Allow(source string, now time.Time) bool {
 	return true
 }
 
-func claimSource(r *http.Request, trustedProxies []netip.Prefix) string {
+func claimSource(r *http.Request) string {
 	address, ok := remoteIP(r.RemoteAddr)
 	if !ok {
 		return "invalid"
-	}
-	if trustedProxy(address, trustedProxies) {
-		header := r.Header.Get("X-Forwarded-For")
-		if len(header) > 2_048 || strings.Count(header, ",") >= 32 {
-			return claimNetwork(address)
-		}
-		forwarded := strings.Split(header, ",")
-		for index := len(forwarded) - 1; index >= 0 && trustedProxy(address, trustedProxies); index-- {
-			candidate, err := netip.ParseAddr(strings.TrimSpace(forwarded[index]))
-			if err != nil {
-				return claimNetwork(address)
-			}
-			address = candidate.Unmap()
-		}
 	}
 	return claimNetwork(address)
 }
@@ -577,15 +505,6 @@ func remoteIP(remoteAddress string) (netip.Addr, bool) {
 	host := strings.Trim(value, "[]")
 	address, err := netip.ParseAddr(host)
 	return address.Unmap(), err == nil
-}
-
-func trustedProxy(address netip.Addr, trustedProxies []netip.Prefix) bool {
-	for _, prefix := range trustedProxies {
-		if prefix.Contains(address) {
-			return true
-		}
-	}
-	return false
 }
 
 func claimNetwork(address netip.Addr) string {

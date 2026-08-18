@@ -146,9 +146,6 @@ Every supported environment option and timeout is listed below and documented in
 | `SAVE_POLL_INTERVAL`      | Save enrichment interval; minimum `15s`                              | `30s`                  |
 | `SAVE_TIMEOUT`            | Whole-generation timeout; must be below `SAVE_POLL_INTERVAL`         | `20s`                  |
 | `PLAYER_CLAIMS_ENABLED`   | Enable save-backed “This is me” character connection                 | `false`                |
-| `PLAYER_CLAIMS_ORIGIN`    | Exact browser-facing HTTP or HTTPS origin used for request validation | required when enabled  |
-| `PLAYER_CLAIMS_SECRET_FILE` | Owner-only file containing a persistent 32-byte installation secret | required when enabled  |
-| `PLAYER_CLAIMS_TRUSTED_PROXIES` | Comma-separated proxy CIDRs trusted to supply `X-Forwarded-For` | empty                  |
 
 To enable save integration, mount the server's `SaveGames/0` directory read-only
 and set `SAVE_DATA_ENABLED=true`. The image includes the pinned
@@ -177,54 +174,23 @@ Correct option indexes, counts, dynamic instance IDs, raw item IDs, account IDs,
 save identifiers never reach the browser or logs. Challenges, question cycling,
 and submissions remain bounded by the built-in per-client and process-wide rate limits.
 
-If a save cannot supply one safe private fact, the older reversible
-inventory-swap proof is attempted when the common inventory can support it. Its recovery slot pairs,
-proof phase, and advisory per-swap progress are the only claim data that may be
-kept in `sessionStorage`; quiz questions and answers are never persisted.
+If no inventory, loadout, equipment, food-pouch, or party group contains at
+least three distinct real choices, that character cannot currently be
+connected. Add three different items or Pal species to one supported group,
+wait until the map has read a completed backup containing the change, and try
+again.
 
-For reload safety, the browser keeps only the recovery slot pairs, proof phase,
-and advisory per-swap progress in `sessionStorage`. It never stores the claim
-bearer, player identity, item data, or save progress there, and clears the
-recovery record after verified completion or explicit inventory-recovery
-acknowledgement.
-
-Create a dedicated installation secret; do not reuse the Palworld admin
-password:
-
-```bash
-umask 077
-openssl rand -hex 32 > player-claims.secret
-```
-
-Mount that file read-only in the map container, then set
-`PLAYER_CLAIMS_ENABLED=true`, `PLAYER_CLAIMS_ORIGIN` to the exact browser-facing
-origin (for example `http://192.0.2.10:8080` or `https://map.example.com`), and
-`PLAYER_CLAIMS_SECRET_FILE` to its
-absolute container path. Keep it owner-only and readable by the container's
-non-root runtime user. The secret must survive restarts and be backed up: it
-keeps private character subjects and opaque public IDs stable even when the
-REST URL or admin password changes.
-Enabling claims on an existing deployment changes opaque player/guild IDs once
-as they move from credential-derived IDs to the installation-secret key.
-
-HTTP origins are supported for simple self-hosted and raw-IP deployments. HTTPS
-is still strongly recommended on shared or untrusted networks because it
-prevents interception of the authenticated session and private completion
-progress. HTTPS uses a `Secure`, `__Host-` session cookie; HTTP uses a separate
-non-`Secure`, HttpOnly, SameSite=Strict cookie. Exact-origin validation, CSRF
-checks, self-only endpoints, and no-store responses apply in both modes.
-
-When an HTTPS reverse proxy connects to the map, configure its exact address
-range in `PLAYER_CLAIMS_TRUSTED_PROXIES` and have it append `X-Forwarded-For`.
-Forwarding headers from every other source are ignored. Apply request limits at
-the proxy as well as the map's built-in per-client and process-wide limits.
+Enable the feature with `PLAYER_CLAIMS_ENABLED=true`; there is no origin,
+proxy, or secret-file configuration. HTTP and raw-IP deployments are supported.
+HTTPS is still recommended on shared or untrusted networks because it prevents
+interception of the short-lived private session and completion response.
 
 The quiz reads the safely completed second-newest native backup and normally
 appears as soon as that private player projection is decoded. Quiz challenges
-expire after ten minutes. The fallback transition proof can require multiple
-native backup intervals and uses a 90-minute deadline per phase. Sessions are
-held only in memory in this first release, use HttpOnly, SameSite=Strict cookies
-(plus `Secure` under HTTPS), and must be re-established after a map restart.
+expire after ten minutes. Successful checks return a random session bearer held
+only in the open page's React memory. It is never written to localStorage,
+sessionStorage, a cookie, or the URL. Reloading the page or restarting the map
+requires answering another question.
 Connected players can see exact save-confirmed completion for field and tower
 bosses, bounties, watchtowers, waypoints, effigies, journals, and Ancient Shrine pickups through
 `/api/me/progress` only;

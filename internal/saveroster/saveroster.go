@@ -34,8 +34,6 @@ const (
 	maxGenerationEntries = 2048
 	maxPublicIDBytes     = 256
 	maxNameBytes         = 96
-	claimCandidateFloor  = 16
-	claimCycleSlots      = 8
 	claimQuizQuestions   = 1
 	claimQuizMinOptions  = 3
 	claimQuizMaxOptions  = 8
@@ -90,8 +88,8 @@ type Options struct {
 	ProjectGuildKey IDProjector
 
 	// ClaimReader and ClaimSecret must either both be provided or both omitted.
-	// ClaimSecret is a dedicated persistent installation secret and must not be
-	// derived from the Palworld REST password.
+	// ClaimSecret is ephemeral process-local key material used to keep private
+	// subjects separate from public player identifiers.
 	ClaimReader ClaimReader
 	ClaimSecret []byte
 }
@@ -575,14 +573,6 @@ func (s *Source) claimSubject(worldID, playerID string) string {
 	return hex.EncodeToString(digest.Sum(nil))
 }
 
-type claimEvidence struct {
-	target            claimTarget
-	issuedGenerations map[string]struct{}
-	selector          uint64
-	phase             claimPhase
-	inventory         []savesidecar.ClaimStack
-}
-
 type claimQuizEvidence struct {
 	target    claimTarget
 	correct   map[string]int
@@ -594,14 +584,6 @@ type claimQuizCandidate struct {
 	correct  int
 }
 
-type claimPhase uint8
-
-const (
-	claimArming claimPhase = iota
-	claimAwaitingProof
-	claimAwaitingRestore
-)
-
 // claimPlayerCache keeps one immutable decoded generation for a bounded set of
 // private subjects. It is never serialized or logged. Reusing this projection
 // prevents independent challenges for the same character from multiplying
@@ -612,11 +594,8 @@ type claimPlayerCache struct {
 	lastUsed       uint64
 }
 
-// Prepare records every generation visible at challenge start but deliberately
-// does not read a slot baseline or return instructions yet. Verify first waits
-// for a post-start safely immutable generation, then selects a nonce-rich
-// eight-slot cycle from at least sixteen distinct stacks. The claimant must
-// make the ordered cycle and later restore it across separate safe generations.
+// Prepare reads the latest safely immutable save generation and selects one
+// multiple-choice question backed by private character data.
 func (s *Source) Prepare(ctx context.Context, publicPlayerID string, selector uint64) (playerclaim.Prepared, error) {
 	if ctx == nil {
 		return playerclaim.Prepared{}, errors.New("prepare save claim: context is required")
@@ -640,33 +619,26 @@ func (s *Source) Prepare(ctx context.Context, publicPlayerID string, selector ui
 	if err != nil || baseline.worldID != target.worldID {
 		return playerclaim.Prepared{}, playerclaim.ErrUnavailable
 	}
-	if quizReader, ok := s.claimReader.(knowledgeQuizReader); ok && quizReader.KnowledgeQuizEnabled() {
-		player, readErr := s.readClaimPlayerCached(ctx, baseline, target)
-		if readErr == nil && player.PlayerID == target.playerID {
-			instructions, correct, remaining, selected := selectKnowledgeQuiz(player, selector, baseline.snapshotAt)
-			if selected {
-				return playerclaim.Prepared{
-					Subject: target.subject, PublicPlayerID: strings.TrimSpace(publicPlayerID), Instructions: instructions,
-					Evidence: &claimQuizEvidence{target: target, correct: correct, remaining: remaining},
-				}, nil
-			}
-		}
-	}
-	issued, err := visibleGenerationPaths(ctx, baseline.worldPath)
-	if err != nil || len(issued) == 0 {
+	quizReader, ok := s.claimReader.(knowledgeQuizReader)
+	if !ok || !quizReader.KnowledgeQuizEnabled() {
 		return playerclaim.Prepared{}, playerclaim.ErrUnavailable
 	}
+	player, err := s.readClaimPlayerCached(ctx, baseline, target)
+	if err != nil || player.PlayerID != target.playerID {
+		return playerclaim.Prepared{}, playerclaim.ErrUnavailable
+	}
+	instructions, correct, remaining, selected := selectKnowledgeQuiz(player, selector, baseline.snapshotAt)
+	if !selected {
+		return playerclaim.Prepared{}, playerclaim.ErrNoSuitableQuestion
+	}
 	return playerclaim.Prepared{
-		Subject: target.subject, PublicPlayerID: strings.TrimSpace(publicPlayerID),
-		Evidence: &claimEvidence{
-			target: target, issuedGenerations: issued, selector: selector, phase: claimArming,
-		},
+		Subject: target.subject, PublicPlayerID: strings.TrimSpace(publicPlayerID), Instructions: instructions,
+		Evidence: &claimQuizEvidence{target: target, correct: correct, remaining: remaining},
 	}, nil
 }
 
-// Verify succeeds only when a safely selected immutable generation that did
-// not exist at issuance contains the exact requested swap. Unrelated inventory
-// activity does not invalidate the proof; it simply never becomes public.
+// Verify compares the one submitted answer with the private evidence captured
+// from the same immutable save generation.
 func (s *Source) Verify(ctx context.Context, prepared *playerclaim.Prepared) error {
 	if ctx == nil {
 		return errors.New("verify save claim: context is required")
@@ -674,94 +646,24 @@ func (s *Source) Verify(ctx context.Context, prepared *playerclaim.Prepared) err
 	if prepared == nil {
 		return playerclaim.ErrUnavailable
 	}
-	if quiz, ok := prepared.Evidence.(*claimQuizEvidence); ok {
-		if quiz == nil || prepared.Subject == "" || prepared.Subject != quiz.target.subject ||
-			prepared.Instructions.Kind != playerclaim.InventoryQuiz || len(prepared.Answers) != len(prepared.Instructions.Questions) {
-			return playerclaim.ErrUnavailable
-		}
-		s.claimMu.RLock()
-		current, exists := s.claimTargetsForSubjectLocked(quiz.target.subject)
-		s.claimMu.RUnlock()
-		if !exists || current.playerID != quiz.target.playerID || current.worldID != quiz.target.worldID {
-			return playerclaim.ErrUnavailable
-		}
-		for index, answer := range prepared.Answers {
-			correct, exists := quiz.correct[answer.QuestionID]
-			if !exists || answer.QuestionID != prepared.Instructions.Questions[index].ID || answer.Option != correct {
-				return playerclaim.ErrIncorrectAnswer
-			}
-		}
-		return nil
-	}
-	evidence, ok := prepared.Evidence.(*claimEvidence)
-	if !ok || evidence == nil || prepared.Subject == "" || prepared.Subject != evidence.target.subject {
+	quiz, ok := prepared.Evidence.(*claimQuizEvidence)
+	if !ok || quiz == nil || prepared.Subject == "" || prepared.Subject != quiz.target.subject ||
+		prepared.Instructions.Kind != playerclaim.InventoryQuiz || len(prepared.Answers) != 1 ||
+		len(prepared.Instructions.Questions) != 1 {
 		return playerclaim.ErrUnavailable
-	}
-	if s.timeout > 0 {
-		var cancel context.CancelFunc
-		ctx, cancel = context.WithTimeout(ctx, s.timeout)
-		defer cancel()
 	}
 	s.claimMu.RLock()
-	current, exists := s.claimTargetsForSubjectLocked(evidence.target.subject)
+	current, exists := s.claimTargetsForSubjectLocked(quiz.target.subject)
 	s.claimMu.RUnlock()
-	if !exists || current.playerID != evidence.target.playerID || current.worldID != evidence.target.worldID || current.worldPath != evidence.target.worldPath {
+	if !exists || current.playerID != quiz.target.playerID || current.worldID != quiz.target.worldID {
 		return playerclaim.ErrUnavailable
 	}
-	generation, err := s.selectClaimGeneration(ctx)
-	if err != nil || generation.worldID != evidence.target.worldID || generation.worldPath != evidence.target.worldPath {
-		return playerclaim.ErrPending
+	answer := prepared.Answers[0]
+	correct, exists := quiz.correct[answer.QuestionID]
+	if !exists || answer.QuestionID != prepared.Instructions.Questions[0].ID || answer.Option != correct {
+		return playerclaim.ErrIncorrectAnswer
 	}
-	if _, existedAtIssue := evidence.issuedGenerations[generation.path]; existedAtIssue {
-		return playerclaim.ErrPending
-	}
-	player, err := s.readClaimPlayerCached(ctx, generation, evidence.target)
-	if err != nil || player.PlayerID != evidence.target.playerID {
-		return playerclaim.ErrPending
-	}
-	// A complete selected generation is immutable. Once it has decoded
-	// successfully, observing the same non-matching state again cannot advance
-	// this challenge and would only repeat expensive sidecar work on every poll.
-	evidence.issuedGenerations[generation.path] = struct{}{}
-	if evidence.phase == claimArming {
-		sequence, ok := selectInventorySequence(player.Common, evidence.selector)
-		if !ok {
-			return playerclaim.ErrUnavailable
-		}
-		visibleAfterRead, err := visibleGenerationPaths(ctx, generation.worldPath)
-		if err != nil {
-			return playerclaim.ErrUnavailable
-		}
-		evidence.issuedGenerations = visibleAfterRead
-		evidence.phase = claimAwaitingProof
-		evidence.inventory = sequence
-		prepared.Instructions = claimInstructions(sequence, playerclaim.ProofPhaseProve, generation.snapshotAt)
-		return playerclaim.ErrReady
-	}
-	if prepared.Instructions.Kind != playerclaim.InventorySwapSequence {
-		return playerclaim.ErrUnavailable
-	}
-	switch evidence.phase {
-	case claimAwaitingProof:
-		if !matchesClaimCycle(player.Common, evidence.inventory) {
-			return playerclaim.ErrPending
-		}
-		visibleAfterRead, err := visibleGenerationPaths(ctx, generation.worldPath)
-		if err != nil {
-			return playerclaim.ErrUnavailable
-		}
-		evidence.issuedGenerations = visibleAfterRead
-		evidence.phase = claimAwaitingRestore
-		prepared.Instructions = claimInstructions(evidence.inventory, playerclaim.ProofPhaseRestore, generation.snapshotAt)
-		return playerclaim.ErrReady
-	case claimAwaitingRestore:
-		if matchesClaimBaseline(player.Common, evidence.inventory) {
-			return nil
-		}
-		return playerclaim.ErrPending
-	default:
-		return playerclaim.ErrUnavailable
-	}
+	return nil
 }
 
 // CycleQuestion replaces the requested knowledge question so a claimant can
@@ -907,6 +809,17 @@ func appendStackQuizFacts(destination *[]claimQuizFact, stacks []savesidecar.Cla
 			prompt: fmt.Sprintf(prompt, stack.Slot+1), value: label, options: options,
 		})
 	}
+}
+
+func validClaimStack(stack savesidecar.ClaimStack) bool {
+	return stack.ItemID != "" && stack.Count > 0
+}
+
+func claimRandom(state uint64) uint64 {
+	state ^= state >> 12
+	state ^= state << 25
+	state ^= state >> 27
+	return state * 0x2545f4914f6cdd1d
 }
 
 func quizOptionsFromStacks(stacks []savesidecar.ClaimStack) []string {
@@ -1192,122 +1105,6 @@ func (s *Source) claimTargetsForSubjectLocked(subject string) (claimTarget, bool
 		result, found = target, true
 	}
 	return result, found
-}
-
-// selectInventorySequence chooses an eight-slot cycle from at least sixteen
-// stacks whose complete save fingerprints are unique. There are more than
-// 2^25 possible labelled cycles at the minimum candidate count, so an unseen
-// pre-instruction inventory state has negligible chance of matching the
-// nonce-selected target. Selection is O(n), bounded by sidecar validation.
-func selectInventorySequence(stacks []savesidecar.ClaimStack, selector uint64) ([]savesidecar.ClaimStack, bool) {
-	counts := make(map[claimStackKey]int, len(stacks))
-	for _, stack := range stacks {
-		if validClaimStack(stack) {
-			counts[claimStackFingerprint(stack)]++
-		}
-	}
-	candidates := make([]savesidecar.ClaimStack, 0, len(stacks))
-	for _, stack := range stacks {
-		if validClaimStack(stack) && counts[claimStackFingerprint(stack)] == 1 {
-			candidates = append(candidates, stack)
-		}
-	}
-	if len(candidates) < claimCandidateFloor {
-		return nil, false
-	}
-	state := selector ^ 0x9e3779b97f4a7c15
-	for index := len(candidates) - 1; index > 0; index-- {
-		state = claimRandom(state)
-		other := int(state % uint64(index+1))
-		candidates[index], candidates[other] = candidates[other], candidates[index]
-	}
-	return append([]savesidecar.ClaimStack{}, candidates[:claimCycleSlots]...), true
-}
-
-func claimRandom(state uint64) uint64 {
-	state ^= state >> 12
-	state ^= state << 25
-	state ^= state >> 27
-	return state * 0x2545f4914f6cdd1d
-}
-
-func validClaimStack(stack savesidecar.ClaimStack) bool {
-	return stack.ItemID != "" && stack.Count > 0
-}
-
-type claimStackKey struct {
-	itemID        string
-	count         uint32
-	dynamicItemID string
-}
-
-func claimStackFingerprint(stack savesidecar.ClaimStack) claimStackKey {
-	return claimStackKey{itemID: stack.ItemID, count: stack.Count, dynamicItemID: stack.DynamicItemID}
-}
-
-func claimInstructions(sequence []savesidecar.ClaimStack, phase playerclaim.ProofPhase, snapshotAt time.Time) playerclaim.Instructions {
-	pairs := make([]playerclaim.SlotPair, 0, len(sequence)-1)
-	if len(sequence) == claimCycleSlots {
-		for index := 1; index < len(sequence); index++ {
-			pairs = append(pairs, playerclaim.SlotPair{SlotA: int(sequence[0].Slot) + 1, SlotB: int(sequence[index].Slot) + 1})
-		}
-		if phase == playerclaim.ProofPhaseRestore {
-			for left, right := 0, len(pairs)-1; left < right; left, right = left+1, right-1 {
-				pairs[left], pairs[right] = pairs[right], pairs[left]
-			}
-		}
-	}
-	step := 1
-	if phase == playerclaim.ProofPhaseRestore {
-		step = 2
-	}
-	return playerclaim.Instructions{
-		Kind: playerclaim.InventorySwapSequence, Phase: phase, Step: step, TotalSteps: 2,
-		Pairs: pairs, SnapshotAt: snapshotAt.UTC(),
-	}
-}
-
-func matchesClaimCycle(stacks, sequence []savesidecar.ClaimStack) bool {
-	if len(sequence) != claimCycleSlots {
-		return false
-	}
-	for index, original := range sequence {
-		want := sequence[len(sequence)-1]
-		if index > 0 {
-			want = sequence[index-1]
-		}
-		current, ok := claimStackAt(stacks, original.Slot)
-		if !ok || !sameStack(current, want) {
-			return false
-		}
-	}
-	return true
-}
-
-func matchesClaimBaseline(stacks, sequence []savesidecar.ClaimStack) bool {
-	if len(sequence) != claimCycleSlots {
-		return false
-	}
-	for _, original := range sequence {
-		current, ok := claimStackAt(stacks, original.Slot)
-		if !ok || !sameStack(current, original) {
-			return false
-		}
-	}
-	return true
-}
-
-func claimStackAt(stacks []savesidecar.ClaimStack, slot uint32) (savesidecar.ClaimStack, bool) {
-	for _, stack := range stacks {
-		if stack.Slot == slot {
-			return stack, true
-		}
-	}
-	return savesidecar.ClaimStack{}, false
-}
-
-func sameStack(left, right savesidecar.ClaimStack) bool {
-	return left.ItemID == right.ItemID && left.Count == right.Count && left.DynamicItemID == right.DynamicItemID
 }
 
 func nonNegativeInt64(value *int64) *int64 {

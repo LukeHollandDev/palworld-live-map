@@ -17,28 +17,20 @@ inventory, equipment, food, or party slots. Dropped-item and key-item containers
 are excluded. A wrong submission
 consumes the challenge, and existing per-client and global limits bound guessing and private
 decoder work. Correct option indexes, counts, dynamic instance IDs, raw item IDs, raw
-save identifiers, proof evidence, completion state keys, and the installation
-secret must never be returned by an API or written to logs. Challenges and
-sessions are bounded and stored hash-at-rest; sessions use HttpOnly,
-SameSite=Strict cookies (`Secure` under HTTPS).
-
-The reversible inventory transition remains only as a fallback for saves that
-cannot produce a safe quiz. For reload recovery, the browser may retain only
-its validated slot pairs, proof phase, and advisory per-swap progress in
-`sessionStorage`; bearer tokens, player identities, quiz questions or answers,
-item data, and save progress must never be persisted there. That recovery record
-is cleared only after verified completion or explicit recovery acknowledgement.
+save identifiers, proof evidence, and completion state keys must never be
+returned by an API or written to logs. Challenges and
+sessions are bounded and stored hash-at-rest. The browser receives a random
+session bearer after a correct answer and keeps it only in page memory; it is
+not persisted in cookies, browser storage, or URLs. Reloading requires another
+check. If no supported group has three distinct choices, connection is refused
+until the character changes that saved inventory, equipment, food, or party state.
 
 Enabling claims does not change the existing public player endpoints: their
 online and offline rosters, saved positions, levels, guild relationships,
 last-seen values, and aggregate progression remain public. Only the new exact
 per-landmark completion response is authenticated, self-only, no-store, and
-projects private save keys to already-public catalogue IDs. Configure the exact browser-facing HTTP or HTTPS
-origin. HTTPS is strongly recommended on public or untrusted networks because
-HTTP cannot prevent interception of a player's session and self-private
-completion progress. HTTP uses a separate non-`Secure` cookie; it does not make
-raw save identifiers, inventory contents, or progress available through public
-endpoints. Exact-origin validation, CSRF checks, self-only routes, and no-store
-responses remain enforced in both modes. Trust forwarding headers only from
-explicitly configured proxy CIDRs, apply edge request limits, and keep the save
-mount and secret file read-only to the container.
+projects private save keys to already-public catalogue IDs. HTTP and raw-IP
+deployments are supported without origin configuration. HTTPS remains strongly
+recommended on public or untrusted networks because HTTP cannot prevent bearer
+or completion-response interception. Keep the save mount read-only and apply
+edge request limits where the map is publicly reachable.

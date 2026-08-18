@@ -86,7 +86,18 @@ describe('authenticated completion overlay', () => {
             saveEnabled: true,
             saveAvailable: true,
             saveStale: false,
-            players: []
+            players: [
+              {
+                id: 'claimed-player',
+                kind: 'players',
+                name: 'Claimed',
+                x: 0,
+                y: 0,
+                map: 'palpagos',
+                online: false,
+                level: 50
+              }
+            ]
           })
         }
         if (path === '/api/objects') {
@@ -100,10 +111,23 @@ describe('authenticated completion overlay', () => {
             objects: []
           })
         }
-        if (path === '/api/me')
+        if (path === '/api/player-claims')
+          return json(
+            {
+              status: 'ready',
+              challengeToken: 'challenge-token',
+              expiresAt: new Date(Date.now() + 60_000).toISOString(),
+              instructions: {
+                kind: 'inventory_quiz',
+                questions: [{ id: 'q1', prompt: 'What was equipped?', options: ['A', 'B', 'C'], canCycle: false }]
+              }
+            },
+            201
+          )
+        if (path === '/api/player-claims/verify')
           return json({
-            authenticated: true,
-            playerId: 'claimed-player',
+            status: 'verified',
+            sessionToken: 'session-token',
             idleExpiresAt: new Date(Date.now() + 60 * 60_000).toISOString(),
             absoluteExpiresAt: new Date(Date.now() + 2 * 60 * 60_000).toISOString()
           })
@@ -133,15 +157,18 @@ describe('authenticated completion overlay', () => {
     const explorer = await screen.findByRole('complementary', { name: 'Map filters' })
     await user.click(screen.getByRole('button', { name: 'My Progress' }))
     const progressPanel = await screen.findByRole('complementary', { name: 'My Progress' })
+    await user.click(within(progressPanel).getByRole('button', { name: 'This is me' }))
+    await user.selectOptions(await within(progressPanel).findByLabelText('What was equipped?'), '1')
+    await user.click(within(progressPanel).getByRole('button', { name: 'Connect character' }))
+    expect(await within(progressPanel).findByText(/Save synced ·/)).toBeVisible()
     expect(within(progressPanel).getByRole('progressbar', { name: 'Palpagos Islands completion' })).toHaveAttribute(
       'aria-valuenow',
       '3'
     )
-    expect(await within(progressPanel).findByText(/Save synced ·/)).toBeVisible()
     expect(within(progressPanel).getByText('Breakdown')).toBeVisible()
     expect(within(progressPanel).getByText('Fast Travel')).toBeVisible()
     expect(within(progressPanel).getByText('Save + manual')).toBeVisible()
-    expect(within(progressPanel).getByRole('heading', { name: 'Connected private save' })).toBeVisible()
+    expect(within(progressPanel).getByRole('heading', { name: 'Connected save' })).toBeVisible()
 
     await user.click(within(explorer).getByRole('button', { name: 'Expand Waypoints section' }))
     await user.click(within(explorer).getByRole('button', { name: 'Expand Journals section' }))
@@ -179,8 +206,8 @@ describe('authenticated completion overlay', () => {
     expect(stored).not.toContain('private-catalogue-hash')
     expect(stored).not.toContain(snapshotAt)
     expect(requests.find((request) => request.path === '/api/me/progress')?.init).toMatchObject({
-      credentials: 'same-origin',
-      cache: 'no-store'
+      cache: 'no-store',
+      headers: { Authorization: 'Bearer session-token' }
     })
   })
 })

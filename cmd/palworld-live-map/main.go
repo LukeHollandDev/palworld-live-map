@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"crypto/rand"
 	"errors"
 	"flag"
 	"fmt"
@@ -50,15 +51,7 @@ func main() {
 		roster = demo
 		logger.Info("demo mode enabled; no Palworld server will be contacted")
 	} else {
-		var client *palworld.Client
-		var clientErr error
-		if cfg.PlayerClaimsEnabled {
-			client, clientErr = palworld.NewClientWithPublicIdentitySecret(
-				cfg.RESTURL, cfg.AdminPassword, cfg.UpstreamTimeout, cfg.WorldTimeout, cfg.PlayerClaimsSecret[:],
-			)
-		} else {
-			client, clientErr = palworld.NewClient(cfg.RESTURL, cfg.AdminPassword, cfg.UpstreamTimeout, cfg.WorldTimeout)
-		}
+		client, clientErr := palworld.NewClient(cfg.RESTURL, cfg.AdminPassword, cfg.UpstreamTimeout, cfg.WorldTimeout)
 		if clientErr != nil {
 			logger.Error("Palworld client configuration error", "error", clientErr)
 			os.Exit(1)
@@ -76,8 +69,13 @@ func main() {
 				ProjectGuildKey: client.PublicGuildKey,
 			}
 			if cfg.PlayerClaimsEnabled {
+				var claimSecret [32]byte
+				if _, err := rand.Read(claimSecret[:]); err != nil {
+					logger.Error("player claim setup failed", "error", "secure randomness is unavailable")
+					os.Exit(1)
+				}
 				rosterOptions.ClaimReader = reader
-				rosterOptions.ClaimSecret = cfg.PlayerClaimsSecret[:]
+				rosterOptions.ClaimSecret = claimSecret[:]
 			}
 			rosterSource, rosterErr := saveroster.New(rosterOptions)
 			if rosterErr != nil {

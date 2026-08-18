@@ -12,7 +12,6 @@ import (
 	"math"
 	"mime"
 	"net/http"
-	"net/netip"
 	"net/url"
 	"path"
 	"path/filepath"
@@ -58,13 +57,10 @@ type Server struct {
 }
 
 type serverSettings struct {
-	pollInterval               time.Duration
-	worldPollInterval          time.Duration
-	worldDataEnabled           bool
-	playerClaimsEnabled        bool
-	playerClaimsOrigin         string
-	playerClaimsHTTP           bool
-	playerClaimsTrustedProxies []netip.Prefix
+	pollInterval        time.Duration
+	worldPollInterval   time.Duration
+	worldDataEnabled    bool
+	playerClaimsEnabled bool
 }
 
 type mapFile struct {
@@ -180,9 +176,6 @@ func NewWithClaims(cfg config.Config, source snapshotSource, claims *playerclaim
 		settings: serverSettings{
 			pollInterval: cfg.PollInterval, worldPollInterval: cfg.WorldPollInterval,
 			worldDataEnabled: cfg.WorldDataEnabled, playerClaimsEnabled: cfg.PlayerClaimsEnabled,
-			playerClaimsOrigin:         cfg.PlayerClaimsOrigin,
-			playerClaimsHTTP:           cfg.PlayerClaimsHTTP,
-			playerClaimsTrustedProxies: append([]netip.Prefix{}, cfg.PlayerClaimsTrustedProxies...),
 		},
 		source: source, assets: webAssets, maps: maps, mapFiles: mapFiles, layers: layers,
 		landmarks: landmarkCatalogue.Locations, landmarkCatalogue: landmarkCatalogue.Metadata,

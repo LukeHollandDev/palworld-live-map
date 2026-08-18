@@ -1,17 +1,12 @@
 package server
 
 import (
-	"bytes"
 	"context"
-	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"net/http"
 	"net/http/httptest"
-	"net/netip"
-	"reflect"
 	"strings"
-	"sync"
 	"testing"
 	"time"
 
@@ -19,1244 +14,190 @@ import (
 	"github.com/LukeHollandDev/palworld-live-map/internal/playerclaim"
 )
 
-const claimTestOrigin = "https://map.example.test"
+type claimTestProver struct{ prepareErr error }
 
-var claimTestNow = time.Date(2026, time.August, 15, 12, 0, 0, 0, time.UTC)
-
-type claimHTTPClock struct {
-	mu  sync.Mutex
-	now time.Time
+func claimTestInstructions(id string) playerclaim.Instructions {
+	return playerclaim.Instructions{Kind: playerclaim.InventoryQuiz, SnapshotAt: time.Unix(100, 0), Questions: []playerclaim.QuizQuestion{{
+		ID: id, Prompt: "What was equipped?", Options: []string{"A", "B", "C"}, CanCycle: true,
+	}}}
 }
 
-func (c *claimHTTPClock) Now() time.Time {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	return c.now
-}
-
-func (c *claimHTTPClock) Advance(delta time.Duration) {
-	c.mu.Lock()
-	c.now = c.now.Add(delta)
-	c.mu.Unlock()
-}
-
-type claimHTTPProver struct {
-	mu sync.Mutex
-
-	prepareErr          error
-	prepareInstructions playerclaim.Instructions
-	verifySteps         []claimHTTPVerifyStep
-	progress            playerclaim.PrivateProgress
-	progressErr         error
-
-	prepareCalls int
-	verifyCalls  int
-	cycleCalls   int
-	lastTarget   string
-	lastSelector uint64
-	lastAnswers  []playerclaim.QuizAnswer
-	lastQuestion string
-}
-
-type claimHTTPVerifyStep struct {
-	err          error
-	instructions playerclaim.Instructions
-}
-
-type mutableClaimSnapshotSource struct {
-	revision uint64
-	players  palworld.PlayerSnapshot
-}
-
-func (s *mutableClaimSnapshotSource) Snapshot() palworld.Snapshot {
-	return palworld.Snapshot{Players: append([]palworld.Player{}, s.players.Players...), Objects: []palworld.WorldObject{}}
-}
-
-func (s *mutableClaimSnapshotSource) PlayerSnapshotSince(revision uint64) (palworld.PlayerSnapshot, uint64, bool) {
-	if revision == s.revision {
-		return palworld.PlayerSnapshot{}, s.revision, false
-	}
-	value := s.players
-	value.Players = append([]palworld.Player{}, value.Players...)
-	return value, s.revision, true
-}
-
-func (s *mutableClaimSnapshotSource) ObjectSnapshotSince(revision uint64) (palworld.ObjectSnapshot, uint64, bool) {
-	if revision == 1 {
-		return palworld.ObjectSnapshot{}, 1, false
-	}
-	return palworld.ObjectSnapshot{Objects: []palworld.WorldObject{}}, 1, true
-}
-
-func (p *claimHTTPProver) Prepare(_ context.Context, target string, selector uint64) (playerclaim.Prepared, error) {
-	p.mu.Lock()
-	defer p.mu.Unlock()
-	p.prepareCalls++
-	p.lastTarget = target
-	p.lastSelector = selector
+func (p *claimTestProver) Prepare(_ context.Context, playerID string, _ uint64) (playerclaim.Prepared, error) {
 	if p.prepareErr != nil {
 		return playerclaim.Prepared{}, p.prepareErr
 	}
-	return playerclaim.Prepared{
-		Subject:        "private-world-subject:" + target,
-		PublicPlayerID: target,
-		Instructions:   p.prepareInstructions,
-		Evidence: struct {
-			Secret string
-		}{Secret: "never disclose this evidence"},
-	}, nil
+	return playerclaim.Prepared{Subject: "private-subject", PublicPlayerID: playerID, Instructions: claimTestInstructions("q1")}, nil
 }
 
-func (p *claimHTTPProver) Verify(_ context.Context, prepared *playerclaim.Prepared) error {
-	p.mu.Lock()
-	defer p.mu.Unlock()
-	p.verifyCalls++
-	if prepared != nil {
-		p.lastAnswers = append([]playerclaim.QuizAnswer(nil), prepared.Answers...)
-	}
-	if len(p.verifySteps) == 0 {
-		return nil
-	}
-	step := p.verifySteps[0]
-	p.verifySteps = p.verifySteps[1:]
-	if step.instructions.Kind != "" && prepared != nil {
-		prepared.Instructions = step.instructions
-	}
-	return step.err
-}
-
-func (p *claimHTTPProver) CycleQuestion(_ context.Context, prepared *playerclaim.Prepared, questionID string) error {
-	p.mu.Lock()
-	defer p.mu.Unlock()
-	p.cycleCalls++
-	p.lastQuestion = questionID
-	if prepared == nil || prepared.Instructions.Kind != playerclaim.InventoryQuiz || questionID != "q1" {
-		return playerclaim.ErrNoAlternateQuestion
-	}
-	prepared.Instructions.Questions = append([]playerclaim.QuizQuestion(nil), prepared.Instructions.Questions...)
-	prepared.Instructions.Questions[0] = playerclaim.QuizQuestion{
-		ID: "q4", Prompt: "Replacement item?", Options: []string{"Q", "R", "S", "T", "U", "V", "W", "X"},
+func (*claimTestProver) Verify(_ context.Context, prepared *playerclaim.Prepared) error {
+	if len(prepared.Answers) != 1 || prepared.Answers[0].QuestionID != "q1" || prepared.Answers[0].Option != 1 {
+		return playerclaim.ErrIncorrectAnswer
 	}
 	return nil
 }
 
-func (p *claimHTTPProver) Progress(_ context.Context, subject string) (playerclaim.PrivateProgress, error) {
-	p.mu.Lock()
-	defer p.mu.Unlock()
-	if !strings.HasPrefix(subject, "private-world-subject:") {
-		return playerclaim.PrivateProgress{}, playerclaim.ErrUnavailable
+func (*claimTestProver) CycleQuestion(_ context.Context, prepared *playerclaim.Prepared, questionID string) error {
+	if questionID != "q1" {
+		return playerclaim.ErrNoAlternateQuestion
 	}
-	if p.progressErr != nil {
-		return playerclaim.PrivateProgress{}, p.progressErr
-	}
-	return p.progress, nil
+	prepared.Instructions = claimTestInstructions("q2")
+	return nil
 }
 
-func (p *claimHTTPProver) calls() (prepare, verify int) {
-	p.mu.Lock()
-	defer p.mu.Unlock()
-	return p.prepareCalls, p.verifyCalls
+func (*claimTestProver) Progress(context.Context, string) (playerclaim.PrivateProgress, error) {
+	return playerclaim.PrivateProgress{SnapshotAt: time.Unix(200, 0)}, nil
 }
 
-func claimHTTPSequenceInstructions(phase playerclaim.ProofPhase) playerclaim.Instructions {
-	step := 1
-	snapshotAt := claimTestNow.Add(time.Minute)
-	pairs := []playerclaim.SlotPair{
-		{SlotA: 2, SlotB: 7}, {SlotA: 2, SlotB: 8}, {SlotA: 2, SlotB: 9}, {SlotA: 2, SlotB: 10},
-		{SlotA: 2, SlotB: 11}, {SlotA: 2, SlotB: 12}, {SlotA: 2, SlotB: 13},
-	}
-	if phase == playerclaim.ProofPhaseRestore {
-		step = 2
-		snapshotAt = claimTestNow.Add(2 * time.Minute)
-		pairs = []playerclaim.SlotPair{
-			{SlotA: 2, SlotB: 13}, {SlotA: 2, SlotB: 12}, {SlotA: 2, SlotB: 11}, {SlotA: 2, SlotB: 10},
-			{SlotA: 2, SlotB: 9}, {SlotA: 2, SlotB: 8}, {SlotA: 2, SlotB: 7},
-		}
-	}
-	return playerclaim.Instructions{
-		Kind: playerclaim.InventorySwapSequence, Phase: phase, Step: step, TotalSteps: 2,
-		Pairs:      pairs,
-		SnapshotAt: snapshotAt,
-	}
+type claimTestSource struct{ players []palworld.Player }
+
+func (s claimTestSource) Snapshot() palworld.Snapshot { return palworld.Snapshot{Players: s.players} }
+func (s claimTestSource) PlayerSnapshotSince(uint64) (palworld.PlayerSnapshot, uint64, bool) {
+	return palworld.PlayerSnapshot{Players: s.players}, 1, true
+}
+func (claimTestSource) ObjectSnapshotSince(uint64) (palworld.ObjectSnapshot, uint64, bool) {
+	return palworld.ObjectSnapshot{}, 1, true
 }
 
-func newClaimHTTPServer(t *testing.T, prover *claimHTTPProver, clock *claimHTTPClock) (*Server, *playerclaim.Service) {
+func newQuestionClaimServer(t *testing.T, prover *claimTestProver) *Server {
 	t.Helper()
 	if prover == nil {
-		prover = &claimHTTPProver{}
+		prover = &claimTestProver{}
 	}
-	if clock == nil {
-		clock = &claimHTTPClock{now: claimTestNow}
-	}
-	claims, err := playerclaim.NewService(prover, playerclaim.Options{Now: clock.Now})
+	service, err := playerclaim.NewService(prover, playerclaim.Options{})
 	if err != nil {
-		t.Fatalf("playerclaim.NewService() error = %v", err)
+		t.Fatal(err)
 	}
 	cfg := testConfig()
 	cfg.PlayerClaimsEnabled = true
-	cfg.PlayerClaimsOrigin = claimTestOrigin
-	for index := range cfg.PlayerClaimsSecret {
-		cfg.PlayerClaimsSecret[index] = 0xab
-	}
-	server, err := NewWithClaims(cfg, fixedSnapshot{}, claims)
+	source := claimTestSource{players: []palworld.Player{{ID: "online", Name: "Online", Online: true}, {ID: "offline", Name: "Offline", Online: false}}}
+	server, err := NewWithClaims(cfg, source, service)
 	if err != nil {
-		t.Fatalf("NewWithClaims() error = %v", err)
+		t.Fatal(err)
 	}
-	server.source = fixedSnapshot{value: palworld.Snapshot{Players: claimTestLivePlayers()}}
-	return server, claims
+	return server
 }
 
-func claimTestLivePlayers() []palworld.Player {
-	ids := []string{"public-player", "session-owner", "different-player"}
-	for _, prefix := range []string{"public-player-", "ipv6-player-", "proxy-player-"} {
-		for index := 1; index <= 7; index++ {
-			ids = append(ids, prefix+string(rune('0'+index)))
-		}
-	}
-	players := make([]palworld.Player, 0, len(ids))
-	for _, id := range ids {
-		players = append(players, palworld.Player{ID: id, Name: id, Online: true})
-	}
-	players = append(players, palworld.Player{ID: "offline-player", Name: "Offline", Online: false})
-	return players
-}
-
-func newClaimMutation(method, path, body string) *http.Request {
+func claimRequest(method, path, body string) *http.Request {
 	request := httptest.NewRequest(method, path, strings.NewReader(body))
-	request.Header.Set("Origin", claimTestOrigin)
-	request.Header.Set("Sec-Fetch-Site", "same-origin")
-	request.Header.Set(claimCSRFHeader, "1")
 	request.Header.Set("Content-Type", "application/json")
 	return request
 }
 
-func serveClaim(t *testing.T, server *Server, request *http.Request) *httptest.ResponseRecorder {
-	t.Helper()
+func serveClaim(server *Server, request *http.Request) *httptest.ResponseRecorder {
 	response := httptest.NewRecorder()
 	server.Handler().ServeHTTP(response, request)
 	return response
 }
 
-func startClaimHTTP(t *testing.T, server *Server, playerID string) (string, *httptest.ResponseRecorder) {
+func startQuestionClaim(t *testing.T, server *Server, playerID string) string {
 	t.Helper()
-	body, err := json.Marshal(map[string]string{"playerId": playerID})
-	if err != nil {
-		t.Fatal(err)
-	}
-	response := serveClaim(t, server, newClaimMutation(http.MethodPost, "/api/player-claims", string(body)))
+	response := serveClaim(server, claimRequest(http.MethodPost, "/api/player-claims", `{"playerId":"`+playerID+`"}`))
 	if response.Code != http.StatusCreated {
-		t.Fatalf("start claim = status %d, body %s", response.Code, response.Body.String())
+		t.Fatalf("start = %d %s", response.Code, response.Body.String())
 	}
 	var payload struct {
 		ChallengeToken string `json:"challengeToken"`
 	}
 	if err := json.Unmarshal(response.Body.Bytes(), &payload); err != nil {
-		t.Fatalf("decode start response: %v", err)
-	}
-	return payload.ChallengeToken, response
-}
-
-func verifyClaimHTTP(t *testing.T, server *Server, token string) *httptest.ResponseRecorder {
-	t.Helper()
-	body, err := json.Marshal(map[string]string{"challengeToken": token})
-	if err != nil {
 		t.Fatal(err)
 	}
-	return serveClaim(t, server, newClaimMutation(http.MethodPost, "/api/player-claims/verify", string(body)))
+	return payload.ChallengeToken
 }
 
-func claimSessionFromResponse(t *testing.T, response *httptest.ResponseRecorder) *http.Cookie {
-	t.Helper()
-	for _, cookie := range response.Result().Cookies() {
-		if cookie.Name == claimSessionCookie {
-			return cookie
-		}
-	}
-	t.Fatalf("response has no %s cookie: %v", claimSessionCookie, response.Header().Values("Set-Cookie"))
-	return nil
-}
-
-func TestHTTPClaimsUseDistinctHostOnlyCookie(t *testing.T) {
-	server, _ := newClaimHTTPServer(t, nil, nil)
-	server.settings.playerClaimsHTTP = true
-	response := httptest.NewRecorder()
-	server.setClaimCookie(response, strings.Repeat("a", 43), claimTestNow.Add(time.Hour))
-	cookies := response.Result().Cookies()
-	if len(cookies) != 1 {
-		t.Fatalf("cookies = %v", cookies)
-	}
-	cookie := cookies[0]
-	if cookie.Name != httpClaimSessionCookie || cookie.Path != "/" || cookie.Domain != "" || cookie.Secure || !cookie.HttpOnly || cookie.SameSite != http.SameSiteStrictMode {
-		t.Fatalf("HTTP claim cookie = %+v", cookie)
-	}
-	if cookie.Name == claimSessionCookie {
-		t.Fatal("HTTP claim cookie reused the HTTPS __Host- name")
+func TestQuestionClaimNeedsOnlyEnabledFlagAndWorksForOfflinePlayer(t *testing.T) {
+	server := newQuestionClaimServer(t, nil)
+	for _, playerID := range []string{"online", "offline"} {
+		t.Run(playerID, func(t *testing.T) {
+			request := claimRequest(http.MethodPost, "/api/player-claims", `{"playerId":"`+playerID+`"}`)
+			request.Header.Set("Origin", "http://unrelated.example")
+			response := serveClaim(server, request)
+			if response.Code != http.StatusCreated {
+				t.Fatalf("status = %d, body = %s", response.Code, response.Body.String())
+			}
+			if response.Header().Get("Set-Cookie") != "" {
+				t.Fatalf("unexpected cookie: %s", response.Header().Get("Set-Cookie"))
+			}
+		})
 	}
 }
 
-func assertPrivateClaimResponse(t *testing.T, response *httptest.ResponseRecorder) {
-	t.Helper()
-	cacheControl := response.Header().Get("Cache-Control")
-	if !strings.Contains(cacheControl, "private") || !strings.Contains(cacheControl, "no-store") {
-		t.Errorf("private response Cache-Control = %q, want private and no-store", cacheControl)
-	}
-	if got := response.Header().Get("Pragma"); got != "no-cache" {
-		t.Errorf("private response Pragma = %q, want no-cache", got)
-	}
-	if got := response.Header().Get("ETag"); got != "" {
-		t.Errorf("private response ETag = %q, want empty", got)
+func TestNoSuitableQuestionHasDistinctActionableCode(t *testing.T) {
+	server := newQuestionClaimServer(t, &claimTestProver{prepareErr: playerclaim.ErrNoSuitableQuestion})
+	response := serveClaim(server, claimRequest(http.MethodPost, "/api/player-claims", `{"playerId":"offline"}`))
+	if response.Code != http.StatusConflict || !strings.Contains(response.Body.String(), "no_suitable_question") {
+		t.Fatalf("response = %d %s", response.Code, response.Body.String())
 	}
 }
 
-func assertReadyClaimResponse(t *testing.T, response *httptest.ResponseRecorder, want playerclaim.Instructions) {
-	t.Helper()
-	if response.Code != http.StatusAccepted {
-		t.Fatalf("ready response = status %d, body %s", response.Code, response.Body.String())
+func TestVerifiedSessionUsesBearerHeaderAndNoCookie(t *testing.T) {
+	server := newQuestionClaimServer(t, nil)
+	token := startQuestionClaim(t, server, "offline")
+	body := `{"challengeToken":"` + token + `","answers":[{"questionId":"q1","option":1}]}`
+	verified := serveClaim(server, claimRequest(http.MethodPost, "/api/player-claims/verify", body))
+	if verified.Code != http.StatusOK {
+		t.Fatalf("verify = %d %s", verified.Code, verified.Body.String())
 	}
-	assertPrivateClaimResponse(t, response)
-	if len(response.Header().Values("Set-Cookie")) != 0 {
-		t.Fatalf("ready response set cookies: %v", response.Header().Values("Set-Cookie"))
+	if verified.Header().Get("Set-Cookie") != "" {
+		t.Fatalf("unexpected cookie: %s", verified.Header().Get("Set-Cookie"))
 	}
 	var payload struct {
-		Status       playerclaim.VerificationStatus `json:"status"`
-		Instructions *playerclaim.Instructions      `json:"instructions"`
+		SessionToken string `json:"sessionToken"`
 	}
-	if err := json.Unmarshal(response.Body.Bytes(), &payload); err != nil {
-		t.Fatal(err)
+	if err := json.Unmarshal(verified.Body.Bytes(), &payload); err != nil || payload.SessionToken == "" {
+		t.Fatalf("payload = %+v, %v", payload, err)
 	}
-	if payload.Status != playerclaim.VerificationReady || payload.Instructions == nil || !reflect.DeepEqual(*payload.Instructions, want) {
-		t.Fatalf("ready response = %+v, want instructions %+v", payload, want)
+
+	unauthorized := serveClaim(server, httptest.NewRequest(http.MethodGet, "/api/me", nil))
+	if unauthorized.Code != http.StatusUnauthorized {
+		t.Fatalf("unauthorized = %d", unauthorized.Code)
 	}
-	if len(payload.Instructions.Pairs) != 7 {
-		t.Fatalf("ready response pairs = %v, want exactly seven ordered swaps", payload.Instructions.Pairs)
+	request := httptest.NewRequest(http.MethodGet, "/api/me", nil)
+	request.Header.Set("Authorization", "Bearer "+payload.SessionToken)
+	authorized := serveClaim(server, request)
+	if authorized.Code != http.StatusOK || !strings.Contains(authorized.Body.String(), `"playerId":"offline"`) {
+		t.Fatalf("authorized = %d %s", authorized.Code, authorized.Body.String())
 	}
-	var raw map[string]json.RawMessage
-	if err := json.Unmarshal(response.Body.Bytes(), &raw); err != nil {
-		t.Fatal(err)
+
+	logout := claimRequest(http.MethodPost, "/api/logout", `{}`)
+	logout.Header.Set("Authorization", "Bearer "+payload.SessionToken)
+	if response := serveClaim(server, logout); response.Code != http.StatusOK {
+		t.Fatalf("logout = %d", response.Code)
 	}
-	if len(raw) != 3 || raw["status"] == nil || raw["instructions"] == nil || raw["expiresAt"] == nil {
-		t.Fatalf("ready response fields = %v", raw)
-	}
-	var rawInstructions map[string]json.RawMessage
-	if err := json.Unmarshal(raw["instructions"], &rawInstructions); err != nil {
-		t.Fatal(err)
-	}
-	if len(rawInstructions) != 6 {
-		t.Fatalf("instruction fields = %v, want only kind, phase, step, totalSteps, pairs, and snapshotAt", rawInstructions)
-	}
-	var rawPairs []map[string]json.RawMessage
-	if err := json.Unmarshal(rawInstructions["pairs"], &rawPairs); err != nil {
-		t.Fatal(err)
-	}
-	for index, pair := range rawPairs {
-		if len(pair) != 2 || pair["slotA"] == nil || pair["slotB"] == nil {
-			t.Fatalf("pair %d fields = %v, want only slotA and slotB", index, pair)
-		}
-	}
-	for _, privateValue := range []string{"private-world-subject", "never disclose", "subject", "evidence"} {
-		if strings.Contains(strings.ToLower(response.Body.String()), strings.ToLower(privateValue)) {
-			t.Errorf("ready response exposes %q: %s", privateValue, response.Body.String())
-		}
+	if response := serveClaim(server, request); response.Code != http.StatusUnauthorized {
+		t.Fatalf("after logout = %d", response.Code)
 	}
 }
 
-func assertPendingClaimReplay(t *testing.T, response *httptest.ResponseRecorder, want playerclaim.Instructions) {
-	t.Helper()
-	if response.Code != http.StatusAccepted {
-		t.Fatalf("pending replay response = status %d, body %s", response.Code, response.Body.String())
+func TestIncorrectAnswerConsumesQuestion(t *testing.T) {
+	server := newQuestionClaimServer(t, nil)
+	token := startQuestionClaim(t, server, "online")
+	body := `{"challengeToken":"` + token + `","answers":[{"questionId":"q1","option":0}]}`
+	response := serveClaim(server, claimRequest(http.MethodPost, "/api/player-claims/verify", body))
+	if response.Code != http.StatusUnauthorized || !strings.Contains(response.Body.String(), "verification_failed") {
+		t.Fatalf("response = %d %s", response.Code, response.Body.String())
 	}
-	assertPrivateClaimResponse(t, response)
-	if len(response.Header().Values("Set-Cookie")) != 0 {
-		t.Fatalf("pending replay response set cookies: %v", response.Header().Values("Set-Cookie"))
-	}
-	var payload struct {
-		Status       playerclaim.VerificationStatus `json:"status"`
-		Instructions *playerclaim.Instructions      `json:"instructions"`
-		ExpiresAt    time.Time                      `json:"expiresAt"`
-	}
-	if err := json.Unmarshal(response.Body.Bytes(), &payload); err != nil {
-		t.Fatal(err)
-	}
-	if payload.Status != playerclaim.VerificationPending || payload.Instructions == nil ||
-		!reflect.DeepEqual(*payload.Instructions, want) || payload.ExpiresAt.IsZero() {
-		t.Fatalf("pending replay response = %+v, want current instructions %+v", payload, want)
-	}
-	for _, privateValue := range []string{"private-world-subject", "never disclose", "subject", "evidence"} {
-		if strings.Contains(strings.ToLower(response.Body.String()), strings.ToLower(privateValue)) {
-			t.Errorf("pending replay response exposes %q: %s", privateValue, response.Body.String())
-		}
+	response = serveClaim(server, claimRequest(http.MethodPost, "/api/player-claims/verify", body))
+	if response.Code != http.StatusUnauthorized || !strings.Contains(response.Body.String(), "invalid_or_expired_challenge") {
+		t.Fatalf("second = %d %s", response.Code, response.Body.String())
 	}
 }
 
-func TestPlayerClaimsConfigurationAndServiceMustMatch(t *testing.T) {
-	prover := &claimHTTPProver{}
-	claims, err := playerclaim.NewService(prover, playerclaim.Options{})
-	if err != nil {
-		t.Fatal(err)
-	}
-
+func TestClaimsConfigurationMustMatchService(t *testing.T) {
+	service, _ := playerclaim.NewService(&claimTestProver{}, playerclaim.Options{})
 	disabled := testConfig()
-	if _, err := NewWithClaims(disabled, fixedSnapshot{}, claims); err == nil {
-		t.Fatal("NewWithClaims() accepted a service while player claims were disabled")
+	if _, err := NewWithClaims(disabled, fixedSnapshot{}, service); err == nil {
+		t.Fatal("accepted service while disabled")
 	}
-
 	enabled := testConfig()
 	enabled.PlayerClaimsEnabled = true
-	enabled.PlayerClaimsOrigin = claimTestOrigin
 	if _, err := NewWithClaims(enabled, fixedSnapshot{}, nil); err == nil {
-		t.Fatal("NewWithClaims() accepted enabled player claims without a service")
-	}
-	if _, err := New(enabled, fixedSnapshot{}); err == nil {
-		t.Fatal("New() accepted enabled player claims without a service")
+		t.Fatal("accepted enabled claims without service")
 	}
 }
 
-func TestPublicConfigExposesOnlyPlayerClaimCapability(t *testing.T) {
-	server, _ := newClaimHTTPServer(t, nil, nil)
-	response := serveClaim(t, server, httptest.NewRequest(http.MethodGet, "/api/config", nil))
-	if response.Code != http.StatusOK {
-		t.Fatalf("config = status %d, body %s", response.Code, response.Body.String())
-	}
-	var payload map[string]json.RawMessage
-	if err := json.Unmarshal(response.Body.Bytes(), &payload); err != nil {
-		t.Fatal(err)
-	}
-	if got := string(payload["playerClaimsEnabled"]); got != "true" {
-		t.Fatalf("playerClaimsEnabled = %s, want true", got)
-	}
-	for _, forbiddenKey := range []string{"playerClaimsOrigin", "playerClaimsSecret", "claimsOrigin", "claimsSecret"} {
-		if _, exists := payload[forbiddenKey]; exists {
-			t.Errorf("public config exposes private key %q", forbiddenKey)
-		}
-	}
-	body := response.Body.String()
-	for _, forbiddenValue := range []string{claimTestOrigin, strings.Repeat("ab", 32), "admin-secret-never-expose"} {
-		if strings.Contains(body, forbiddenValue) {
-			t.Errorf("public config exposes private value %q: %s", forbiddenValue, body)
-		}
-	}
-}
-
-func TestClaimsModeDoesNotChangeExistingPublicPlayerFeatures(t *testing.T) {
-	captures := int64(42)
-	paldeck := 150
-	lastSeen := claimTestNow.Add(-time.Hour)
-	server, _ := newClaimHTTPServer(t, nil, nil)
-	server.source = fixedSnapshot{value: palworld.Snapshot{
-		SaveEnabled: true, SaveAvailable: true, SaveStale: true, SaveLastError: "private save failure",
-		SaveUpdatedAt: lastSeen, SaveSnapshotAt: lastSeen,
-		Players: []palworld.Player{
-			{ID: "online", Name: "Online", Online: true, GuildKey: "guild:online", GuildName: "Online Guild", Level: 10, X: 1, Y: 2, Map: "palpagos", CaptureTotal: &captures, PaldeckUnlocked: &paldeck, LastSeenAt: lastSeen},
-			{ID: "offline", Name: "Offline Save", Online: false, GuildKey: "guild:save", GuildName: "Saved Guild", Level: 60, X: 3, Y: 4, Map: "palpagos", CaptureTotal: &captures, PaldeckUnlocked: &paldeck, LastSeenAt: lastSeen},
-		},
-	}}
-	for _, endpoint := range []string{"/api/players", "/api/state"} {
-		response := serveClaim(t, server, httptest.NewRequest(http.MethodGet, endpoint, nil))
-		if response.Code != http.StatusOK {
-			t.Fatalf("%s = status %d, body %s", endpoint, response.Code, response.Body.String())
-		}
-		body := response.Body.String()
-		for _, existingPublicValue := range []string{
-			`"id":"online"`, `"id":"offline"`, "Offline Save", "Saved Guild", `"level":60`,
-			`"captureTotal":42`, `"paldeckUnlocked":150`, `"lastSeenAt":`,
-		} {
-			if !strings.Contains(body, existingPublicValue) {
-				t.Errorf("%s omitted existing public value %q: %s", endpoint, existingPublicValue, body)
-			}
-		}
-		if endpoint == "/api/state" {
-			for _, saveStatus := range []string{`"saveAvailable":true`, `"saveEnabled":true`, "private save failure"} {
-				if !strings.Contains(body, saveStatus) {
-					t.Errorf("%s omitted existing save status %q: %s", endpoint, saveStatus, body)
-				}
-			}
-		}
-	}
-}
-
-func TestExistingPublicSaveChangeStillChangesPlayersETagInClaimsMode(t *testing.T) {
-	firstCaptures, secondCaptures := int64(10), int64(11)
-	source := &mutableClaimSnapshotSource{revision: 1, players: palworld.PlayerSnapshot{
-		Players:     []palworld.Player{{ID: "online", Name: "Online", Online: true, X: 1, Y: 2, Map: "palpagos", CaptureTotal: &firstCaptures}},
-		SaveEnabled: true, SaveAvailable: true, SaveUpdatedAt: claimTestNow,
-	}}
-	server, _ := newClaimHTTPServer(t, nil, nil)
-	server.source = source
-	first := serveClaim(t, server, httptest.NewRequest(http.MethodGet, "/api/players", nil))
-	if first.Code != http.StatusOK || first.Header().Get("ETag") == "" {
-		t.Fatalf("first players = status %d, etag %q, body %s", first.Code, first.Header().Get("ETag"), first.Body.String())
-	}
-	etag := first.Header().Get("ETag")
-	source.revision = 2
-	source.players.Players[0].CaptureTotal = &secondCaptures
-	source.players.SaveUpdatedAt = claimTestNow.Add(time.Minute)
-	request := httptest.NewRequest(http.MethodGet, "/api/players", nil)
-	request.Header.Set("If-None-Match", etag)
-	second := serveClaim(t, server, request)
-	if second.Code != http.StatusOK || second.Header().Get("ETag") == etag || !strings.Contains(second.Body.String(), `"captureTotal":11`) {
-		t.Fatalf("public save update = status %d, etag %q, body %s", second.Code, second.Header().Get("ETag"), second.Body.String())
-	}
-}
-
-func TestClaimMutationsRequireStrictBrowserAndJSONHeaders(t *testing.T) {
-	tests := []struct {
-		name       string
-		mutate     func(*http.Request)
-		wantStatus int
-	}{
-		{name: "missing origin", mutate: func(r *http.Request) { r.Header.Del("Origin") }, wantStatus: http.StatusForbidden},
-		{name: "wrong origin", mutate: func(r *http.Request) { r.Header.Set("Origin", "https://attacker.example") }, wantStatus: http.StatusForbidden},
-		{name: "uppercase equivalent origin", mutate: func(r *http.Request) { r.Header.Set("Origin", "https://MAP.example.test") }, wantStatus: http.StatusForbidden},
-		{name: "default port equivalent origin", mutate: func(r *http.Request) { r.Header.Set("Origin", claimTestOrigin+":443") }, wantStatus: http.StatusForbidden},
-		{name: "missing fetch metadata", mutate: func(r *http.Request) { r.Header.Del("Sec-Fetch-Site") }, wantStatus: http.StatusForbidden},
-		{name: "same site is not same origin", mutate: func(r *http.Request) { r.Header.Set("Sec-Fetch-Site", "same-site") }, wantStatus: http.StatusForbidden},
-		{name: "cross site", mutate: func(r *http.Request) { r.Header.Set("Sec-Fetch-Site", "cross-site") }, wantStatus: http.StatusForbidden},
-		{name: "missing csrf header", mutate: func(r *http.Request) { r.Header.Del(claimCSRFHeader) }, wantStatus: http.StatusForbidden},
-		{name: "wrong csrf header", mutate: func(r *http.Request) { r.Header.Set(claimCSRFHeader, "true") }, wantStatus: http.StatusForbidden},
-		{name: "missing content type", mutate: func(r *http.Request) { r.Header.Del("Content-Type") }, wantStatus: http.StatusUnsupportedMediaType},
-		{name: "non json content type", mutate: func(r *http.Request) { r.Header.Set("Content-Type", "text/plain") }, wantStatus: http.StatusUnsupportedMediaType},
-	}
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			prover := &claimHTTPProver{}
-			server, _ := newClaimHTTPServer(t, prover, nil)
-			request := newClaimMutation(http.MethodPost, "/api/player-claims", `{"playerId":"public-player"}`)
-			test.mutate(request)
-			response := serveClaim(t, server, request)
-			if response.Code != test.wantStatus || !strings.Contains(response.Body.String(), `"error":`) {
-				t.Fatalf("response = status %d, body %s; want %d", response.Code, response.Body.String(), test.wantStatus)
-			}
-			if prepare, verify := prover.calls(); prepare != 0 || verify != 0 {
-				t.Fatalf("rejected request reached prover: prepare=%d verify=%d", prepare, verify)
-			}
-			assertPrivateClaimResponse(t, response)
-		})
-	}
-
-	t.Run("json content type parameters are accepted", func(t *testing.T) {
-		server, _ := newClaimHTTPServer(t, nil, nil)
-		request := newClaimMutation(http.MethodPost, "/api/player-claims", `{"playerId":"public-player"}`)
-		request.Header.Set("Content-Type", "application/json; charset=utf-8")
-		response := serveClaim(t, server, request)
-		if response.Code != http.StatusCreated {
-			t.Fatalf("response = status %d, body %s", response.Code, response.Body.String())
-		}
-	})
-
-	t.Run("canonical non-default port origin is accepted exactly", func(t *testing.T) {
-		server, _ := newClaimHTTPServer(t, nil, nil)
-		server.settings.playerClaimsOrigin = claimTestOrigin + ":8443"
-		request := newClaimMutation(http.MethodPost, "/api/player-claims", `{"playerId":"public-player"}`)
-		request.Header.Set("Origin", claimTestOrigin+":8443")
-		response := serveClaim(t, server, request)
-		if response.Code != http.StatusCreated {
-			t.Fatalf("response = status %d, body %s", response.Code, response.Body.String())
-		}
-	})
-}
-
-func TestHTTPClaimMutationsUseTheBrowserFacingSameOrigin(t *testing.T) {
-	tests := []struct {
-		name       string
-		requestURL string
-		origin     string
-		fetchSite  string
-		wantStatus int
-	}{
-		{name: "configured address", requestURL: "http://127.0.0.1:8080/api/player-claims", origin: "http://127.0.0.1:8080", fetchSite: "same-origin", wantStatus: http.StatusCreated},
-		{name: "local hostname alias", requestURL: "http://localhost:8080/api/player-claims", origin: "http://localhost:8080", fetchSite: "same-origin", wantStatus: http.StatusCreated},
-		{name: "missing fetch metadata", requestURL: "http://localhost:8080/api/player-claims", origin: "http://localhost:8080", wantStatus: http.StatusCreated},
-		{name: "different request origin", requestURL: "http://localhost:8080/api/player-claims", origin: "http://127.0.0.1:8080", fetchSite: "same-origin", wantStatus: http.StatusForbidden},
-		{name: "cross site remains rejected", requestURL: "http://localhost:8080/api/player-claims", origin: "http://localhost:8080", fetchSite: "cross-site", wantStatus: http.StatusForbidden},
-	}
-
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			server, _ := newClaimHTTPServer(t, &claimHTTPProver{}, nil)
-			server.settings.playerClaimsOrigin = "http://127.0.0.1:8080"
-			request := httptest.NewRequest(http.MethodPost, test.requestURL, strings.NewReader(`{"playerId":"public-player"}`))
-			request.Header.Set("Origin", test.origin)
-			if test.fetchSite != "" {
-				request.Header.Set("Sec-Fetch-Site", test.fetchSite)
-			}
-			request.Header.Set(claimCSRFHeader, "1")
-			request.Header.Set("Content-Type", "application/json")
-
-			response := serveClaim(t, server, request)
-			if response.Code != test.wantStatus {
-				t.Fatalf("response = status %d, body %s; want %d", response.Code, response.Body.String(), test.wantStatus)
-			}
-		})
-	}
-}
-
-func TestClaimStartRejectsMalformedAndAmbiguousBodies(t *testing.T) {
-	tests := []struct {
-		name string
-		body string
-	}{
-		{name: "empty", body: ""},
-		{name: "truncated", body: `{"playerId":`},
-		{name: "empty object", body: `{}`},
-		{name: "empty player", body: `{"playerId":""}`},
-		{name: "whitespace player", body: `{"playerId":"  "}`},
-		{name: "padded player", body: `{"playerId":" public-player"}`},
-		{name: "control character", body: `{"playerId":"public\u0000player"}`},
-		{name: "unknown field", body: `{"playerId":"public-player","subject":"stolen"}`},
-		{name: "trailing document", body: `{"playerId":"public-player"} {"playerId":"second"}`},
-		{name: "wrong shape", body: `[]`},
-		{name: "player id too long", body: `{"playerId":"` + strings.Repeat("a", maxClaimPlayerID+1) + `"}`},
-		{name: "body too large", body: `{"playerId":"` + strings.Repeat("a", maxClaimBody) + `"}`},
-	}
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			prover := &claimHTTPProver{}
-			server, _ := newClaimHTTPServer(t, prover, nil)
-			response := serveClaim(t, server, newClaimMutation(http.MethodPost, "/api/player-claims", test.body))
-			if response.Code != http.StatusBadRequest || response.Body.String() != "{\"error\":\"invalid_request\"}\n" {
-				t.Fatalf("response = status %d, body %s", response.Code, response.Body.String())
-			}
-			if prepare, _ := prover.calls(); prepare != 0 {
-				t.Fatalf("invalid body reached prover %d times", prepare)
-			}
-			assertPrivateClaimResponse(t, response)
-		})
-	}
-}
-
-func TestClaimStartReturnsOnlyArmingStateAndOpaqueToken(t *testing.T) {
-	prover := &claimHTTPProver{}
-	server, _ := newClaimHTTPServer(t, prover, nil)
-	token, response := startClaimHTTP(t, server, "public-player")
-	assertPrivateClaimResponse(t, response)
-
-	decodedToken, err := base64.RawURLEncoding.DecodeString(token)
-	if err != nil || len(decodedToken) != 32 {
-		t.Fatalf("challengeToken decodes to %d bytes with error %v", len(decodedToken), err)
-	}
-	var payload map[string]json.RawMessage
-	if err := json.Unmarshal(response.Body.Bytes(), &payload); err != nil {
-		t.Fatal(err)
-	}
-	if len(payload) != 3 || payload["challengeToken"] == nil || payload["status"] == nil || payload["expiresAt"] == nil {
-		t.Fatalf("start response fields = %v", payload)
-	}
-	if string(payload["status"]) != `"arming"` {
-		t.Fatalf("start status = %s, want arming", payload["status"])
-	}
-	if payload["instructions"] != nil {
-		t.Fatalf("unarmed challenge exposed instructions: %s", payload["instructions"])
-	}
-	if len(response.Header().Values("Set-Cookie")) != 0 {
-		t.Fatalf("unarmed challenge set cookies: %v", response.Header().Values("Set-Cookie"))
-	}
-	for _, privateValue := range []string{"private-world-subject", "never disclose", "evidence", "subject"} {
-		if strings.Contains(strings.ToLower(response.Body.String()), strings.ToLower(privateValue)) {
-			t.Errorf("start response exposes %q: %s", privateValue, response.Body.String())
-		}
-	}
-}
-
-func TestUnknownClaimTargetHasGenericUnavailableResponse(t *testing.T) {
-	tests := []struct {
-		name        string
-		playerID    string
-		prepareErr  error
-		wantPrepare int
-	}{
-		{name: "unknown", playerID: "unknown-player", wantPrepare: 0},
-		{name: "live unavailable", playerID: "public-player", prepareErr: playerclaim.ErrUnavailable, wantPrepare: 1},
-		{name: "live decoder detail", playerID: "public-player", prepareErr: errors.New("private decoder detail: player does not exist"), wantPrepare: 1},
-	}
-	var wantBody string
-	for index, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			prover := &claimHTTPProver{prepareErr: test.prepareErr}
-			server, _ := newClaimHTTPServer(t, prover, nil)
-			body, err := json.Marshal(map[string]string{"playerId": test.playerID})
-			if err != nil {
-				t.Fatal(err)
-			}
-			response := serveClaim(t, server, newClaimMutation(http.MethodPost, "/api/player-claims", string(body)))
-			if response.Code != http.StatusServiceUnavailable {
-				t.Fatalf("error %v = status %d, body %s", test.prepareErr, response.Code, response.Body.String())
-			}
-			if index == 0 {
-				wantBody = response.Body.String()
-			} else if response.Body.String() != wantBody {
-				t.Fatalf("unknown target responses differ: %q != %q", response.Body.String(), wantBody)
-			}
-			if response.Body.String() != "{\"error\":\"claim_unavailable\"}\n" || strings.Contains(response.Body.String(), "decoder") {
-				t.Fatalf("non-generic unknown target response: %s", response.Body.String())
-			}
-			if prepare, _ := prover.calls(); prepare != test.wantPrepare {
-				t.Fatalf("Prover.Prepare calls = %d, want %d", prepare, test.wantPrepare)
-			}
-			assertPrivateClaimResponse(t, response)
-		})
-	}
-}
-
-func TestOfflinePublicPlayerCanStartClaim(t *testing.T) {
-	prover := &claimHTTPProver{}
-	server, _ := newClaimHTTPServer(t, prover, nil)
-	body, err := json.Marshal(map[string]string{"playerId": "offline-player"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	response := serveClaim(t, server, newClaimMutation(http.MethodPost, "/api/player-claims", string(body)))
-	if response.Code != http.StatusCreated || !strings.Contains(response.Body.String(), `"status":"arming"`) {
-		t.Fatalf("offline claim = status %d, body %s", response.Code, response.Body.String())
-	}
-	if prepare, _ := prover.calls(); prepare != 1 {
-		t.Fatalf("Prover.Prepare calls = %d, want 1", prepare)
-	}
-}
-
-func TestOfflineInventoryQuizAnswersIssuePrivateSession(t *testing.T) {
-	quiz := playerclaim.Instructions{
-		Kind: playerclaim.InventoryQuiz, SnapshotAt: claimTestNow,
-		Questions: []playerclaim.QuizQuestion{
-			{ID: "q1", Prompt: "First item?", Options: []string{"Wood", "Stone", "Fiber", "Ore", "Coal", "Sulfur", "Quartz", "Pal Sphere"}},
-		},
-	}
-	prover := &claimHTTPProver{prepareInstructions: quiz}
-	server, _ := newClaimHTTPServer(t, prover, nil)
-	startBody, err := json.Marshal(map[string]string{"playerId": "offline-player"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	started := serveClaim(t, server, newClaimMutation(http.MethodPost, "/api/player-claims", string(startBody)))
-	if started.Code != http.StatusCreated || !strings.Contains(started.Body.String(), `"status":"ready"`) ||
-		!strings.Contains(started.Body.String(), `"kind":"inventory_quiz"`) || strings.Contains(started.Body.String(), "correct") {
-		t.Fatalf("quiz start = status %d, body %s", started.Code, started.Body.String())
-	}
-	var challenge playerclaim.Challenge
-	if err := json.Unmarshal(started.Body.Bytes(), &challenge); err != nil {
-		t.Fatal(err)
-	}
-	answers := []playerclaim.QuizAnswer{{QuestionID: "q1", Option: 1}}
-	verifyBody, err := json.Marshal(verifyClaimRequest{ChallengeToken: challenge.Bearer, Answers: answers})
-	if err != nil {
-		t.Fatal(err)
-	}
-	verified := serveClaim(t, server, newClaimMutation(http.MethodPost, "/api/player-claims/verify", string(verifyBody)))
-	if verified.Code != http.StatusOK || len(verified.Result().Cookies()) != 1 {
-		t.Fatalf("quiz verify = status %d, body %s", verified.Code, verified.Body.String())
-	}
-	if !reflect.DeepEqual(prover.lastAnswers, answers) {
-		t.Fatalf("quiz answers = %+v, want %+v", prover.lastAnswers, answers)
-	}
-}
-
-func TestOfflineQuizCyclesTheQuestion(t *testing.T) {
-	quiz := playerclaim.Instructions{
-		Kind: playerclaim.InventoryQuiz, SnapshotAt: claimTestNow,
-		Questions: []playerclaim.QuizQuestion{
-			{ID: "q1", Prompt: "First?", Options: []string{"A", "B", "C", "D", "E", "F", "G", "H"}, CanCycle: true},
-		},
-	}
-	prover := &claimHTTPProver{prepareInstructions: quiz}
-	server, _ := newClaimHTTPServer(t, prover, nil)
-	started := serveClaim(t, server, newClaimMutation(http.MethodPost, "/api/player-claims", `{"playerId":"offline-player"}`))
-	var challenge playerclaim.Challenge
-	if started.Code != http.StatusCreated || json.Unmarshal(started.Body.Bytes(), &challenge) != nil {
-		t.Fatalf("start = status %d, body %s", started.Code, started.Body.String())
-	}
-	body, err := json.Marshal(cycleClaimQuestionRequest{ChallengeToken: challenge.Bearer, QuestionID: "q1"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	cycled := serveClaim(t, server, newClaimMutation(http.MethodPost, "/api/player-claims/questions/cycle", string(body)))
-	if cycled.Code != http.StatusOK || !strings.Contains(cycled.Body.String(), `"id":"q4"`) ||
-		strings.Contains(cycled.Body.String(), "correct") {
-		t.Fatalf("cycle = status %d, body %s", cycled.Code, cycled.Body.String())
-	}
-	if prover.cycleCalls != 1 || prover.lastQuestion != "q1" {
-		t.Fatalf("cycle calls = %d, question = %q", prover.cycleCalls, prover.lastQuestion)
-	}
-}
-
-func TestClaimOrderedLifecycleIssuesSessionOnlyAfterAllActions(t *testing.T) {
-	clock := &claimHTTPClock{now: claimTestNow}
-	firstInstructions := claimHTTPSequenceInstructions(playerclaim.ProofPhaseProve)
-	secondInstructions := claimHTTPSequenceInstructions(playerclaim.ProofPhaseRestore)
-	prover := &claimHTTPProver{verifySteps: []claimHTTPVerifyStep{
-		{err: playerclaim.ErrPending},
-		{err: playerclaim.ErrReady, instructions: firstInstructions},
-		{err: playerclaim.ErrReady, instructions: secondInstructions},
-		{err: playerclaim.ErrPending},
-		{},
-	}}
-	server, _ := newClaimHTTPServer(t, prover, clock)
-	challengeToken, started := startClaimHTTP(t, server, "public-player")
-	if !strings.Contains(started.Body.String(), `"status":"arming"`) || strings.Contains(started.Body.String(), `"instructions"`) {
-		t.Fatalf("start response = %s", started.Body.String())
-	}
-
-	arming := verifyClaimHTTP(t, server, challengeToken)
-	if arming.Code != http.StatusAccepted || arming.Body.String() != "{\"status\":\"arming\"}\n" {
-		t.Fatalf("arming response = status %d, body %s", arming.Code, arming.Body.String())
-	}
-	if len(arming.Header().Values("Set-Cookie")) != 0 {
-		t.Fatalf("arming response set cookies: %v", arming.Header().Values("Set-Cookie"))
-	}
-	assertPrivateClaimResponse(t, arming)
-
-	firstReady := verifyClaimHTTP(t, server, challengeToken)
-	assertReadyClaimResponse(t, firstReady, firstInstructions)
-
-	secondReady := verifyClaimHTTP(t, server, challengeToken)
-	assertReadyClaimResponse(t, secondReady, secondInstructions)
-	if firstReady.Body.String() == secondReady.Body.String() {
-		t.Fatalf("ordered proof repeated the same instruction: %s", secondReady.Body.String())
-	}
-	for index, pair := range firstInstructions.Pairs {
-		if restore := secondInstructions.Pairs[len(secondInstructions.Pairs)-1-index]; restore != pair {
-			t.Fatalf("restore pair %d = %+v, want reverse of prove pair %+v", index, restore, pair)
-		}
-	}
-
-	pending := verifyClaimHTTP(t, server, challengeToken)
-	assertPendingClaimReplay(t, pending, secondInstructions)
-
-	verified := verifyClaimHTTP(t, server, challengeToken)
-	if verified.Code != http.StatusOK {
-		t.Fatalf("verified response = status %d, body %s", verified.Code, verified.Body.String())
-	}
-	assertPrivateClaimResponse(t, verified)
-	cookie := claimSessionFromResponse(t, verified)
-	decodedBearer, err := base64.RawURLEncoding.DecodeString(cookie.Value)
-	if err != nil || len(decodedBearer) != 32 {
-		t.Fatalf("session cookie decodes to %d bytes with error %v", len(decodedBearer), err)
-	}
-	if cookie.Name != "__Host-palworld_live_map_session" || cookie.Path != "/" || cookie.Domain != "" || !cookie.Secure || !cookie.HttpOnly || cookie.SameSite != http.SameSiteStrictMode {
-		t.Fatalf("unsafe session cookie: %+v", cookie)
-	}
-	if !cookie.Expires.Equal(claimTestNow.Add(playerclaim.DefaultSessionAbsoluteTTL)) {
-		t.Fatalf("cookie expiry = %v, want %v", cookie.Expires, claimTestNow.Add(playerclaim.DefaultSessionAbsoluteTTL))
-	}
-	for _, privateValue := range []string{cookie.Value, challengeToken, "private-world-subject", "never disclose", "bearer", "token", "subject", "evidence"} {
-		if strings.Contains(strings.ToLower(verified.Body.String()), strings.ToLower(privateValue)) {
-			t.Errorf("verified response exposes %q: %s", privateValue, verified.Body.String())
-		}
-	}
-
-	meRequest := httptest.NewRequest(http.MethodGet, "/api/me", nil)
-	meRequest.AddCookie(cookie)
-	me := serveClaim(t, server, meRequest)
-	if me.Code != http.StatusOK {
-		t.Fatalf("me response = status %d, body %s", me.Code, me.Body.String())
-	}
-	assertPrivateClaimResponse(t, me)
-	var mePayload map[string]json.RawMessage
-	if err := json.Unmarshal(me.Body.Bytes(), &mePayload); err != nil {
-		t.Fatal(err)
-	}
-	if string(mePayload["authenticated"]) != "true" || string(mePayload["playerId"]) != `"public-player"` {
-		t.Fatalf("me response = %s", me.Body.String())
-	}
-	for _, privateValue := range []string{cookie.Value, "private-world-subject", "never disclose", "subject", "evidence"} {
-		if strings.Contains(strings.ToLower(me.Body.String()), strings.ToLower(privateValue)) {
-			t.Errorf("me response exposes %q: %s", privateValue, me.Body.String())
-		}
-	}
-
-	logoutRequest := newClaimMutation(http.MethodPost, "/api/logout", `{}`)
-	logoutRequest.AddCookie(cookie)
-	logout := serveClaim(t, server, logoutRequest)
-	if logout.Code != http.StatusOK || logout.Body.String() != "{\"authenticated\":false}\n" {
-		t.Fatalf("logout response = status %d, body %s", logout.Code, logout.Body.String())
-	}
-	assertPrivateClaimResponse(t, logout)
-	cleared := claimSessionFromResponse(t, logout)
-	if cleared.Value != "" || cleared.MaxAge >= 0 || !cleared.Secure || !cleared.HttpOnly || cleared.SameSite != http.SameSiteStrictMode || cleared.Path != "/" {
-		t.Fatalf("unsafe clearing cookie: %+v", cleared)
-	}
-
-	reusedRequest := httptest.NewRequest(http.MethodGet, "/api/me", nil)
-	reusedRequest.AddCookie(cookie)
-	reused := serveClaim(t, server, reusedRequest)
-	if reused.Code != http.StatusUnauthorized || reused.Body.String() != "{\"error\":\"authentication_required\"}\n" {
-		t.Fatalf("revoked session response = status %d, body %s", reused.Code, reused.Body.String())
-	}
-	assertPrivateClaimResponse(t, reused)
-}
-
-func TestClaimPendingReplaysLostReadyInstructions(t *testing.T) {
-	prove := claimHTTPSequenceInstructions(playerclaim.ProofPhaseProve)
-	restore := claimHTTPSequenceInstructions(playerclaim.ProofPhaseRestore)
-	prover := &claimHTTPProver{verifySteps: []claimHTTPVerifyStep{
-		{err: playerclaim.ErrReady, instructions: prove},
-		{err: playerclaim.ErrPending},
-		{err: playerclaim.ErrReady, instructions: restore},
-		{err: playerclaim.ErrPending},
-	}}
-	server, _ := newClaimHTTPServer(t, prover, nil)
-	challengeToken, _ := startClaimHTTP(t, server, "public-player")
-
-	// Treat each ready response as dropped after the service has advanced its
-	// private phase. The next request must replay the bearer-protected sequence.
-	_ = verifyClaimHTTP(t, server, challengeToken)
-	assertPendingClaimReplay(t, verifyClaimHTTP(t, server, challengeToken), prove)
-	_ = verifyClaimHTTP(t, server, challengeToken)
-	assertPendingClaimReplay(t, verifyClaimHTTP(t, server, challengeToken), restore)
-}
-
-func TestAuthenticatedProgressProjectsPrivateKeysToCatalogueIDs(t *testing.T) {
-	prover := &claimHTTPProver{verifySteps: []claimHTTPVerifyStep{
-		{err: playerclaim.ErrReady, instructions: claimHTTPSequenceInstructions(playerclaim.ProofPhaseProve)},
-		{err: playerclaim.ErrReady, instructions: claimHTTPSequenceInstructions(playerclaim.ProofPhaseRestore)},
-		{},
-	}}
-	server, _ := newClaimHTTPServer(t, prover, nil)
-	server.landmarks = append(server.landmarks,
-		palworld.WorldObject{ID: "landmark:alpha:TestAlpha:1:2", Kind: "alpha-pals", Name: "Test Alpha"},
-		palworld.WorldObject{ID: "landmark:tower:REGION_Grass_Boss", Kind: "bosses", Name: "Test Tower"},
-	)
-	completionKeys := map[string]string{}
-	completionIDs := map[string]string{}
-	for _, record := range server.worldCatalogue.Completion {
-		if completionKeys[record.Category] == "" {
-			completionKeys[record.Category], completionIDs[record.Category] = record.StateKey, record.LocationID
-		}
-	}
-	for _, category := range []string{"bounties", "watchtowers", "waypoints", "effigies", "journals", "ancient-shrine-pickups"} {
-		if completionKeys[category] == "" {
-			t.Fatalf("embedded catalogue has no %s completion record", category)
-		}
-	}
-	for _, item := range server.landmarks {
-		if completionKeys[item.Kind] == "" {
-			if key := legacyCompletionKey(item); key != "" {
-				completionKeys[item.Kind], completionIDs[item.Kind] = key, item.ID
-			}
-		}
-	}
-	if completionKeys["alpha-pals"] == "" || completionKeys["bosses"] == "" {
-		t.Fatal("embedded legacy landmarks have no private completion join")
-	}
-	prover.mu.Lock()
-	prover.progress = playerclaim.PrivateProgress{
-		SnapshotAt:     claimTestNow,
-		FastTravelKeys: []string{completionKeys["watchtowers"], completionKeys["waypoints"], "private-unmatched-fast-travel-key"},
-		NoteKeys:       []string{completionKeys["journals"], "private-unmatched-note-key"},
-		RelicKeys:      []string{completionKeys["effigies"]},
-		ItemPickupKeys: []string{completionKeys["ancient-shrine-pickups"]},
-		NormalBossKeys: []string{completionKeys["alpha-pals"], completionKeys["bounties"]},
-		TowerBossKeys:  []string{completionKeys["bosses"]},
-	}
-	prover.mu.Unlock()
-
-	token, _ := startClaimHTTP(t, server, "public-player")
-	assertReadyClaimResponse(t, verifyClaimHTTP(t, server, token), claimHTTPSequenceInstructions(playerclaim.ProofPhaseProve))
-	assertReadyClaimResponse(t, verifyClaimHTTP(t, server, token), claimHTTPSequenceInstructions(playerclaim.ProofPhaseRestore))
-	verified := verifyClaimHTTP(t, server, token)
-	if verified.Code != http.StatusOK {
-		t.Fatalf("verified response = status %d, body %s", verified.Code, verified.Body.String())
-	}
-	cookie := claimSessionFromResponse(t, verified)
-
-	request := httptest.NewRequest(http.MethodGet, "/api/me/progress", nil)
-	request.AddCookie(cookie)
-	response := serveClaim(t, server, request)
-	if response.Code != http.StatusOK {
-		t.Fatalf("progress response = status %d, body %s", response.Code, response.Body.String())
-	}
-	assertPrivateClaimResponse(t, response)
-	var payload claimProgressResponse
-	if err := json.Unmarshal(response.Body.Bytes(), &payload); err != nil {
-		t.Fatal(err)
-	}
-	if !payload.SnapshotAt.Equal(claimTestNow) || payload.CatalogueVersion != server.worldCatalogue.ContentHash || len(payload.Domains) != 8 {
-		t.Fatalf("progress response = %+v", payload)
-	}
-	completed := map[string][]string{}
-	for _, domain := range payload.Domains {
-		if domain.Coverage != "complete" || domain.Total <= 0 {
-			t.Fatalf("domain = %+v", domain)
-		}
-		completed[domain.ID] = domain.CompletedIDs
-	}
-	for _, category := range []string{"alpha-pals", "bosses", "bounties", "watchtowers", "waypoints", "effigies", "journals", "ancient-shrine-pickups"} {
-		if !reflect.DeepEqual(completed[category], []string{completionIDs[category]}) {
-			t.Fatalf("completed %s = %v, want %q", category, completed[category], completionIDs[category])
-		}
-	}
-	body := response.Body.String()
-	for _, forbidden := range []string{completionKeys["waypoints"], "private-unmatched-fast-travel-key", "private-unmatched-note-key", "stateKey", "private-world-subject"} {
-		if strings.Contains(body, forbidden) {
-			t.Errorf("progress response exposed %q: %s", forbidden, body)
-		}
-	}
-}
-
-func TestLegacyCompletionKeyAcceptsProjectedLandmarkIDs(t *testing.T) {
-	tests := []struct {
-		name string
-		item palworld.WorldObject
-		want string
-	}{
-		{
-			name: "alpha pal",
-			item: palworld.WorldObject{
-				ID:   "landmark:alpha:81_1_grass_FBOSS_1:-343155.00:244585.00",
-				Kind: "alpha-pals",
-			},
-			want: "81_1_grass_fboss_1",
-		},
-		{
-			name: "tower boss",
-			item: palworld.WorldObject{
-				ID:   "landmark:tower:REGION_Grass_Boss",
-				Kind: "bosses",
-			},
-			want: "boss_battle_name_grassboss",
-		},
-	}
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			if got := legacyCompletionKey(test.item); got != test.want {
-				t.Fatalf("legacyCompletionKey(%q) = %q, want %q", test.item.ID, got, test.want)
-			}
-		})
-	}
-}
-
-func TestProgressRequiresAuthenticatedSession(t *testing.T) {
-	server, _ := newClaimHTTPServer(t, nil, nil)
-	response := serveClaim(t, server, httptest.NewRequest(http.MethodGet, "/api/me/progress", nil))
-	if response.Code != http.StatusUnauthorized || response.Body.String() != "{\"error\":\"authentication_required\"}\n" {
-		t.Fatalf("progress response = status %d, body %s", response.Code, response.Body.String())
-	}
-	assertPrivateClaimResponse(t, response)
-}
-
-func TestInvalidAndExpiredChallengesShareGenericResponse(t *testing.T) {
-	clock := &claimHTTPClock{now: claimTestNow}
-	server, _ := newClaimHTTPServer(t, nil, clock)
-	actualToken, _ := startClaimHTTP(t, server, "public-player")
-	unknownToken := base64.RawURLEncoding.EncodeToString(bytes.Repeat([]byte{0xff}, 32))
-
-	unknown := verifyClaimHTTP(t, server, unknownToken)
-	clock.Advance(playerclaim.ChallengePhaseTTL)
-	expired := verifyClaimHTTP(t, server, actualToken)
-	for name, response := range map[string]*httptest.ResponseRecorder{"unknown": unknown, "expired": expired} {
-		if response.Code != http.StatusUnauthorized || response.Body.String() != "{\"error\":\"invalid_or_expired_challenge\"}\n" {
-			t.Errorf("%s response = status %d, body %s", name, response.Code, response.Body.String())
-		}
-		assertPrivateClaimResponse(t, response)
-		if cookies := response.Header().Values("Set-Cookie"); len(cookies) != 0 {
-			t.Errorf("%s response changed an unrelated session cookie: %v", name, cookies)
-		}
-	}
-	if unknown.Code != expired.Code || unknown.Body.String() != expired.Body.String() {
-		t.Fatalf("unknown and expired challenge responses differ: %d %q != %d %q", unknown.Code, unknown.Body.String(), expired.Code, expired.Body.String())
-	}
-
-	malformed := verifyClaimHTTP(t, server, "not-a-valid-token")
-	if malformed.Code != http.StatusBadRequest || malformed.Body.String() != "{\"error\":\"invalid_request\"}\n" {
-		t.Fatalf("malformed response = status %d, body %s", malformed.Code, malformed.Body.String())
-	}
-}
-
-func TestInvalidChallengeDoesNotClearOrRevokeUnrelatedSession(t *testing.T) {
-	clock := &claimHTTPClock{now: claimTestNow}
-	prover := &claimHTTPProver{verifySteps: []claimHTTPVerifyStep{
-		{err: playerclaim.ErrReady, instructions: claimHTTPSequenceInstructions(playerclaim.ProofPhaseProve)},
-		{err: playerclaim.ErrReady, instructions: claimHTTPSequenceInstructions(playerclaim.ProofPhaseRestore)},
-		{},
-	}}
-	server, _ := newClaimHTTPServer(t, prover, clock)
-	sessionChallenge, _ := startClaimHTTP(t, server, "session-owner")
-	assertReadyClaimResponse(t, verifyClaimHTTP(t, server, sessionChallenge), claimHTTPSequenceInstructions(playerclaim.ProofPhaseProve))
-	assertReadyClaimResponse(t, verifyClaimHTTP(t, server, sessionChallenge), claimHTTPSequenceInstructions(playerclaim.ProofPhaseRestore))
-	verified := verifyClaimHTTP(t, server, sessionChallenge)
-	if verified.Code != http.StatusOK {
-		t.Fatalf("session verification = status %d, body %s", verified.Code, verified.Body.String())
-	}
-	sessionCookie := claimSessionFromResponse(t, verified)
-
-	assertSessionWorks := func(label string) {
-		t.Helper()
-		request := httptest.NewRequest(http.MethodGet, "/api/me", nil)
-		request.AddCookie(sessionCookie)
-		response := serveClaim(t, server, request)
-		if response.Code != http.StatusOK || !strings.Contains(response.Body.String(), `"playerId":"session-owner"`) {
-			t.Fatalf("%s session = status %d, body %s", label, response.Code, response.Body.String())
-		}
-	}
-	assertSessionWorks("initial")
-
-	unknownToken := base64.RawURLEncoding.EncodeToString(bytes.Repeat([]byte{0xee}, 32))
-	unknownBody, err := json.Marshal(map[string]string{"challengeToken": unknownToken})
-	if err != nil {
-		t.Fatal(err)
-	}
-	unknownRequest := newClaimMutation(http.MethodPost, "/api/player-claims/verify", string(unknownBody))
-	unknownRequest.AddCookie(sessionCookie)
-	unknown := serveClaim(t, server, unknownRequest)
-	if unknown.Code != http.StatusUnauthorized || unknown.Body.String() != "{\"error\":\"invalid_or_expired_challenge\"}\n" {
-		t.Fatalf("unknown challenge = status %d, body %s", unknown.Code, unknown.Body.String())
-	}
-	if cookies := unknown.Header().Values("Set-Cookie"); len(cookies) != 0 {
-		t.Fatalf("unknown challenge changed session cookie: %v", cookies)
-	}
-	assertSessionWorks("after unknown challenge")
-
-	expiringToken, _ := startClaimHTTP(t, server, "different-player")
-	clock.Advance(playerclaim.ChallengePhaseTTL)
-	expiredBody, err := json.Marshal(map[string]string{"challengeToken": expiringToken})
-	if err != nil {
-		t.Fatal(err)
-	}
-	expiredRequest := newClaimMutation(http.MethodPost, "/api/player-claims/verify", string(expiredBody))
-	expiredRequest.AddCookie(sessionCookie)
-	expired := serveClaim(t, server, expiredRequest)
-	if expired.Code != http.StatusUnauthorized || expired.Body.String() != unknown.Body.String() {
-		t.Fatalf("expired challenge = status %d, body %s", expired.Code, expired.Body.String())
-	}
-	if cookies := expired.Header().Values("Set-Cookie"); len(cookies) != 0 {
-		t.Fatalf("expired challenge changed session cookie: %v", cookies)
-	}
-	assertSessionWorks("after expired challenge")
-}
-
-func TestPrivateClaimEndpointsIgnoreConditionalCaching(t *testing.T) {
-	prover := &claimHTTPProver{verifySteps: []claimHTTPVerifyStep{{err: playerclaim.ErrPending}}}
-	server, _ := newClaimHTTPServer(t, prover, nil)
-
-	startRequest := newClaimMutation(http.MethodPost, "/api/player-claims", `{"playerId":"public-player"}`)
-	startRequest.Header.Set("If-None-Match", "*")
-	started := serveClaim(t, server, startRequest)
-	if started.Code != http.StatusCreated {
-		t.Fatalf("start = status %d, body %s", started.Code, started.Body.String())
-	}
-	assertPrivateClaimResponse(t, started)
-	var challenge struct {
-		Token string `json:"challengeToken"`
-	}
-	if err := json.Unmarshal(started.Body.Bytes(), &challenge); err != nil {
-		t.Fatal(err)
-	}
-
-	verifyRequest := newClaimMutation(http.MethodPost, "/api/player-claims/verify", `{"challengeToken":"`+challenge.Token+`"}`)
-	verifyRequest.Header.Set("If-None-Match", "*")
-	pending := serveClaim(t, server, verifyRequest)
-	if pending.Code != http.StatusAccepted {
-		t.Fatalf("verify = status %d, body %s", pending.Code, pending.Body.String())
-	}
-	assertPrivateClaimResponse(t, pending)
-
-	meRequest := httptest.NewRequest(http.MethodGet, "/api/me", nil)
-	meRequest.Header.Set("If-None-Match", "*")
-	unauthenticated := serveClaim(t, server, meRequest)
-	if unauthenticated.Code != http.StatusUnauthorized {
-		t.Fatalf("me = status %d, body %s", unauthenticated.Code, unauthenticated.Body.String())
-	}
-	assertPrivateClaimResponse(t, unauthenticated)
-
-	logoutRequest := newClaimMutation(http.MethodPost, "/api/logout", `{}`)
-	logoutRequest.Header.Set("If-None-Match", "*")
-	logout := serveClaim(t, server, logoutRequest)
-	if logout.Code != http.StatusOK {
-		t.Fatalf("logout = status %d, body %s", logout.Code, logout.Body.String())
-	}
-	assertPrivateClaimResponse(t, logout)
-}
-
-func TestClaimStartRateLimitUsesDirectIPv4SourceAndIgnoresForwardingHeaders(t *testing.T) {
-	server, _ := newClaimHTTPServer(t, nil, nil)
-	for attempt := 1; attempt <= 5; attempt++ {
-		request := newClaimMutation(http.MethodPost, "/api/player-claims", `{"playerId":"public-player-`+string(rune('0'+attempt))+`"}`)
-		request.RemoteAddr = "203.0.113.7:4321"
-		request.Header.Set("X-Forwarded-For", "198.51.100."+string(rune('0'+attempt)))
-		response := serveClaim(t, server, request)
-		if response.Code != http.StatusCreated {
-			t.Fatalf("attempt %d = status %d, body %s", attempt, response.Code, response.Body.String())
-		}
-	}
-
-	limitedRequest := newClaimMutation(http.MethodPost, "/api/player-claims", `{"playerId":"public-player-6"}`)
-	limitedRequest.RemoteAddr = "203.0.113.7:9999"
-	limitedRequest.Header.Set("X-Forwarded-For", "192.0.2.200")
-	limited := serveClaim(t, server, limitedRequest)
-	if limited.Code != http.StatusTooManyRequests || limited.Header().Get("Retry-After") != "60" || limited.Body.String() != "{\"error\":\"claim_unavailable\"}\n" {
-		t.Fatalf("limited response = status %d, retry %q, body %s", limited.Code, limited.Header().Get("Retry-After"), limited.Body.String())
-	}
-	assertPrivateClaimResponse(t, limited)
-
-	distinctRequest := newClaimMutation(http.MethodPost, "/api/player-claims", `{"playerId":"public-player-7"}`)
-	distinctRequest.RemoteAddr = "203.0.113.8:4321"
-	distinctRequest.Header.Set("X-Forwarded-For", "203.0.113.7")
-	distinct := serveClaim(t, server, distinctRequest)
-	if distinct.Code != http.StatusCreated {
-		t.Fatalf("distinct source = status %d, body %s", distinct.Code, distinct.Body.String())
-	}
-}
-
-func TestClaimStartRateLimitGroupsIPv6By64(t *testing.T) {
-	server, _ := newClaimHTTPServer(t, nil, nil)
-	addresses := []string{
-		"[2001:db8:1234:5678::1]:1001",
-		"[2001:db8:1234:5678::2]:1002",
-		"[2001:db8:1234:5678:1111::1]:1003",
-		"[2001:db8:1234:5678:2222::1]:1004",
-		"[2001:db8:1234:5678:ffff:ffff:ffff:ffff]:1005",
-	}
-	for index, address := range addresses {
-		request := newClaimMutation(http.MethodPost, "/api/player-claims", `{"playerId":"ipv6-player-`+string(rune('1'+index))+`"}`)
-		request.RemoteAddr = address
-		response := serveClaim(t, server, request)
-		if response.Code != http.StatusCreated {
-			t.Fatalf("source %s = status %d, body %s", address, response.Code, response.Body.String())
-		}
-	}
-
-	limitedRequest := newClaimMutation(http.MethodPost, "/api/player-claims", `{"playerId":"ipv6-player-6"}`)
-	limitedRequest.RemoteAddr = "[2001:db8:1234:5678:abcd::1]:1006"
-	limited := serveClaim(t, server, limitedRequest)
-	if limited.Code != http.StatusTooManyRequests || limited.Header().Get("Retry-After") != "60" {
-		t.Fatalf("same /64 = status %d, retry %q, body %s", limited.Code, limited.Header().Get("Retry-After"), limited.Body.String())
-	}
-
-	distinctRequest := newClaimMutation(http.MethodPost, "/api/player-claims", `{"playerId":"ipv6-player-7"}`)
-	distinctRequest.RemoteAddr = "[2001:db8:1234:5679::1]:1007"
-	distinct := serveClaim(t, server, distinctRequest)
-	if distinct.Code != http.StatusCreated {
-		t.Fatalf("different /64 = status %d, body %s", distinct.Code, distinct.Body.String())
-	}
-}
-
-func TestClaimStartRateLimitUsesForwardedClientOnlyFromTrustedProxy(t *testing.T) {
-	server, _ := newClaimHTTPServer(t, nil, nil)
-	server.settings.playerClaimsTrustedProxies = []netip.Prefix{
-		netip.MustParsePrefix("10.0.0.0/8"), netip.MustParsePrefix("192.0.2.0/24"),
-	}
-	for attempt := 1; attempt <= 5; attempt++ {
-		request := newClaimMutation(http.MethodPost, "/api/player-claims", `{"playerId":"proxy-player-`+string(rune('0'+attempt))+`"}`)
-		request.RemoteAddr = "10.0.0.5:443"
-		// The right-most trusted hop is stripped. The untrusted address before it
-		// is the client; the left-most value is an attacker-supplied spoof.
-		request.Header.Set("X-Forwarded-For", "203.0.113."+string(rune('0'+attempt))+", 198.51.100.9, 192.0.2.4")
-		response := serveClaim(t, server, request)
-		if response.Code != http.StatusCreated {
-			t.Fatalf("attempt %d = status %d, body %s", attempt, response.Code, response.Body.String())
-		}
-	}
-	limitedRequest := newClaimMutation(http.MethodPost, "/api/player-claims", `{"playerId":"proxy-player-6"}`)
-	limitedRequest.RemoteAddr = "10.0.0.5:443"
-	limitedRequest.Header.Set("X-Forwarded-For", "192.0.2.200, 198.51.100.9, 192.0.2.4")
-	limited := serveClaim(t, server, limitedRequest)
-	if limited.Code != http.StatusTooManyRequests {
-		t.Fatalf("shared forwarded client = status %d, body %s", limited.Code, limited.Body.String())
-	}
-
-	distinctRequest := newClaimMutation(http.MethodPost, "/api/player-claims", `{"playerId":"proxy-player-7"}`)
-	distinctRequest.RemoteAddr = "10.0.0.5:443"
-	distinctRequest.Header.Set("X-Forwarded-For", "198.51.100.10, 192.0.2.4")
-	distinct := serveClaim(t, server, distinctRequest)
-	if distinct.Code != http.StatusCreated {
-		t.Fatalf("distinct forwarded client = status %d, body %s", distinct.Code, distinct.Body.String())
+func TestNoSuitableQuestionErrorSurvivesWrapping(t *testing.T) {
+	err := errors.Join(errors.New("prepare"), playerclaim.ErrNoSuitableQuestion)
+	if !errors.Is(err, playerclaim.ErrNoSuitableQuestion) {
+		t.Fatal("sentinel not discoverable")
 	}
 }
