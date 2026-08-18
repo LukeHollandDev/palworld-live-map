@@ -64,7 +64,8 @@ describe('useSaveProgress', () => {
     expect(JSON.stringify(window.localStorage)).not.toContain('private-transient-waypoint')
   })
 
-  it('shows unavailable state and can retry without exposing a previous snapshot', async () => {
+  it('automatically checks again without exposing a previous snapshot', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
     const fetchMock = vi
       .fn()
       .mockResolvedValueOnce(new Response('{"error":"progress_unavailable"}', { status: 503 }))
@@ -78,7 +79,7 @@ describe('useSaveProgress', () => {
     )
 
     await waitFor(() => expect(result.current.state).toMatchObject({ phase: 'unavailable' }))
-    act(() => result.current.retry())
+    await act(async () => vi.advanceTimersByTimeAsync(60_000))
     await waitFor(() => expect(result.current.state.phase).toBe('available'))
     expect(fetchMock).toHaveBeenCalledTimes(2)
   })
@@ -155,6 +156,7 @@ describe('useSaveProgress', () => {
   })
 
   it('keeps the last valid overlay applied while refresh is pending or fails', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
     const refresh = deferred<Response>()
     const fetchMock = vi
       .fn()
@@ -169,7 +171,7 @@ describe('useSaveProgress', () => {
     )
     await waitFor(() => expect(result.current.state.phase).toBe('available'))
 
-    act(() => result.current.retry())
+    await act(async () => vi.advanceTimersByTimeAsync(60_000))
     await waitFor(() => expect(result.current.state).toMatchObject({ phase: 'available', refreshing: true }))
     expect(
       result.current.state.phase === 'available'

@@ -30,7 +30,6 @@ function checklist(overrides: Partial<ProgressChecklistView> = {}): ProgressChec
     ],
     remainingOnly: false,
     saveProgress: { phase: 'inactive' },
-    onRetrySaveProgress: vi.fn(),
     onRemainingOnlyChange: vi.fn(),
     ...overrides
   }
@@ -80,9 +79,7 @@ describe('ProgressPanel', () => {
     expect(value.onRemainingOnlyChange).toHaveBeenCalledWith(true)
   })
 
-  it('keeps save progress recovery in the standalone panel', async () => {
-    const user = userEvent.setup()
-    const onRetrySaveProgress = vi.fn()
+  it('leaves save refresh timing to the server', () => {
     render(
       <ProgressPanel
         open
@@ -95,8 +92,7 @@ describe('ProgressPanel', () => {
             sessionEpoch: 1,
             requestAttempt: 1,
             reason: 'request'
-          },
-          onRetrySaveProgress
+          }
         })}
         progressButtonRef={createRef<HTMLButtonElement>()}
         onClose={vi.fn()}
@@ -104,8 +100,7 @@ describe('ProgressPanel', () => {
     )
 
     expect(screen.getByText('Save temporarily unavailable')).toBeVisible()
-    await user.click(screen.getByRole('button', { name: 'Retry save progress' }))
-    expect(onRetrySaveProgress).toHaveBeenCalledOnce()
+    expect(screen.queryByRole('button', { name: /save progress/i })).not.toBeInTheDocument()
   })
 
   it('lets an online player start a private identity check from My Progress', async () => {

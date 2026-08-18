@@ -6,6 +6,8 @@ import {
   type SaveProgressSnapshot
 } from '../lib/saveProgress'
 
+const SAVE_PROGRESS_CHECK_INTERVAL_MS = 60_000
+
 export type SaveProgressState =
   | { phase: 'inactive' }
   | { phase: 'loading'; playerId: string; sessionEpoch: number; requestAttempt: number }
@@ -56,6 +58,12 @@ export function useSaveProgress(session: SaveProgressSession, options: SaveProgr
     loadedRef.current = next
     setLoaded(next)
   }, [])
+
+  useEffect(() => {
+    if (connectedPlayerId === null || connectedSessionEpoch === null || connectedBearer === null) return
+    const timer = window.setInterval(() => setAttempt((current) => current + 1), SAVE_PROGRESS_CHECK_INTERVAL_MS)
+    return () => window.clearInterval(timer)
+  }, [connectedBearer, connectedPlayerId, connectedSessionEpoch])
 
   useEffect(() => {
     if (connectedPlayerId === null || connectedSessionEpoch === null || connectedBearer === null) {
@@ -200,16 +208,9 @@ export function useSaveProgress(session: SaveProgressSession, options: SaveProgr
     options.onUnauthorized
   ])
 
-  const retry = useCallback(() => {
-    if (loadedRef.current.phase === 'loading') return
-    if (loadedRef.current.phase === 'available' && loadedRef.current.refreshing) return
-    setAttempt((current) => current + 1)
-  }, [])
-
   // The effect performs the durable cleanup. This synchronous boundary makes
   // the very first render after logout or same-ID reconnect private-data safe.
-  if (connectedPlayerId === null || connectedSessionEpoch === null)
-    return { state: { phase: 'inactive' } as const, retry }
+  if (connectedPlayerId === null || connectedSessionEpoch === null) return { state: { phase: 'inactive' } as const }
   if ('playerId' in loaded && !belongsToSession(loaded, connectedPlayerId, connectedSessionEpoch)) {
     return {
       state: {
@@ -217,9 +218,8 @@ export function useSaveProgress(session: SaveProgressSession, options: SaveProgr
         playerId: connectedPlayerId,
         sessionEpoch: connectedSessionEpoch,
         requestAttempt: attempt
-      } as const,
-      retry
+      } as const
     }
   }
-  return { state: loaded, retry }
+  return { state: loaded }
 }

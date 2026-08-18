@@ -185,7 +185,7 @@ function LiveMap({
   const objects = usePolling<ObjectState>('/api/objects', config.worldPollIntervalMs, config.worldDataEnabled)
   const claimSession = usePlayerClaimSession()
   const expectedCatalogueVersion = useMemo(() => catalogueVersionFromURL(config.catalogueUrl), [config.catalogueUrl])
-  const { state: saveProgress, retry: retrySaveProgress } = useSaveProgress(claimSession.session, {
+  const { state: saveProgress } = useSaveProgress(claimSession.session, {
     expectedCatalogueVersion,
     onUnauthorized: claimSession.invalidate
   })
@@ -719,7 +719,6 @@ function LiveMap({
             breakdown: completionBreakdown,
             remainingOnly: localCompletion.remainingOnly,
             saveProgress,
-            onRetrySaveProgress: retrySaveProgress,
             onRemainingOnlyChange: (remainingOnly) =>
               setLocalCompletion((current) => setRemainingOnly(current, remainingOnly))
           }}

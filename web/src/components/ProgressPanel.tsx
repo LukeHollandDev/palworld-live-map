@@ -14,7 +14,6 @@ export interface ProgressChecklistView {
   breakdown: CompletionBreakdownItem[]
   remainingOnly: boolean
   saveProgress: SaveProgressState
-  onRetrySaveProgress: () => void
   onRemainingOnlyChange: (remainingOnly: boolean) => void
 }
 
@@ -181,21 +180,6 @@ export function ProgressPanel({
               <time className="sr-only" dateTime={progress.snapshot.snapshotAt}>
                 Save snapshot {progress.snapshot.snapshotAt}
               </time>
-            ) : null}
-            {(progress.phase === 'unavailable' && progress.reason === 'request') ||
-            (progress.phase === 'available' && (progress.stale || progress.refreshFailed)) ? (
-              <button
-                type="button"
-                className="pal-interactive mt-2 min-h-8 border border-[#8bb7bd]/25 bg-[#26363b]/55 px-2.5 text-[11px] text-[#d7e8ea]"
-                disabled={progress.phase === 'available' && progress.refreshing}
-                onClick={checklist.onRetrySaveProgress}
-              >
-                {progress.phase === 'unavailable'
-                  ? 'Retry save progress'
-                  : progress.refreshing
-                    ? 'Refreshing…'
-                    : 'Refresh save progress'}
-              </button>
             ) : null}
           </div>
         </section>
