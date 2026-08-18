@@ -268,7 +268,7 @@ describe('PlayerClaimPanel', () => {
 
     await user.click(await screen.findByRole('button', { name: 'This is me' }))
     await user.selectOptions(screen.getByRole('combobox', { name: 'Which item is in common-inventory slot 4?' }), '2')
-    await user.click(screen.getByRole('button', { name: 'Change question 1' }))
+    await user.click(screen.getByRole('button', { name: 'Try a different question' }))
     const q1Replacement = await screen.findByRole('combobox', { name: 'Which weapon was equipped in slot 1?' })
     expect(q1Replacement).toHaveValue('')
     expect(requests.map((request) => request.body)).toEqual([{ challengeToken, questionId: 'q1' }])

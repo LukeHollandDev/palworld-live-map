@@ -1545,10 +1545,8 @@ function QuizControl({
   return (
     <div className="grid gap-2.5">
       {quiz.questions.map((question, questionIndex) => (
-        <fieldset key={question.id} className="m-0 grid gap-1 border-0 border-t border-[#8bb7bd]/20 px-0 pt-2.5">
-          <legend className="pr-1 text-xs font-medium text-[#e5f5f7]">
-            {questionIndex + 1}. {question.prompt}
-          </legend>
+        <fieldset key={question.id} className="m-0 grid gap-2 border-0 p-0">
+          <legend className="mb-1 text-xs font-medium leading-5 text-[#e5f5f7]">{question.prompt}</legend>
           <select
             className="pal-glass-inset min-h-11 px-2 text-xs text-[#e5f5f7]"
             aria-label={question.prompt}
@@ -1567,12 +1565,15 @@ function QuizControl({
           </select>
           <button
             type="button"
-            className="min-h-7 justify-self-start text-[10px] text-[#8fd7df] underline decoration-[#8fd7df]/40 underline-offset-4 disabled:cursor-not-allowed disabled:text-[#71878c] disabled:no-underline"
-            aria-label={`Change question ${questionIndex + 1}`}
+            className="pal-glass-control pal-interactive min-h-10 w-full cursor-pointer px-3 text-xs text-[#b7dfe3] disabled:cursor-not-allowed disabled:text-[#71878c]"
             disabled={disabled || cyclingQuestionId !== null || !question.canCycle}
             onClick={() => void onCycle(questionIndex)}
           >
-            {cyclingQuestionId === question.id ? 'Changing…' : question.canCycle ? 'Change' : 'No more questions'}
+            {cyclingQuestionId === question.id
+              ? 'Choosing another question…'
+              : question.canCycle
+                ? 'Try a different question'
+                : 'No other questions available'}
           </button>
         </fieldset>
       ))}
