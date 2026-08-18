@@ -20,9 +20,9 @@ Give your Palworld community a live view of players, guilds, bases, Pals, in-gam
 - Optional save integration adds offline players, saved locations, levels,
   guilds, capture totals, Paldeck progress, Arena RP, fast-travel points,
   discovered areas, boss/tower clears, and last-seen times
-- Optional saved-character connection asks one save-backed multiple-choice
-  question before granting self-only completion access, with a reversible
-  inventory proof as a fallback; private save contents never leave the backend
+- Optional saved-character connection asks one grounded multiple-choice
+  question before granting self-only completion access; raw save identifiers
+  and completion keys stay in the backend
 - My Progress combines private save-confirmed exploration with a local browser
   checklist, shows completion by landmark category, and can hide completed
   locations from both the map and its filters
@@ -169,10 +169,11 @@ If the map cannot build a question, add three distinct items or Pal species to
 one supported group and wait for a completed backup before trying again.
 
 Connecting adds save-confirmed completion for bosses, bounties, travel points,
-effigies, journals, and Ancient Shrine pickups. Other landmarks continue to use
-the browser-local checklist. The connection lasts until the page is reloaded;
-HTTPS is recommended on untrusted networks. Existing public player data and map
-features are unchanged.
+effigies, journals, and Ancient Shrine pickups. Progress is checked
+automatically, and the server selects the completed backup used for the overlay.
+Other landmarks continue to use the browser-local checklist. The connection
+lasts until the page is reloaded; HTTPS is recommended on untrusted networks.
+Existing public player data and map features are unchanged.
 
 ## License
 

@@ -12,13 +12,12 @@ one-shot, one-question memory quiz generated from a safely completed backup.
 The question exposes three to eight real item or Pal names from the answer's
 saved container and can be replaced before answering. Starting or cycling a
 challenge can therefore disclose this bounded set before identity is verified.
-Questions may use the first two rows of common
-inventory, equipment, food, or party slots. Dropped-item and key-item containers
-are excluded. A wrong submission
-consumes the challenge, and existing per-client and global limits bound guessing and private
-decoder work. Correct option indexes, counts, dynamic instance IDs, raw item IDs, raw
-save identifiers, proof evidence, and completion state keys must never be
-returned by an API or written to logs. Challenges and
+Questions may use the first two inventory rows, loadout, equipment, food pouch,
+or party Pal species. Dropped-item and key-item containers are excluded. A
+wrong submission consumes the challenge, and existing per-client and global
+limits bound guessing and private decoder work. Correct option indexes, counts,
+dynamic instance IDs, raw item IDs, raw save identifiers, proof evidence, and
+completion state keys must never be returned by an API or written to logs. Challenges and
 sessions are bounded and stored hash-at-rest. The browser receives a random
 session bearer after a correct answer and keeps it only in page memory; it is
 not persisted in cookies, browser storage, or URLs. Reloading requires another

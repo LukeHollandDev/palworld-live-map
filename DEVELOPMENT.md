@@ -21,6 +21,8 @@ Optional save enrichment runs the external [`palworld-save-reader`](https://gith
 
 The container image builds the pinned decoder in its own stage, applies the repository-maintained resolve-v4 roster/progress patch, and installs it beside the server binary. It also generates the ignored WebP map tile pyramids in a build-only Python stage; the final distroless image contains the tiles but no image tooling and starts immediately. Source runs use the same patched reader and layout under the ignored `bin` directory; an unpatched v0.2.0 reader emits resolve v2 and its roster enrichment is deliberately rejected. Resolve v4 adds exact self-private completion keys while retaining the save-backed leaderboard fields. Version 0.2.0 adds the legacy Mermaid Huffman support required by older Palworld 1.X save streams.
 
+With `PLAYER_CLAIMS_ENABLED=true`, an online or offline roster entry can be connected through one grounded question from its private save projection. A successful answer creates a bounded in-memory bearer. While the page remains open, the browser checks progress automatically and the server selects the safe completed backup; the bearer is never written to cookies, browser storage, or URLs.
+
 Field Alpha and tower-boss locations are versioned data under [`assets/palworld`](assets/palworld). The frontend lives in [`web`](web) and uses React, TypeScript, Vite, Tailwind CSS, Biome, and Vitest.
 
 `DEMO_MODE=true` uses deterministic fictional data without contacting a Palworld server. It is useful for development, screenshots, and smoke tests.
