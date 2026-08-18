@@ -98,6 +98,19 @@ describe('question-only character connection', () => {
     expect(screen.getByText(/Wait until the map has read a completed backup containing the change/)).toBeInTheDocument()
   })
 
+  it('explains when repeated attempts are rate limited', async () => {
+    vi.spyOn(globalThis, 'fetch').mockImplementation(() => response({ error: 'claim_unavailable' }, 429))
+    render(
+      <PlayerClaimProvider enabled>
+        <Harness />
+      </PlayerClaimProvider>
+    )
+    fireEvent.click(screen.getByRole('button', { name: 'This is me' }))
+    expect(
+      await screen.findByText('Too many attempts. Wait a few minutes before starting another check.')
+    ).toBeInTheDocument()
+  })
+
   it('cycles the single question without creating another challenge', async () => {
     const fetchMock = vi.spyOn(globalThis, 'fetch')
     fetchMock

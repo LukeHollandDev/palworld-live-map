@@ -33,7 +33,7 @@ export type PlayerClaimSessionState =
   | { phase: 'anonymous' }
   | { phase: 'connected'; playerId: string; sessionEpoch: number; expiresAt: number; bearer: string }
 
-type Notice = 'unavailable' | 'incorrect' | 'no-suitable-question' | 'expired' | null
+type Notice = 'unavailable' | 'incorrect' | 'no-suitable-question' | 'rate-limited' | 'expired' | null
 
 interface PlayerClaimContextValue {
   enabled: boolean
@@ -162,7 +162,14 @@ export function PlayerClaimProvider({ enabled, children }: { enabled: boolean; c
       try {
         const response = await postJSON('/api/player-claims', { playerId })
         if (!response.ok) {
-          setNotice((await readError(response)) === 'no_suitable_question' ? 'no-suitable-question' : 'unavailable')
+          const error = await readError(response)
+          setNotice(
+            response.status === 429
+              ? 'rate-limited'
+              : error === 'no_suitable_question'
+                ? 'no-suitable-question'
+                : 'unavailable'
+          )
           return
         }
         const ready = parseReady(await response.json())
@@ -190,7 +197,7 @@ export function PlayerClaimProvider({ enabled, children }: { enabled: boolean; c
         questionId: challenge.question.id
       })
       if (!response.ok) {
-        setNotice('unavailable')
+        setNotice(response.status === 429 ? 'rate-limited' : 'unavailable')
         return
       }
       const next = parseCycled(await response.json())
@@ -228,11 +235,13 @@ export function PlayerClaimProvider({ enabled, children }: { enabled: boolean; c
         const error = await readError(response)
         setChallenge({ ...challenge, phase: 'expired' })
         setNotice(
-          error === 'verification_failed'
-            ? 'incorrect'
-            : error === 'invalid_or_expired_challenge'
-              ? 'expired'
-              : 'unavailable'
+          response.status === 429
+            ? 'rate-limited'
+            : error === 'verification_failed'
+              ? 'incorrect'
+              : error === 'invalid_or_expired_challenge'
+                ? 'expired'
+                : 'unavailable'
         )
         return
       }
@@ -343,11 +352,13 @@ function NoSuitableQuestion() {
 function ClaimNotice({ notice }: { notice: Exclude<Notice, null> }) {
   if (notice === 'no-suitable-question') return <NoSuitableQuestion />
   const message =
-    notice === 'incorrect'
-      ? 'That answer did not match the latest completed save. Start a new check to try again.'
-      : notice === 'expired'
-        ? 'This check expired. Start a new one.'
-        : 'Character connection is temporarily unavailable. Please try again.'
+    notice === 'rate-limited'
+      ? 'Too many attempts. Wait a few minutes before starting another check.'
+      : notice === 'incorrect'
+        ? 'That answer did not match the latest completed save. Start a new check to try again.'
+        : notice === 'expired'
+          ? 'This check expired. Start a new one.'
+          : 'Character connection is temporarily unavailable. Please try again.'
   return (
     <p role="status" aria-live="polite" className={statusClass('warning')}>
       {message}
