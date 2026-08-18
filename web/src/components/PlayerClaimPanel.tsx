@@ -1637,7 +1637,7 @@ function RecoverySnapshotControl({
                 key={`${pair.slotA}:${pair.slotB}`}
                 className="border-l-2 border-[#d8a95f]/60 bg-[#563d25]/25 px-2 py-1.5 text-xs leading-5 text-[#fff0d3] marker:text-[#efc779]"
               >
-                Swap common-inventory slot {pair.slotA} with slot {pair.slotB}.{' '}
+                Swap inventory slot {pair.slotA} with slot {pair.slotB}.{' '}
                 <span className="text-[10px] text-[#d8bc83]">
                   {index < completedCount ? 'Counted as applied' : 'Not counted as applied'}
                 </span>
@@ -1658,7 +1658,7 @@ function RecoverySnapshotControl({
                 className="border-l-2 border-[#d8a95f]/60 bg-[#563d25]/25 px-2 py-1.5 text-xs leading-5 text-[#fff0d3] marker:text-[#efc779]"
               >
                 <span className="block">
-                  Swap common-inventory slot {pair.slotA} with slot {pair.slotB}.
+                  Swap inventory slot {pair.slotA} with slot {pair.slotB}.
                 </span>
                 <label className="mt-1 flex min-h-7 cursor-pointer items-center gap-2 text-[11px] text-[#f4dfbc]">
                   <input
@@ -1707,7 +1707,7 @@ function EmergencyRecovery({ instructions }: { instructions: ClaimInstructions }
             key={`${pair.slotA}:${pair.slotB}`}
             className="border-l-2 border-[#d8a95f]/60 bg-[#563d25]/25 px-2 py-1.5 text-xs leading-5 text-[#fff0d3] marker:text-[#efc779]"
           >
-            Swap common-inventory slot {pair.slotA} with slot {pair.slotB}.
+            Swap inventory slot {pair.slotA} with slot {pair.slotB}.
           </li>
         ))}
       </ol>
@@ -1756,7 +1756,7 @@ function InstructionSequence({
             className="border-l-2 border-[#79dceb]/60 bg-[#29454a]/35 px-2 py-1.5 text-xs leading-5 text-[#edf9fa] marker:text-[#8fd7df]"
           >
             <span className="block">
-              Swap common-inventory slot {pair.slotA} with slot {pair.slotB}.
+              Swap inventory slot {pair.slotA} with slot {pair.slotB}.
             </span>
             <label className="mt-1 flex min-h-7 cursor-pointer items-center gap-2 text-[11px] text-[#a9d7dc]">
               <input
