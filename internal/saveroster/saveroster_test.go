@@ -1333,7 +1333,7 @@ func testPlayerProjector(raw string) (string, bool) {
 	return "player:test", true
 }
 
-func TestSelectKnowledgeQuizBuildsTwoCyclableQuestionsWithCharacterOptions(t *testing.T) {
+func TestSelectKnowledgeQuizBuildsOneCyclableQuestionWithCharacterOptions(t *testing.T) {
 	stacks := make([]savesidecar.ClaimStack, 8)
 	for index := range stacks {
 		stacks[index] = savesidecar.ClaimStack{Slot: uint32(index), ItemID: fmt.Sprintf("TestItem%d", index+1), Count: 1}
@@ -1345,7 +1345,7 @@ func TestSelectKnowledgeQuizBuildsTwoCyclableQuestionsWithCharacterOptions(t *te
 	}
 	snapshotAt := time.Date(2026, time.August, 16, 1, 0, 0, 0, time.UTC)
 	instructions, correct, remaining, ok := selectKnowledgeQuiz(player, 42, snapshotAt)
-	if !ok || instructions.Kind != playerclaim.InventoryQuiz || len(instructions.Questions) != 2 || len(correct) != 2 || len(remaining) == 0 {
+	if !ok || instructions.Kind != playerclaim.InventoryQuiz || len(instructions.Questions) != 1 || len(correct) != 1 || len(remaining) == 0 {
 		t.Fatalf("selectKnowledgeQuiz() = %+v, %v, %v, %v", instructions, correct, remaining, ok)
 	}
 	for index, question := range instructions.Questions {
@@ -1380,7 +1380,7 @@ func TestSelectKnowledgeQuizBuildsTwoCyclableQuestionsWithCharacterOptions(t *te
 	}
 }
 
-func TestSelectKnowledgeQuizAllowsBothQuestionsToUsePartyPals(t *testing.T) {
+func TestSelectKnowledgeQuizAllowsPartyPalQuestions(t *testing.T) {
 	player := savesidecar.ClaimPlayer{Party: []savesidecar.ClaimPal{
 		{Slot: 0, InstanceID: "private-one", Species: "Lamball"},
 		{Slot: 1, InstanceID: "private-two", Species: "Cattiva"},
@@ -1389,7 +1389,7 @@ func TestSelectKnowledgeQuizAllowsBothQuestionsToUsePartyPals(t *testing.T) {
 	instructions, correct, remaining, ok := selectKnowledgeQuiz(
 		player, 7, time.Date(2026, time.August, 16, 1, 0, 0, 0, time.UTC),
 	)
-	if !ok || len(instructions.Questions) != 2 || len(correct) != 2 || len(remaining) != 1 {
+	if !ok || len(instructions.Questions) != 1 || len(correct) != 1 || len(remaining) != 2 {
 		t.Fatalf("selectKnowledgeQuiz() = %+v, %v, %v, %v", instructions, correct, remaining, ok)
 	}
 	for index, question := range instructions.Questions {
@@ -1417,7 +1417,7 @@ func TestSelectKnowledgeQuizSkipsContainersWithoutThreeDistinctRealOptions(t *te
 	instructions, _, remaining, ok := selectKnowledgeQuiz(
 		player, 17, time.Date(2026, time.August, 16, 1, 0, 0, 0, time.UTC),
 	)
-	if !ok || len(instructions.Questions) != 2 || len(remaining) != 1 {
+	if !ok || len(instructions.Questions) != 1 || len(remaining) != 2 {
 		t.Fatalf("selectKnowledgeQuiz() = %+v, remaining %d, ok %v", instructions, len(remaining), ok)
 	}
 	for _, question := range instructions.Questions {
@@ -1449,7 +1449,7 @@ func TestSelectKnowledgeQuizUsesOnlyTheFirstTwoCommonInventoryRows(t *testing.T)
 	instructions, _, remaining, ok := selectKnowledgeQuiz(
 		player, 23, time.Date(2026, time.August, 16, 1, 0, 0, 0, time.UTC),
 	)
-	if !ok || len(instructions.Questions) != 2 || len(remaining) != 1 {
+	if !ok || len(instructions.Questions) != 1 || len(remaining) != 2 {
 		t.Fatalf("selectKnowledgeQuiz() = %+v, remaining %d, ok %v", instructions, len(remaining), ok)
 	}
 	wantOptions := []string{"Fiber", "Stone", "Wood"}
@@ -1467,7 +1467,7 @@ func sortedStrings(values []string) []string {
 	return result
 }
 
-func TestCycleQuestionReplacesOnlyTheRequestedCard(t *testing.T) {
+func TestCycleQuestionReplacesTheCurrentQuestion(t *testing.T) {
 	stacks := make([]savesidecar.ClaimStack, 8)
 	for index := range stacks {
 		stacks[index] = savesidecar.ClaimStack{Slot: uint32(index), ItemID: fmt.Sprintf("PrivateItem%d", index+1), Count: 1}
@@ -1485,22 +1485,19 @@ func TestCycleQuestionReplacesOnlyTheRequestedCard(t *testing.T) {
 		Subject: "subject", PublicPlayerID: "player", Instructions: instructions,
 		Evidence: &claimQuizEvidence{target: claimTarget{}, correct: correct, remaining: remaining},
 	}
-	q2Before := prepared.Instructions.Questions[1]
 	q1ID := prepared.Instructions.Questions[0].ID
 	if err := (&Source{}).CycleQuestion(context.Background(), &prepared, q1ID); err != nil {
 		t.Fatalf("CycleQuestion(q1) error = %v", err)
 	}
-	if prepared.Instructions.Questions[0].ID == q1ID ||
-		!reflect.DeepEqual(prepared.Instructions.Questions[1].Options, q2Before.Options) ||
-		prepared.Instructions.Questions[1].ID != q2Before.ID {
-		t.Fatalf("Q1 cycle changed another card: %+v", prepared.Instructions.Questions)
+	if prepared.Instructions.Questions[0].ID == q1ID {
+		t.Fatalf("Q1 cycle did not replace the question: %+v", prepared.Instructions.Questions)
 	}
 	q1After := prepared.Instructions.Questions[0]
-	if err := (&Source{}).CycleQuestion(context.Background(), &prepared, q2Before.ID); err != nil {
-		t.Fatalf("CycleQuestion(q2) error = %v", err)
+	if err := (&Source{}).CycleQuestion(context.Background(), &prepared, q1After.ID); err != nil {
+		t.Fatalf("CycleQuestion(replacement) error = %v", err)
 	}
-	if prepared.Instructions.Questions[0].ID != q1After.ID || prepared.Instructions.Questions[1].ID == q2Before.ID {
-		t.Fatalf("Q2 cycle changed another card: %+v", prepared.Instructions.Questions)
+	if prepared.Instructions.Questions[0].ID == q1After.ID {
+		t.Fatalf("second cycle did not replace the question: %+v", prepared.Instructions.Questions)
 	}
 }
 

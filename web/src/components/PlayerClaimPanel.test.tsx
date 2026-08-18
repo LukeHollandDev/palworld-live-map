@@ -60,12 +60,6 @@ function quizStartResponse(expiresInMs = 10 * 60_000, token = challengeToken) {
           prompt: 'Which item is in common-inventory slot 4?',
           options: ['Wood', 'Stone', 'Fiber'],
           canCycle: true
-        },
-        {
-          id: 'q2',
-          prompt: 'Which item is in common-inventory slot 9?',
-          options: ['Berry', 'Milk', 'Honey', 'Flour'],
-          canCycle: true
         }
       ]
     }
@@ -165,7 +159,7 @@ afterEach(() => {
 })
 
 describe('PlayerClaimPanel', () => {
-  it('verifies an offline character with two quick multiple-choice questions', async () => {
+  it('verifies an offline character with one quick multiple-choice question', async () => {
     const requests: Array<{ path: string; init?: RequestInit }> = []
     let meRequests = 0
     vi.stubGlobal(
@@ -213,21 +207,17 @@ describe('PlayerClaimPanel', () => {
     await user.click(await screen.findByRole('button', { name: 'This is me' }))
     expect(await screen.findByRole('heading', { name: 'Verify Offline Player' })).toBeVisible()
     await user.selectOptions(screen.getByRole('combobox', { name: 'Which item is in common-inventory slot 4?' }), '1')
-    await user.selectOptions(screen.getByRole('combobox', { name: 'Which item is in common-inventory slot 9?' }), '3')
-    await user.click(screen.getByRole('button', { name: 'Verify answers' }))
+    await user.click(screen.getByRole('button', { name: 'Verify answer' }))
 
     const verify = requests.find((request) => request.path === '/api/player-claims/verify')
     expect(JSON.parse(String(verify?.init?.body))).toEqual({
       challengeToken,
-      answers: [
-        { questionId: 'q1', option: 1 },
-        { questionId: 'q2', option: 3 }
-      ]
+      answers: [{ questionId: 'q1', option: 1 }]
     })
     expect(await screen.findByRole('heading', { name: 'Connected private save' })).toBeVisible()
   })
 
-  it('cycles either question independently without clearing the other answer', async () => {
+  it('cycles the question and clears its previous answer', async () => {
     const requests: Array<{ path: string; body: unknown }> = []
     vi.stubGlobal(
       'fetch',
@@ -243,12 +233,6 @@ describe('PlayerClaimPanel', () => {
             id: 'q4',
             prompt: 'Which weapon was equipped in slot 1?',
             options: ['Old Bow', 'Crossbow', 'Handgun'],
-            canCycle: true
-          }
-          const q5 = {
-            id: 'q5',
-            prompt: 'Which Pal was in party slot 2?',
-            options: ['Lamball', 'Cattiva', 'Chikipi', 'Foxparks', 'Lifmunk'],
             canCycle: false
           }
           return jsonResponse({
@@ -257,7 +241,7 @@ describe('PlayerClaimPanel', () => {
             instructions: {
               kind: 'inventory_quiz',
               snapshotAt: new Date(Date.now() - 1_000).toISOString(),
-              questions: body.questionId === 'q1' ? [q4, initial[1]] : [q4, q5]
+              questions: body.questionId === initial[0].id ? [q4] : initial
             }
           })
         }
@@ -283,20 +267,11 @@ describe('PlayerClaimPanel', () => {
     )
 
     await user.click(await screen.findByRole('button', { name: 'This is me' }))
-    const q2 = screen.getByRole('combobox', { name: 'Which item is in common-inventory slot 9?' })
-    await user.selectOptions(q2, '3')
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Which item is in common-inventory slot 4?' }), '2')
     await user.click(screen.getByRole('button', { name: 'Change question 1' }))
     const q1Replacement = await screen.findByRole('combobox', { name: 'Which weapon was equipped in slot 1?' })
-    expect(q2).toHaveValue('3')
-
-    await user.selectOptions(q1Replacement, '2')
-    await user.click(screen.getByRole('button', { name: 'Change question 2' }))
-    expect(await screen.findByRole('combobox', { name: 'Which Pal was in party slot 2?' })).toBeVisible()
-    expect(q1Replacement).toHaveValue('2')
-    expect(requests.map((request) => request.body)).toEqual([
-      { challengeToken, questionId: 'q1' },
-      { challengeToken, questionId: 'q2' }
-    ])
+    expect(q1Replacement).toHaveValue('')
+    expect(requests.map((request) => request.body)).toEqual([{ challengeToken, questionId: 'q1' }])
   })
 
   it('shows one concise result after incorrect quiz answers', async () => {
@@ -315,10 +290,9 @@ describe('PlayerClaimPanel', () => {
 
     await user.click(await screen.findByRole('button', { name: 'This is me' }))
     await user.selectOptions(screen.getByRole('combobox', { name: 'Which item is in common-inventory slot 4?' }), '0')
-    await user.selectOptions(screen.getByRole('combobox', { name: 'Which item is in common-inventory slot 9?' }), '0')
-    await user.click(screen.getByRole('button', { name: 'Verify answers' }))
+    await user.click(screen.getByRole('button', { name: 'Verify answer' }))
 
-    expect(await screen.findByText('Answers did not match.')).toBeVisible()
+    expect(await screen.findByText('Answer did not match.')).toBeVisible()
     expect(screen.getByRole('button', { name: 'Try again' })).toBeVisible()
     expect(screen.queryByText(/This check ended/)).not.toBeInTheDocument()
     expect(screen.queryByText(/latest completed save/)).not.toBeInTheDocument()

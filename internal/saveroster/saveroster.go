@@ -36,7 +36,7 @@ const (
 	maxNameBytes         = 96
 	claimCandidateFloor  = 16
 	claimCycleSlots      = 8
-	claimQuizQuestions   = 2
+	claimQuizQuestions   = 1
 	claimQuizMinOptions  = 3
 	claimQuizMaxOptions  = 8
 	claimCommonQuizSlots = 12 // The first two six-column rows in the in-game inventory.
@@ -764,9 +764,8 @@ func (s *Source) Verify(ctx context.Context, prepared *playerclaim.Prepared) err
 	}
 }
 
-// CycleQuestion replaces only the requested knowledge question. The remaining
-// questions and their answer keys stay unchanged, so a claimant can skip one
-// uncertain memory without re-answering the other cards.
+// CycleQuestion replaces the requested knowledge question so a claimant can
+// skip one uncertain memory before submitting their single answer.
 func (s *Source) CycleQuestion(ctx context.Context, prepared *playerclaim.Prepared, questionID string) error {
 	if ctx == nil || prepared == nil || strings.TrimSpace(questionID) == "" {
 		return playerclaim.ErrUnavailable

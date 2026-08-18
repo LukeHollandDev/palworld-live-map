@@ -281,8 +281,7 @@ func (s *Service) Start(ctx context.Context, publicPlayerID string) (Challenge, 
 	}, nil
 }
 
-// CycleQuestion replaces one uncertain knowledge question while preserving
-// the other question IDs and their client-side answers.
+// CycleQuestion replaces the current uncertain knowledge question.
 func (s *Service) CycleQuestion(ctx context.Context, challengeBearer, questionID string) (Verification, error) {
 	cycler, ok := s.prover.(QuestionCycler)
 	if !ok || strings.TrimSpace(questionID) == "" {
@@ -625,7 +624,7 @@ func emptyInstructions(instructions Instructions) bool {
 
 func validQuizInstructions(instructions Instructions) bool {
 	if instructions.Kind != InventoryQuiz || instructions.Phase != "" || instructions.Step != 0 ||
-		instructions.TotalSteps != 0 || len(instructions.Pairs) != 0 || len(instructions.Questions) != 2 ||
+		instructions.TotalSteps != 0 || len(instructions.Pairs) != 0 || len(instructions.Questions) != 1 ||
 		instructions.SnapshotAt.IsZero() {
 		return false
 	}

@@ -8,11 +8,11 @@ This map does not provide general viewer authentication. Anyone who can access i
 
 The optional saved-character connection authenticates only self-private routes;
 it is not an access-control layer for the live map. Its primary proof is a
-one-shot, two-question memory quiz generated from a safely completed backup.
-Each question exposes three to eight real item or Pal names from the answer's
-saved container and can be replaced independently without changing the other
-card. Starting or cycling a challenge can therefore disclose this bounded set
-before identity is verified. Questions may use the first two rows of common
+one-shot, one-question memory quiz generated from a safely completed backup.
+The question exposes three to eight real item or Pal names from the answer's
+saved container and can be replaced before answering. Starting or cycling a
+challenge can therefore disclose this bounded set before identity is verified.
+Questions may use the first two rows of common
 inventory, equipment, food, or party slots. Dropped-item and key-item containers
 are excluded. A wrong submission
 consumes the challenge, and existing per-client and global limits bound guessing and private

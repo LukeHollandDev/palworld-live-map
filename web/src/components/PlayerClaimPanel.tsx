@@ -160,7 +160,7 @@ function parseQuiz(value: unknown): QuizInstructions | null {
     !isRecord(value) ||
     value.kind !== 'inventory_quiz' ||
     !Array.isArray(value.questions) ||
-    value.questions.length !== 2
+    value.questions.length !== 1
   )
     return null
   const questions: QuizQuestion[] = []
@@ -1469,12 +1469,12 @@ function ActiveChallenge({
         >
           {challenge.phase === 'checking'
             ? challenge.quiz
-              ? 'Checking answers…'
+              ? 'Checking answer…'
               : instructions
                 ? `Checking step ${instructions.step}…`
                 : 'Checking baseline…'
             : challenge.quiz
-              ? 'Verify answers'
+              ? 'Verify answer'
               : challenge.phase === 'ready'
                 ? `I completed all ${CLAIM_PAIR_COUNT} swaps`
                 : challenge.phase === 'arming'
@@ -1785,7 +1785,7 @@ function ClaimNotice({ notice }: { notice: Exclude<Notice, null> }) {
     notice === 'rejected'
       ? 'This identity request was rejected. Reload the map and try again.'
       : notice === 'incorrect'
-        ? 'Those answers did not match this character’s latest completed save. Start a new check to try again.'
+        ? 'That answer did not match this character’s latest completed save. Start a new check to try again.'
         : notice === 'session-mismatch'
           ? 'The identity proof completed, but another player session is active. Disconnect it before trying again.'
           : 'Identity checks are temporarily unavailable. Please try again shortly.'
@@ -1812,7 +1812,7 @@ function ChallengeStatus({
     return null
   }
   if (challenge.quiz && challenge.phase === 'checking') {
-    message = 'Checking both answers…'
+    message = 'Checking your answer…'
   }
   if (challenge.phase === 'ready' && instructions) {
     message = `Step ${instructions.step} is ready. Complete all seven swaps in order, then confirm once.`
@@ -1834,7 +1834,7 @@ function ChallengeStatus({
   if (challenge.phase === 'expired') {
     message = challenge.quiz
       ? notice === 'incorrect'
-        ? 'Answers did not match.'
+        ? 'Answer did not match.'
         : 'Check expired.'
       : instructions
         ? challenge.recoveryAcknowledged

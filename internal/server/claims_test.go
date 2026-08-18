@@ -718,7 +718,6 @@ func TestOfflineInventoryQuizAnswersIssuePrivateSession(t *testing.T) {
 		Kind: playerclaim.InventoryQuiz, SnapshotAt: claimTestNow,
 		Questions: []playerclaim.QuizQuestion{
 			{ID: "q1", Prompt: "First item?", Options: []string{"Wood", "Stone", "Fiber", "Ore", "Coal", "Sulfur", "Quartz", "Pal Sphere"}},
-			{ID: "q2", Prompt: "Second item?", Options: []string{"A", "B", "C", "D", "E", "F", "G", "H"}},
 		},
 	}
 	prover := &claimHTTPProver{prepareInstructions: quiz}
@@ -736,7 +735,7 @@ func TestOfflineInventoryQuizAnswersIssuePrivateSession(t *testing.T) {
 	if err := json.Unmarshal(started.Body.Bytes(), &challenge); err != nil {
 		t.Fatal(err)
 	}
-	answers := []playerclaim.QuizAnswer{{QuestionID: "q1", Option: 1}, {QuestionID: "q2", Option: 3}}
+	answers := []playerclaim.QuizAnswer{{QuestionID: "q1", Option: 1}}
 	verifyBody, err := json.Marshal(verifyClaimRequest{ChallengeToken: challenge.Bearer, Answers: answers})
 	if err != nil {
 		t.Fatal(err)
@@ -750,12 +749,11 @@ func TestOfflineInventoryQuizAnswersIssuePrivateSession(t *testing.T) {
 	}
 }
 
-func TestOfflineQuizCyclesOneQuestionWithoutChangingTheOthers(t *testing.T) {
+func TestOfflineQuizCyclesTheQuestion(t *testing.T) {
 	quiz := playerclaim.Instructions{
 		Kind: playerclaim.InventoryQuiz, SnapshotAt: claimTestNow,
 		Questions: []playerclaim.QuizQuestion{
 			{ID: "q1", Prompt: "First?", Options: []string{"A", "B", "C", "D", "E", "F", "G", "H"}, CanCycle: true},
-			{ID: "q2", Prompt: "Second?", Options: []string{"I", "J", "K", "L", "M", "N", "O", "P"}, CanCycle: true},
 		},
 	}
 	prover := &claimHTTPProver{prepareInstructions: quiz}
@@ -771,7 +769,6 @@ func TestOfflineQuizCyclesOneQuestionWithoutChangingTheOthers(t *testing.T) {
 	}
 	cycled := serveClaim(t, server, newClaimMutation(http.MethodPost, "/api/player-claims/questions/cycle", string(body)))
 	if cycled.Code != http.StatusOK || !strings.Contains(cycled.Body.String(), `"id":"q4"`) ||
-		!strings.Contains(cycled.Body.String(), `"id":"q2"`) ||
 		strings.Contains(cycled.Body.String(), "correct") {
 		t.Fatalf("cycle = status %d, body %s", cycled.Code, cycled.Body.String())
 	}
