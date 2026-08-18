@@ -74,6 +74,7 @@ function mockAPI(resolve: (path: string) => unknown = (path) => responses[path])
         typeof input === 'string' ? input : input instanceof URL ? input.pathname : new URL(input.url).pathname
       const body = resolve(path)
       if (body instanceof Error) throw body
+      if (body instanceof Response) return body
       return body
         ? new Response(JSON.stringify(body), { status: 200, headers: { 'Content-Type': 'application/json' } })
         : new Response(null, { status: 404 })
@@ -84,8 +85,10 @@ function mockAPI(resolve: (path: string) => unknown = (path) => responses[path])
 afterEach(() => {
   cleanup()
   window.localStorage.clear()
+  window.history.replaceState({}, '', '/')
   vi.restoreAllMocks()
   vi.unstubAllGlobals()
+  Object.defineProperty(document, 'execCommand', { configurable: true, value: undefined })
 })
 
 describe('App', () => {
@@ -230,20 +233,21 @@ describe('App', () => {
     const serverSurface = serverTitle.parentElement?.parentElement
     if (!commandbarLayout || !serverSurface) throw new Error('Expected the responsive command bar layout')
     expect(commandbarLayout).toHaveClass(
-      'grid-cols-[54px_minmax(0,1fr)_54px]',
-      'max-sm:grid-cols-2',
+      'grid-cols-[54px_minmax(0,1fr)_54px_54px]',
+      'max-sm:grid-cols-3',
       'max-sm:grid-rows-[70px_44px]'
     )
     expect(serverSurface).toHaveClass(
       'pal-glass-surface',
       'h-[54px]',
-      'max-sm:col-span-2',
+      'max-sm:col-span-3',
       'max-sm:col-start-1',
       'row-start-1'
     )
     const filterControl = within(statusBar).getByRole('button', { name: 'Map filters' })
+    const progressControl = within(statusBar).getByRole('button', { name: 'My Progress' })
     const leaderboardControl = within(statusBar).getByRole('button', { name: 'Leaderboards' })
-    for (const control of [filterControl, leaderboardControl]) {
+    for (const control of [filterControl, progressControl, leaderboardControl]) {
       expect(control).toHaveClass(
         'header-panel-control',
         'relative',
@@ -256,12 +260,17 @@ describe('App', () => {
       expect(control).not.toHaveAttribute('aria-hidden')
       expect(control).not.toHaveAttribute('inert')
     }
-    expect(filterControl.parentElement).toBe(leaderboardControl.parentElement)
+    expect(filterControl.parentElement).toBe(progressControl.parentElement)
+    expect(progressControl.parentElement).toBe(leaderboardControl.parentElement)
     expect(filterControl).toHaveClass('pal-selected', 'col-start-1', 'max-sm:row-start-2')
     expect(filterControl).toHaveAttribute('aria-expanded', 'true')
     expect(filterControl.querySelector('svg')).toHaveClass('tabler-icon-filter')
+    expect(progressControl).not.toHaveClass('pal-selected')
+    expect(progressControl).toHaveClass('col-start-3', 'max-sm:col-start-2', 'max-sm:row-start-2')
+    expect(progressControl).toHaveAttribute('aria-expanded', 'false')
+    expect(progressControl.querySelector('svg')).toHaveClass('tabler-icon-checklist')
     expect(leaderboardControl).not.toHaveClass('pal-selected')
-    expect(leaderboardControl).toHaveClass('col-start-3', 'max-sm:col-start-2', 'max-sm:row-start-2')
+    expect(leaderboardControl).toHaveClass('col-start-4', 'max-sm:col-start-3', 'max-sm:row-start-2')
     expect(leaderboardControl).toHaveAttribute('aria-expanded', 'false')
     expect(leaderboardControl.querySelector('svg')).toHaveClass('tabler-icon-trophy')
     expect(filterControl.compareDocumentPosition(serverSurface) & Node.DOCUMENT_POSITION_FOLLOWING).not.toBe(0)
@@ -302,6 +311,118 @@ describe('App', () => {
     await waitFor(() => expect(detailsTitle).toHaveFocus())
     expect(screen.getByText(/X 10\s+Y 20/)).toBeInTheDocument()
     expect(screen.getByText('No guild membership is known for this player.')).toBeVisible()
+  })
+
+  it('composes player claims with private fixed-position sharing and landmark sharing', async () => {
+    mockAPI((path) => {
+      if (path === '/api/config') {
+        return { ...(responses[path] as Record<string, unknown>), playerClaimsEnabled: true }
+      }
+      if (path === '/api/me') {
+        return new Response(JSON.stringify({ error: 'authentication_required' }), {
+          status: 401,
+          headers: { 'Content-Type': 'application/json' }
+        })
+      }
+      if (path === '/assets/test-world-catalogue.json') {
+        return {
+          ...(responses[path] as Record<string, unknown>),
+          locations: [
+            {
+              id: 'waypoint-share-test',
+              kind: 'waypoints',
+              name: 'Small Settlement',
+              x: 15,
+              y: 25,
+              map: 'palpagos'
+            }
+          ]
+        }
+      }
+      return responses[path]
+    })
+    const user = userEvent.setup()
+    vi.stubGlobal('navigator', { ...navigator, clipboard: undefined })
+    Object.defineProperty(document, 'execCommand', { configurable: true, value: undefined })
+    render(<App />)
+
+    const explorer = await screen.findByRole('complementary', { name: 'Map filters' })
+    await user.click(await within(explorer).findByRole('button', { name: 'View Luke · Lv 55' }))
+    let inspector = screen.getByRole('dialog', { name: 'Luke' })
+    expect(await within(inspector).findByRole('button', { name: 'This is me' })).toBeVisible()
+    const sharePlayer = within(inspector).getByRole('button', { name: 'Share position' })
+    expect(sharePlayer.querySelector('svg')).toHaveAttribute('aria-hidden', 'true')
+    await user.click(sharePlayer)
+
+    let manualLink = await within(inspector).findByRole('textbox', { name: 'Position link for manual copy' })
+    let sharedUrl = new URL((manualLink as HTMLInputElement).value)
+    expect(sharedUrl.searchParams.get('share')).toBe('position')
+    expect(sharedUrl.searchParams.get('region')).toBe('palpagos')
+    expect(sharedUrl.searchParams.get('x')).toBe('10')
+    expect(sharedUrl.searchParams.get('y')).toBe('20')
+    expect(sharedUrl.searchParams.get('zoom')).toBe('8')
+    expect([...sharedUrl.searchParams.keys()].sort()).toEqual(['region', 'share', 'x', 'y', 'zoom'])
+    expect(sharedUrl.toString()).not.toContain('player-luke')
+    expect(sharedUrl.toString()).not.toMatch(/bearer|challenge|claim|subject|token/i)
+    expect(within(inspector).getByRole('status')).toHaveTextContent('Automatic copy unavailable. Copy this link:')
+
+    await user.click(within(inspector).getByRole('button', { name: 'Close details' }))
+    await user.click(within(explorer).getByRole('button', { name: 'Expand Waypoints section' }))
+    await user.click(await within(explorer).findByRole('button', { name: 'View Small Settlement' }))
+    inspector = screen.getByRole('dialog', { name: 'Small Settlement' })
+    await user.click(within(inspector).getByRole('button', { name: 'Share position' }))
+
+    manualLink = await within(inspector).findByRole('textbox', { name: 'Position link for manual copy' })
+    sharedUrl = new URL((manualLink as HTMLInputElement).value)
+    expect(sharedUrl.searchParams.get('x')).toBe('15')
+    expect(sharedUrl.searchParams.get('y')).toBe('25')
+    expect(sharedUrl.toString()).not.toContain('waypoint-share-test')
+  })
+
+  it('opens a shared URL on its encoded region and restores only the camera', async () => {
+    const viewportWidth = 1200
+    const viewportHeight = 600
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(
+      () => new DOMRect(0, 0, viewportWidth, viewportHeight)
+    )
+    vi.stubGlobal('devicePixelRatio', 1)
+    vi.stubGlobal(
+      'requestAnimationFrame',
+      vi.fn((callback: FrameRequestCallback) => {
+        callback(0)
+        return 1
+      })
+    )
+    vi.stubGlobal('cancelAnimationFrame', vi.fn())
+    window.history.replaceState({}, '', '/?share=position&region=world-tree&x=250&y=350&zoom=12')
+    mockAPI((path) =>
+      path === '/api/config'
+        ? {
+            ...(responses[path] as Record<string, unknown>),
+            layers: [
+              { id: 'palpagos', name: 'Palpagos Islands', bounds: [100, 100, -100, -100] },
+              { id: 'world-tree', name: 'World Tree', bounds: [400, 500, 200, 300] }
+            ]
+          }
+        : responses[path]
+    )
+
+    render(<App />)
+
+    expect(await screen.findByRole('application', { name: /World Tree interactive world map/ })).toBeVisible()
+    expect(screen.queryByRole('img', { name: /Shared position/ })).not.toBeInTheDocument()
+    const scene = document.querySelector<HTMLElement>('.map-scene')
+    if (!scene) throw new Error('Expected map scene')
+    await waitFor(() => {
+      const match = scene.style.transform.match(/^translate\(([-\d.]+)px, ([-\d.]+)px\) scale\(([-\d.]+)\)$/)
+      if (!match) throw new Error(`Unexpected map transform: ${scene.style.transform}`)
+      const view = { x: Number(match[1]), y: Number(match[2]), scale: Number(match[3]) }
+      const fitScale = (viewportHeight - 128) / 8192
+      expect(2048 * view.scale + view.x).toBeCloseTo(viewportWidth / 2)
+      expect(6144 * view.scale + view.y).toBeCloseTo(viewportHeight / 2)
+      expect(view.scale / fitScale).toBeCloseTo(12)
+    })
+    expect(screen.queryByRole('img', { name: /Shared position/ })).not.toBeInTheDocument()
   })
 
   it('shows save-game progress when available and omits unknown fields', async () => {
@@ -1188,7 +1309,7 @@ describe('App', () => {
     let explorer = screen.getByRole('complementary', { name: 'Map filters' })
     await waitFor(() => expect(within(explorer).getByRole('checkbox', { name: 'Show Guilds' })).toBeChecked())
 
-    const uncheckAll = within(explorer).getByRole('button', { name: 'Uncheck all' })
+    const uncheckAll = within(explorer).getByRole('button', { name: 'Hide all map categories' })
     await user.click(uncheckAll)
     for (const checkbox of within(explorer).getAllByRole('checkbox')) expect(checkbox).not.toBeChecked()
     expect(uncheckAll).toBeDisabled()
@@ -1230,9 +1351,9 @@ describe('App', () => {
     const playerVisibility = within(explorer).getByRole('checkbox', { name: 'Show Luke · Lv 55' })
     const siblingVisibility = within(explorer).getByRole('checkbox', { name: 'Show Anne · Lv 20' })
     const categoryVisibility = within(explorer).getByRole('checkbox', { name: 'Show Online Players' })
-    const checkAll = within(explorer).getByRole('button', { name: 'Check all' })
+    const checkAll = within(explorer).getByRole('button', { name: 'Show all map categories' })
 
-    await user.click(within(explorer).getByRole('button', { name: 'Uncheck all' }))
+    await user.click(within(explorer).getByRole('button', { name: 'Hide all map categories' }))
     expect(checkAll).toBeEnabled()
     expect(playerVisibility).toBeEnabled()
     expect(playerVisibility).not.toBeChecked()
@@ -1275,7 +1396,7 @@ describe('App', () => {
     render(<App />)
     await screen.findByRole('heading', { name: 'Test Realm' })
     const restoredExplorer = screen.getByRole('complementary', { name: 'Map filters' })
-    expect(within(restoredExplorer).getByRole('button', { name: 'Check all' })).toBeDisabled()
+    expect(within(restoredExplorer).getByRole('button', { name: 'Show all map categories' })).toBeDisabled()
     expect(within(restoredExplorer).getByRole('checkbox', { name: 'Show Online Players' })).toBeChecked()
     expect(within(restoredExplorer).getByRole('checkbox', { name: 'Show Luke · Lv 55' })).toBeChecked()
     expect(within(restoredExplorer).getByRole('checkbox', { name: 'Show Anne · Lv 20' })).toBeChecked()
@@ -1556,6 +1677,16 @@ describe('App', () => {
     expect(screen.getByRole('button', { name: 'Penking · Lv 15' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Zoe & Grizzbolt · Lv 10' })).toBeInTheDocument()
 
+    await user.click(within(explorer).getByRole('button', { name: 'Show all map categories' }))
+    await user.click(within(explorer).getByRole('button', { name: 'Hide all map categories' }))
+    await user.click(within(explorer).getByRole('checkbox', { name: 'Show Alpha Pals' }))
+    await user.click(within(explorer).getByRole('checkbox', { name: 'Show Tower Bosses' }))
+    expect(within(explorer).getByText('2 map items shown')).toBeVisible()
+    expect(screen.getByRole('button', { name: 'Penking · Lv 15' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Zoe & Grizzbolt · Lv 10' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Luke · Lv 55' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Home' })).not.toBeInTheDocument()
+
     await user.click(within(explorer).getByRole('button', { name: 'Expand Alpha Pals section' }))
     await user.click(within(explorer).getByRole('button', { name: 'Expand Tower Bosses section' }))
     expect(
@@ -1746,6 +1877,122 @@ describe('App', () => {
     await user.type(screen.getByRole('searchbox'), 'static npc')
     expect(within(explorer).getByRole('button', { name: 'View Static Merchant' })).toBeVisible()
     expect(within(explorer).queryByRole('button', { name: 'View Roaming Scout' })).not.toBeInTheDocument()
+  })
+
+  it('keeps a durable manual landmark checklist and can show only remaining landmarks', async () => {
+    const catalogueLocations = [
+      {
+        id: 'effigy-complete',
+        kind: 'effigies',
+        name: 'First Effigy',
+        x: 10,
+        y: 10,
+        map: 'palpagos'
+      },
+      {
+        id: 'effigy-remaining',
+        kind: 'effigies',
+        name: 'Second Effigy',
+        x: 20,
+        y: 20,
+        map: 'palpagos'
+      }
+    ]
+    mockAPI((path) =>
+      path === '/assets/test-world-catalogue.json'
+        ? { ...(responses[path] as object), locations: catalogueLocations }
+        : responses[path]
+    )
+
+    const user = userEvent.setup()
+    const view = render(<App />)
+    await screen.findByRole('heading', { name: 'Test Realm' })
+    const explorer = screen.getByRole('complementary', { name: 'Map filters' })
+    await user.click(screen.getByRole('button', { name: 'My Progress' }))
+    let progressPanel = screen.getByRole('complementary', { name: 'My Progress' })
+    expect(within(progressPanel).getByRole('progressbar', { name: 'Palpagos Islands completion' })).toHaveAttribute(
+      'aria-valuenow',
+      '0'
+    )
+    expect(within(progressPanel).getByText('My checklist')).toBeVisible()
+    await user.click(within(progressPanel).getByRole('button', { name: 'Close My Progress' }))
+
+    const effigyVisibility = within(explorer).getByRole('checkbox', { name: 'Show Pal Effigies' })
+    await user.click(effigyVisibility)
+    await user.click(within(explorer).getByRole('button', { name: 'Expand Pal Effigies section' }))
+    await user.click(within(explorer).getByRole('button', { name: 'View First Effigy' }))
+
+    const inspector = screen.getByRole('dialog')
+    const completion = within(inspector).getByRole('checkbox', {
+      name: 'Mark First Effigy complete in My checklist'
+    })
+    expect(completion).not.toBeChecked()
+    expect(completion).toHaveAccessibleDescription(
+      'Manual marks stay in this browser. Save-confirmed progress appears only while connected.'
+    )
+    await user.click(completion)
+
+    expect(completion).toBeChecked()
+    expect(within(inspector).getByText('Manual mark saved')).toBeVisible()
+    expect(within(explorer).getByRole('button', { name: 'View First Effigy, manual completion' })).toBeVisible()
+    expect(screen.getByRole('button', { name: 'First Effigy · Manual completion' })).toHaveAttribute(
+      'data-completion-source',
+      'manual'
+    )
+
+    await user.click(screen.getByRole('button', { name: 'My Progress' }))
+    progressPanel = screen.getByRole('complementary', { name: 'My Progress' })
+    expect(within(progressPanel).getByRole('progressbar', { name: 'Palpagos Islands completion' })).toHaveAttribute(
+      'aria-valuenow',
+      '1'
+    )
+    const remainingOnly = within(progressPanel).getByRole('checkbox', { name: 'Show only missing on the map' })
+    expect(remainingOnly).toHaveAccessibleDescription(
+      'Hide landmarks completed manually or confirmed by your connected save from the map and Map filters.'
+    )
+    await user.click(remainingOnly)
+
+    expect(within(explorer).queryByRole('button', { name: /View First Effigy/ })).not.toBeInTheDocument()
+    expect(within(explorer).getByRole('button', { name: 'View Second Effigy' })).toBeVisible()
+    expect(screen.queryByRole('button', { name: 'First Effigy · Manual completion' })).not.toBeInTheDocument()
+
+    await user.click(within(explorer).getByRole('button', { name: 'Show all map categories' }))
+    expect(within(explorer).queryByRole('button', { name: /View First Effigy/ })).not.toBeInTheDocument()
+    await user.click(within(explorer).getByRole('button', { name: 'Hide all map categories' }))
+    expect(within(explorer).getByText('0 map items shown')).toBeVisible()
+    await user.click(within(explorer).getByRole('checkbox', { name: 'Show Pal Effigies' }))
+    expect(within(explorer).queryByRole('button', { name: /View First Effigy/ })).not.toBeInTheDocument()
+    expect(within(explorer).getByRole('button', { name: 'View Second Effigy' })).toBeVisible()
+    expect(within(explorer).getByText('1 map item shown')).toBeVisible()
+    await waitFor(() => {
+      const stored = JSON.parse(
+        window.localStorage.getItem('palworld-live-map.completion-profiles.v1') || '{}'
+      ) as Record<string, unknown>
+      expect(stored).toMatchObject({
+        version: 1,
+        activeProfileId: 'manual:default',
+        remainingOnly: true,
+        profiles: [
+          {
+            id: 'manual:default',
+            name: 'My checklist',
+            source: 'manual',
+            manualMarks: [expect.objectContaining({ landmarkId: 'effigy-complete' })]
+          }
+        ]
+      })
+      expect(stored).not.toHaveProperty('saveEvidence')
+    })
+
+    view.unmount()
+    render(<App />)
+    await screen.findByRole('heading', { name: 'Test Realm' })
+    const restoredExplorer = screen.getByRole('complementary', { name: 'Map filters' })
+    await user.click(screen.getByRole('button', { name: 'My Progress' }))
+    const restoredProgress = screen.getByRole('complementary', { name: 'My Progress' })
+    expect(within(restoredProgress).getByRole('checkbox', { name: 'Show only missing on the map' })).toBeChecked()
+    expect(within(restoredProgress).getByRole('progressbar')).toHaveAttribute('aria-valuenow', '1')
+    expect(within(restoredExplorer).queryByRole('button', { name: /View First Effigy/ })).not.toBeInTheDocument()
   })
 
   it('collapses and expands individual filter sections', async () => {

@@ -2,7 +2,9 @@ package savesidecar
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -11,7 +13,50 @@ import (
 	"time"
 )
 
-const testGameVersion = "1.0.1.100619"
+const (
+	testGameVersion            = "1.0.1.100619"
+	claimCandidateFloorForTest = 16
+)
+
+func TestPrivateClaimSaveTypesMarshalWithoutEvidence(t *testing.T) {
+	stack := ClaimStack{Slot: 7, ItemID: "private-item-id", Count: 31, DynamicItemID: "private-instance-id"}
+	pal := ClaimPal{Slot: 3, InstanceID: "private-pal-id", Species: "private-pal-species"}
+	progress := ClaimProgress{
+		Available:    true,
+		FastTravel:   []string{"private-fast-travel-key"},
+		Areas:        []string{"private-area-key"},
+		Notes:        []string{"private-note-key"},
+		Relics:       []string{"private-relic-key"},
+		ItemPickups:  []string{"private-item-pickup-key"},
+		NormalBosses: []string{"private-normal-boss-key"},
+		TowerBosses:  []string{"private-tower-boss-key"},
+	}
+	player := ClaimPlayer{
+		PlayerID: "aaaaaaaa000000000000000000000000",
+		Common:   []ClaimStack{stack},
+		DropSlot: []ClaimStack{stack}, Essential: []ClaimStack{stack}, Weapons: []ClaimStack{stack},
+		Armor: []ClaimStack{stack}, Food: []ClaimStack{stack},
+		Party:    []ClaimPal{pal},
+		Progress: progress,
+	}
+
+	for name, value := range map[string]any{
+		"player":   player,
+		"stack":    stack,
+		"pal":      pal,
+		"progress": progress,
+	} {
+		t.Run(name, func(t *testing.T) {
+			encoded, err := json.Marshal(value)
+			if err != nil {
+				t.Fatalf("json.Marshal() error = %v", err)
+			}
+			if got, want := string(encoded), `{}`; got != want {
+				t.Fatalf("private save type JSON = %s, want %s", got, want)
+			}
+		})
+	}
+}
 
 func TestDecodePlayerDerivesProgress(t *testing.T) {
 	data, err := os.ReadFile(filepath.Join("testdata", "player-details.json"))
@@ -114,6 +159,25 @@ printf '%s' `+shellQuote(string(fixture))+`
 	}
 }
 
+func TestReaderErrorsNeverIncludeRawPlayerSaveGUID(t *testing.T) {
+	const rawGUID = "aaaaaaaa-0000-0000-0000-000000000000"
+	generation := makeSnapshot(t)
+	target := filepath.Join(t.TempDir(), "outside.sav")
+	if err := os.WriteFile(target, []byte("outside"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(target, filepath.Join(generation, "Players", rawGUID+".sav")); err != nil {
+		t.Skipf("symlinks unavailable: %v", err)
+	}
+	_, err := (&Reader{}).ReadSnapshot(context.Background(), generation)
+	if err == nil {
+		t.Fatal("ReadSnapshot() accepted a player-save symlink")
+	}
+	if strings.Contains(strings.ToLower(err.Error()), rawGUID) {
+		t.Fatalf("loggable snapshot error leaked raw player GUID: %v", err)
+	}
+}
+
 func TestReaderHonorsContextAndOutputBounds(t *testing.T) {
 	slow := writeFakeDecoder(t, "exec sleep 5\n")
 	reader := newTestReader(t, slow, 0)
@@ -127,6 +191,75 @@ func TestReaderHonorsContextAndOutputBounds(t *testing.T) {
 	reader = newTestReader(t, large, 128)
 	if _, err := reader.ReadSnapshot(context.Background(), makeSnapshot(t, "one.sav")); err == nil || !strings.Contains(err.Error(), "failed for all") {
 		t.Fatalf("bounded output error = %v", err)
+	}
+}
+
+func TestReaderSerializesDecoderProcessesAndCancelsQueuedWork(t *testing.T) {
+	dir := t.TempDir()
+	startedPath := filepath.Join(dir, "started")
+	releasePath := filepath.Join(dir, "release")
+	launchesPath := filepath.Join(dir, "launches")
+	binary := writeFakeDecoder(t, `
+printf '%s\n' launched >> `+shellQuote(launchesPath)+`
+: > `+shellQuote(startedPath)+`
+while [ ! -f `+shellQuote(releasePath)+` ]; do sleep 0.01; done
+printf '%s' '{}'
+`)
+	reader := newTestReader(t, binary, 0)
+
+	firstContext, cancelFirst := context.WithCancel(context.Background())
+	defer cancelFirst()
+	defer func() { _ = os.WriteFile(releasePath, []byte("release"), 0o600) }()
+	first := make(chan error, 1)
+	go func() {
+		_, err := reader.run(firstContext, "--work", "first")
+		first <- err
+	}()
+
+	deadline := time.Now().Add(2 * time.Second)
+	for {
+		if _, err := os.Stat(startedPath); err == nil {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("first decoder process did not start")
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+
+	queuedContext, cancelQueued := context.WithTimeout(context.Background(), 100*time.Millisecond)
+	defer cancelQueued()
+	if _, err := reader.run(queuedContext, "--work", "queued"); !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("queued run error = %v, want context deadline exceeded", err)
+	}
+	launches, err := os.ReadFile(launchesPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := len(strings.Fields(string(launches))); got != 1 {
+		t.Fatalf("decoder launches while first process held gate = %d, want 1", got)
+	}
+
+	if err := os.WriteFile(releasePath, []byte("release"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case err := <-first:
+		if err != nil {
+			t.Fatalf("first run error = %v", err)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("first decoder process did not release the gate")
+	}
+	if _, err := reader.run(context.Background(), "--work", "after-release"); err != nil {
+		t.Fatalf("run after release error = %v", err)
+	}
+	launches, err = os.ReadFile(launchesPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := len(strings.Fields(string(launches))); got != 2 {
+		t.Fatalf("decoder launches after gate release = %d, want 2", got)
 	}
 }
 
@@ -170,7 +303,7 @@ func TestReaderResolvesNamesLevelsAndGuilds(t *testing.T) {
 		t.Fatal(err)
 	}
 	argFile := filepath.Join(t.TempDir(), "resolve-arguments")
-	resolved := `{"resolveVersion":3,"kind":"roster","roster":[{
+	resolved := `{"resolveVersion":4,"kind":"roster","roster":[{
 		"playerUId":"AAAAAAAA-0000-0000-0000-000000000000",
 		"character":{"nickname":"Sable","level":42,"arenaRankPoints":1875},
 		"guild":{"id":"5aa6910c-e317-4a73-be66-6d55190b9dbf","name":"Aurora"},
@@ -231,7 +364,7 @@ func TestReaderKeepsPresetDataWhenResolveFails(t *testing.T) {
 	for _, resolveBody := range map[string]string{
 		"exits non-zero": `echo boom >&2; exit 1`,
 		"emits garbage":  `printf '%s' '{not-json'`,
-		"wrong kind":     `printf '%s' '{"resolveVersion":3,"kind":"guilds","roster":[]}'`,
+		"wrong kind":     `printf '%s' '{"resolveVersion":4,"kind":"guilds","roster":[]}'`,
 		"wrong version":  `printf '%s' '{"resolveVersion":999,"kind":"roster","roster":[]}'`,
 	} {
 		binary := writeFakeDecoderWithResolve(t, testPresets, resolveBody,
@@ -256,6 +389,195 @@ func TestReaderKeepsPresetDataWhenResolveFails(t *testing.T) {
 	}
 }
 
+func TestReaderResolvesPrivateClaimSlotsForOnePlayer(t *testing.T) {
+	resolved := `{"resolveVersion":4,"kind":"player","player":{
+		"playerUId":"AAAAAAAA-0000-0000-0000-000000000000",
+		"progress":{"fastTravel":["FT-Two","ft-one"],"areas":[],"notes":["Day0"],"relics":["Relic-One"],"itemPickups":["Pickup-One"],"normalBosses":[],"towerBosses":[]},
+		"inventory":{"common":[
+			{"slot":7,"itemId":"Stone","count":31},
+			{"slot":2,"itemId":"Wood","count":19}
+		],"dropSlot":[{"slot":0,"itemId":"DroppedOre","count":2}],
+		"essential":[{"slot":0,"itemId":"Lantern","count":1}],
+		"weapons":[{"slot":1,"itemId":"AssaultRifle","count":1}],
+		"armor":[{"slot":2,"itemId":"PalMetalArmor","count":1}],
+		"food":[{"slot":3,"itemId":"Salad","count":4}]},
+		"pals":[
+			{"instanceId":"pal-two","species":"Anubis","location":"party","slot":3},
+			{"instanceId":"stored","species":"Lamball","location":"storage","slot":0},
+			{"instanceId":"pal-one","species":"Grizzbolt","location":"party","slot":1}
+		]
+	}}`
+	argFile := filepath.Join(t.TempDir(), "claim-arguments")
+	binary := writeFakeDecoderWithResolve(t, testPresets, `
+printf '%s\n' "$@" > `+shellQuote(argFile)+`
+printf '%s' `+shellQuote(resolved), emptyResolveBody)
+	reader := newTestReader(t, binary, 0)
+	player, err := reader.ReadClaimPlayer(
+		context.Background(), makeSnapshot(t, "one.sav"), "aaaaaaaa-0000-0000-0000-000000000000",
+	)
+	if err != nil {
+		t.Fatalf("ReadClaimPlayer() error = %v", err)
+	}
+	if player.PlayerID != "aaaaaaaa000000000000000000000000" || len(player.Common) != 2 ||
+		player.Common[0].Slot != 2 || player.Common[0].ItemID != "Wood" ||
+		player.Common[1].Slot != 7 || player.Common[1].Count != 31 {
+		t.Fatalf("claim player = %#v", player)
+	}
+	if len(player.Party) != 2 || player.Party[0].Slot != 1 || player.Party[1].Slot != 3 {
+		t.Fatalf("claim party = %#v", player.Party)
+	}
+	if player.Party[0].Species != "Grizzbolt" || len(player.DropSlot) != 1 || len(player.Essential) != 1 ||
+		len(player.Weapons) != 1 || len(player.Armor) != 1 || len(player.Food) != 1 {
+		t.Fatalf("claim private fallback evidence = %#v", player)
+	}
+	if !player.Progress.Available || strings.Join(player.Progress.FastTravel, ",") != "ft-one,ft-two" ||
+		strings.Join(player.Progress.Notes, ",") != "day0" || strings.Join(player.Progress.Relics, ",") != "relic-one" ||
+		strings.Join(player.Progress.ItemPickups, ",") != "pickup-one" || player.Progress.Areas == nil {
+		t.Fatalf("claim progress = %#v", player.Progress)
+	}
+	arguments, err := os.ReadFile(argFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{"--resolve", resolvePlayerKind, "--id", player.PlayerID, "--saves"} {
+		if !strings.Contains(string(arguments), want) {
+			t.Fatalf("claim arguments = %q, want %q", arguments, want)
+		}
+	}
+}
+
+func TestReaderKeepsProofInventoryWhenProgressOrCollectionsAreIncomplete(t *testing.T) {
+	common := make([]map[string]any, claimCandidateFloorForTest)
+	for index := range common {
+		common[index] = map[string]any{
+			"slot": index, "itemId": fmt.Sprintf("PrivateItem%02d", index), "count": index + 1,
+		}
+	}
+	completeProgress := map[string]any{
+		"fastTravel": []string{}, "areas": []string{}, "notes": []string{},
+		"relics": []string{}, "itemPickups": []string{},
+		"normalBosses": []string{}, "towerBosses": []string{},
+	}
+	incompleteProgress := map[string]any{
+		"fastTravel": []string{"private-state-key"}, "notes": []string{},
+		"normalBosses": []string{}, "towerBosses": []string{},
+	}
+	for _, test := range []struct {
+		name          string
+		progress      any
+		wantAvailable bool
+	}{
+		{name: "unrelated collection warning", progress: completeProgress, wantAvailable: true},
+		{name: "missing progress domain", progress: incompleteProgress},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			document := map[string]any{
+				"resolveVersion": 4,
+				"kind":           "player",
+				"player": map[string]any{
+					"playerUId": "aaaaaaaa-0000-0000-0000-000000000000",
+					"progress":  test.progress,
+					"inventory": map[string]any{"common": common},
+					"pals":      []any{},
+					"warnings":  []string{"private collection warning /save/path raw-guid item-id"},
+				},
+			}
+			resolved, err := json.Marshal(document)
+			if err != nil {
+				t.Fatal(err)
+			}
+			binary := writeFakeDecoderWithResolve(t, testPresets, `printf '%s' `+shellQuote(string(resolved)), emptyResolveBody)
+			reader := newTestReader(t, binary, 0)
+			player, err := reader.ReadClaimPlayer(context.Background(), makeSnapshot(t, "one.sav"), "aaaaaaaa-0000-0000-0000-000000000000")
+			if err != nil {
+				t.Fatalf("ReadClaimPlayer() error = %v", err)
+			}
+			if len(player.Common) != claimCandidateFloorForTest {
+				t.Fatalf("proof inventory stacks = %d, want %d", len(player.Common), claimCandidateFloorForTest)
+			}
+			if player.Progress.Available != test.wantAvailable {
+				t.Fatalf("progress availability = %v, want %v: %#v", player.Progress.Available, test.wantAvailable, player.Progress)
+			}
+			if !test.wantAvailable && (player.Progress.FastTravel != nil || player.Progress.Areas != nil ||
+				player.Progress.Notes != nil || player.Progress.NormalBosses != nil || player.Progress.TowerBosses != nil) {
+				t.Fatalf("incomplete progress retained private keys: %#v", player.Progress)
+			}
+		})
+	}
+}
+
+func TestReaderBoundsPartyAfterFilteringStoragePals(t *testing.T) {
+	read := func(t *testing.T, pals []map[string]any) (ClaimPlayer, error) {
+		t.Helper()
+		document := map[string]any{
+			"resolveVersion": 4,
+			"kind":           "player",
+			"player": map[string]any{
+				"playerUId": "aaaaaaaa-0000-0000-0000-000000000000",
+				"inventory": map[string]any{"common": []any{}},
+				"pals":      pals,
+			},
+		}
+		resolved, err := json.Marshal(document)
+		if err != nil {
+			t.Fatal(err)
+		}
+		binary := writeFakeDecoderWithResolve(t, testPresets, `printf '%s' `+shellQuote(string(resolved)), emptyResolveBody)
+		reader := newTestReader(t, binary, 0)
+		return reader.ReadClaimPlayer(context.Background(), makeSnapshot(t, "one.sav"), "aaaaaaaa-0000-0000-0000-000000000000")
+	}
+
+	pals := make([]map[string]any, 0, maxClaimPartyPals*2+2)
+	for index := 0; index < maxClaimPartyPals*2; index++ {
+		pals = append(pals, map[string]any{
+			"instanceId": fmt.Sprintf("private-storage-pal-%03d", index), "location": "storage", "slot": index,
+		})
+	}
+	pals = append(pals,
+		map[string]any{"instanceId": "private-party-one", "location": "party", "slot": 1},
+		map[string]any{"instanceId": "private-party-two", "location": "party", "slot": 2},
+	)
+	player, err := read(t, pals)
+	if err != nil {
+		t.Fatalf("ReadClaimPlayer() with storage Pals = %v", err)
+	}
+	if len(player.Party) != 2 {
+		t.Fatalf("party Pals = %#v, want only two filtered party entries", player.Party)
+	}
+
+	tooManyParty := make([]map[string]any, maxClaimPartyPals+1)
+	for index := range tooManyParty {
+		tooManyParty[index] = map[string]any{
+			"instanceId": fmt.Sprintf("private-party-%03d", index), "location": "party", "slot": index,
+		}
+	}
+	if _, err := read(t, tooManyParty); err == nil {
+		t.Fatal("ReadClaimPlayer() accepted more than the bounded party size")
+	}
+}
+
+func TestReaderRejectsUnsafeClaimDocuments(t *testing.T) {
+	tests := map[string]string{
+		"wrong player":   `{"resolveVersion":4,"kind":"player","player":{"playerUId":"bbbbbbbb-0000-0000-0000-000000000000","inventory":{"common":[]},"pals":[]}}`,
+		"duplicate slot": `{"resolveVersion":4,"kind":"player","player":{"playerUId":"aaaaaaaa-0000-0000-0000-000000000000","inventory":{"common":[{"slot":1,"itemId":"Wood","count":1},{"slot":1,"itemId":"Stone","count":1}]},"pals":[]}}`,
+	}
+	for name, resolved := range tests {
+		t.Run(name, func(t *testing.T) {
+			binary := writeFakeDecoderWithResolve(t, testPresets, `printf '%s' `+shellQuote(resolved), emptyResolveBody)
+			reader := newTestReader(t, binary, 0)
+			if _, err := reader.ReadClaimPlayer(context.Background(), makeSnapshot(t, "one.sav"), "aaaaaaaa-0000-0000-0000-000000000000"); err == nil {
+				t.Fatal("ReadClaimPlayer() succeeded")
+			}
+		})
+	}
+	reader := &Reader{}
+	for _, playerID := range []string{"", "not-a-guid", "aaaaaaaa-0000-0000-0000-00000000000z"} {
+		if _, err := reader.ReadClaimPlayer(context.Background(), "/tmp/snapshot", playerID); err == nil {
+			t.Fatalf("ReadClaimPlayer(%q) succeeded", playerID)
+		}
+	}
+}
+
 // A GUID appearing twice makes every record under it ambiguous, and labelling a
 // player with someone else's name is worse than leaving them unnamed.
 func TestResolveDropsNamesForDuplicateGUIDs(t *testing.T) {
@@ -263,7 +585,7 @@ func TestResolveDropsNamesForDuplicateGUIDs(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	resolved := `{"resolveVersion":3,"kind":"roster","roster":[
+	resolved := `{"resolveVersion":4,"kind":"roster","roster":[
 		{"playerUId":"aaaaaaaa-0000-0000-0000-000000000000","character":{"nickname":"First","level":1}},
 		{"playerUId":"AAAAAAAA00000000000000000000AAAA","character":{"nickname":"Other","level":2}},
 		{"playerUId":"aaaaaaaa-0000-0000-0000-000000000000","character":{"nickname":"Second","level":2}}
@@ -324,7 +646,7 @@ func writeFakeDecoderWithPresets(t *testing.T, presets, body string) string {
 
 // emptyResolveBody names nobody, which is what every test that predates the
 // resolve pass expects: preset behaviour unchanged, no offline players.
-const emptyResolveBody = `printf '%s' '{"resolveVersion":3,"kind":"roster","roster":[]}'`
+const emptyResolveBody = `printf '%s' '{"resolveVersion":4,"kind":"roster","roster":[]}'`
 
 func writeFakeDecoderWithResolve(t *testing.T, presets, resolveBody, body string) string {
 	t.Helper()

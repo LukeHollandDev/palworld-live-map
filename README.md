@@ -6,7 +6,7 @@
 
 Give your Palworld community a live view of players, guilds, bases, Pals, in-game locations, and server health. It runs against your dedicated server's official APIs, stays read-only, and needs no client mods.
 
-![Animated Palworld Live Map demo showing filters, search, a guild base and its Pals, leaderboards, map navigation, and both world regions](assets/images/demo.gif)
+![Animated Palworld Live Map demo showing filters, My Progress, a guild base and its Pals, leaderboards, map navigation, and both world regions](assets/images/demo.gif)
 
 ## Features
 
@@ -20,12 +20,38 @@ Give your Palworld community a live view of players, guilds, bases, Pals, in-gam
 - Optional save integration adds offline players, saved locations, levels,
   guilds, capture totals, Paldeck progress, Arena RP, fast-travel points,
   discovered areas, boss/tower clears, and last-seen times
+- Optional saved-character connection asks one grounded multiple-choice
+  question before granting self-only completion access; raw save identifiers
+  and completion keys stay in the backend
+- My Progress combines private save-confirmed exploration with a local browser
+  checklist, shows completion by landmark category, and can hide completed
+  locations from both the map and its filters
+- Share-position links open the same region, coordinates, and zoom without
+  exposing a player or marker identifier
+- Rich landmark details include altitude, journal previews, and Ancient Shrine
+  rewards when that data is available
 - Configurable refresh intervals and world-object layers
 - Demo mode with fictional moving players and world objects
 
 ## Find anything on the map
 
 Open the map filter to choose which markers are shown and search for players, guilds, Pals, bases, or in-game landmarks. Select a result to jump to its location and open its details.
+
+## Track exploration progress
+
+Open **My Progress** for a regional completed/total breakdown. Palpagos currently
+contains 1,064 checklist locations: 83 Alpha Pals, 8 Tower Bosses, 33 Bounties,
+3 Oil Rigs, 20 Watchtowers, 137 fast-travel points, 170 dungeons, 360 Lifmunk
+Effigies, 55 journals, 106 Ancient Shrine pickups, and 89 NPC locations. The
+total comes from the bundled landmark catalogue and updates with the selected
+region and catalogue version.
+
+Every location can be checked manually in the current browser. Connecting a
+saved character can additionally confirm Alpha Pals, Tower Bosses, Bounties,
+Watchtowers, fast travel, Lifmunk Effigies, journals, and Ancient Shrine
+pickups. Oil Rigs, dungeons, and NPC locations remain manual-only. **Only show
+missing** applies the combined result to the map and map-filter lists without
+changing the category selections.
 
 ## Run with Docker
 
@@ -119,6 +145,7 @@ Every supported environment option and timeout is listed below and documented in
 | `PALWORLD_SAVE_WORLD_ID`  | Exact world ID when automatic discovery is ambiguous                 | empty                  |
 | `SAVE_POLL_INTERVAL`      | Save enrichment interval; minimum `15s`                              | `30s`                  |
 | `SAVE_TIMEOUT`            | Whole-generation timeout; must be below `SAVE_POLL_INTERVAL`         | `20s`                  |
+| `PLAYER_CLAIMS_ENABLED`   | Enable save-backed “This is me” character connection                 | `false`                |
 
 To enable save integration, mount the server's `SaveGames/0` directory read-only
 and set `SAVE_DATA_ENABLED=true`. The image includes the pinned
@@ -131,6 +158,22 @@ Save decoding can use substantial memory, so leave container headroom. A
 decoding problem does not interrupt the live map: online players and available
 progress remain visible, while the map reports that offline details are
 temporarily unavailable.
+
+### Connect a saved character privately
+
+Set `PLAYER_CLAIMS_ENABLED=true` alongside save integration. Choose an online or
+offline character and answer one question based on their saved inventory,
+equipment, food, or party. You can request a different question before answering.
+
+If the map cannot build a question, add three distinct items or Pal species to
+one supported group and wait for a completed backup before trying again.
+
+Connecting adds save-confirmed completion for bosses, bounties, travel points,
+effigies, journals, and Ancient Shrine pickups. Progress is checked
+automatically, and the server selects the completed backup used for the overlay.
+Other landmarks continue to use the browser-local checklist. The connection
+lasts until the page is reloaded; HTTPS is recommended on untrusted networks.
+Existing public player data and map features are unchanged.
 
 ## License
 

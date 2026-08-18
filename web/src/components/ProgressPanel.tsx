@@ -1,0 +1,186 @@
+import { type RefObject, useEffect, useId, useRef } from 'react'
+import type { SaveProgressState } from '../hooks/useSaveProgress'
+import type { CompletionBreakdownItem } from '../lib/completion'
+import type { MapItem, MapLayer } from '../types'
+import { MapPanelHeader, MapPanelShell } from './MapPanel'
+import { PlayerClaimIdentityChooser, PlayerClaimSessionControl } from './PlayerClaimPanel'
+
+export interface ProgressChecklistView {
+  profileName: string
+  completed: number
+  total: number
+  remaining: number
+  breakdown: CompletionBreakdownItem[]
+  remainingOnly: boolean
+  saveProgress: SaveProgressState
+  onRemainingOnlyChange: (remainingOnly: boolean) => void
+}
+
+interface ProgressPanelProps {
+  open: boolean
+  activeLayer: MapLayer
+  players: readonly MapItem[]
+  checklist: ProgressChecklistView
+  progressButtonRef: RefObject<HTMLButtonElement | null>
+  onClose: () => void
+}
+
+function saveProgressDescription(progress: SaveProgressState) {
+  if (progress.phase === 'loading') return 'Loading save progress…'
+  if (progress.phase === 'unavailable')
+    return progress.reason === 'catalogue-version'
+      ? 'Save unavailable · map version mismatch'
+      : 'Save temporarily unavailable'
+  if (progress.phase === 'inactive') return 'Manual · this browser'
+  return null
+}
+
+export function ProgressPanel({
+  open,
+  activeLayer,
+  players,
+  checklist,
+  progressButtonRef,
+  onClose
+}: ProgressPanelProps) {
+  const titleId = useId()
+  const filterDescriptionId = useId()
+  const titleRef = useRef<HTMLHeadingElement>(null)
+  const closeRef = useRef<HTMLButtonElement>(null)
+  const wasOpenRef = useRef(open)
+  const percent = checklist.total > 0 ? Math.round((checklist.completed / checklist.total) * 100) : 0
+  const progress = checklist.saveProgress
+  const progressDescription = saveProgressDescription(progress)
+
+  useEffect(() => {
+    if (open && !wasOpenRef.current) window.requestAnimationFrame(() => closeRef.current?.focus())
+    if (!open && wasOpenRef.current) window.requestAnimationFrame(() => progressButtonRef.current?.focus())
+    wasOpenRef.current = open
+  }, [open, progressButtonRef])
+
+  return (
+    <MapPanelShell
+      id="progress-panel"
+      side="right"
+      mobileSize="fixed"
+      mobileSheetActive={open}
+      mobileSheetLabel="my progress"
+      className={`filter-panel-motion max-sm:z-[34] ${open ? 'is-panel-open' : 'is-panel-closed pointer-events-none'}`}
+      aria-labelledby={titleId}
+      aria-hidden={!open}
+      inert={!open}
+    >
+      <MapPanelHeader
+        as="div"
+        eyebrow="MY MAP"
+        title="My Progress"
+        titleId={titleId}
+        titleRef={titleRef}
+        closeButtonRef={closeRef}
+        closeLabel="Close My Progress"
+        closeControls="progress-panel"
+        closeExpanded
+        onClose={onClose}
+      />
+
+      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain py-3">
+        <section className="pal-glass-inset mx-3.5 mb-3 grid gap-2.5 px-3 py-3" aria-label="Exploration progress">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <p className="m-0 truncate text-[10px] tracking-[.1em] text-[#77b9c2] uppercase">
+                {checklist.profileName}
+              </p>
+              <h3 className="m-0 mt-0.5 text-sm font-semibold text-[#edf9fb]">{activeLayer.name}</h3>
+            </div>
+            <strong className="shrink-0 text-lg font-medium text-[#9de4c1] tabular-nums">{percent}%</strong>
+          </div>
+
+          <div
+            className="h-1.5 overflow-hidden bg-[#162228]"
+            role="progressbar"
+            aria-label={`${activeLayer.name} completion`}
+            aria-valuemin={0}
+            aria-valuemax={checklist.total}
+            aria-valuenow={checklist.completed}
+          >
+            <span className="block h-full bg-[#65d4ad] transition-[width]" style={{ width: `${percent}%` }} />
+          </div>
+
+          <div className="flex items-baseline justify-between gap-3 text-[11px]">
+            <p className="m-0 text-[#9bb0b5]">
+              <strong className="text-sm font-semibold text-[#eaf7f8] tabular-nums">
+                {checklist.completed} / {checklist.total}
+              </strong>{' '}
+              complete
+            </p>
+            <p className="m-0 text-[#d8bc83] tabular-nums">{checklist.remaining} missing</p>
+          </div>
+
+          <div className="border-t border-[#caeaef]/15 pt-2">
+            <p className="m-0 mb-1.5 text-[10px] tracking-[.08em] text-[#789da3] uppercase">Breakdown</p>
+            <div className="grid gap-1">
+              {checklist.breakdown.map((item) => (
+                <div key={item.kind} className="flex min-h-5 items-baseline justify-between gap-3 text-[11px]">
+                  <span className="flex min-w-0 items-center gap-1.5 truncate text-[#b8c9cc]">
+                    <i
+                      className={`inline-block size-1.5 shrink-0 rounded-full ${item.evidence === 'save-supported' ? 'bg-[#65d4ad]' : 'bg-[#718b91]'}`}
+                      aria-hidden="true"
+                    />
+                    {item.label}
+                    <span className="sr-only">
+                      {item.evidence === 'save-supported' ? 'Save-supported' : 'Manual only'}
+                    </span>
+                  </span>
+                  <span className="shrink-0 text-[#dcebed] tabular-nums">
+                    {item.completed} / {item.total}
+                  </span>
+                </div>
+              ))}
+            </div>
+            <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-[9px] leading-4 text-[#718b91]">
+              <span>
+                <i className="mr-1 inline-block size-1.5 rounded-full bg-[#65d4ad]" aria-hidden="true" />
+                Save + manual
+              </span>
+              <span>
+                <i className="mr-1 inline-block size-1.5 rounded-full bg-[#718b91]" aria-hidden="true" />
+                Manual only
+              </span>
+            </div>
+          </div>
+
+          <label className="flex min-h-10 cursor-pointer items-center gap-2 border-t border-[#caeaef]/15 pt-2 text-xs text-[#dcebed]">
+            <input
+              type="checkbox"
+              className="size-4 shrink-0 accent-[#6cb4dd]"
+              checked={checklist.remainingOnly}
+              aria-label="Show only missing on the map"
+              aria-describedby={filterDescriptionId}
+              onChange={(event) => checklist.onRemainingOnlyChange(event.currentTarget.checked)}
+            />
+            <span>Only show missing</span>
+          </label>
+          <p id={filterDescriptionId} className="sr-only">
+            Hide landmarks completed manually or confirmed by your connected save from the map and Map filters.
+          </p>
+
+          {progressDescription ? (
+            <div className="border-t border-[#caeaef]/15 pt-2">
+              <p
+                role="status"
+                aria-live="polite"
+                aria-atomic="true"
+                className={`m-0 text-[11px] leading-5 ${progress.phase === 'unavailable' ? 'text-[#d8bc83]' : 'text-[#8ba4a9]'}`}
+              >
+                {progressDescription}
+              </p>
+            </div>
+          ) : null}
+        </section>
+
+        <PlayerClaimSessionControl players={players} />
+        <PlayerClaimIdentityChooser players={players} />
+      </div>
+    </MapPanelShell>
+  )
+}

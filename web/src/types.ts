@@ -30,10 +30,18 @@ export interface MapLayer {
   bounds: [number, number, number, number]
 }
 
+export interface MapCameraPosition {
+  region: string
+  x: number
+  y: number
+  zoom: number
+}
+
 export interface PublicConfig {
   pollIntervalMs: number
   worldPollIntervalMs: number
   worldDataEnabled: boolean
+  playerClaimsEnabled: boolean
   layers: MapLayer[]
   catalogueUrl: string
   landmarks: WorldObject[]
@@ -87,6 +95,11 @@ export interface Player {
   map: string
 }
 
+export interface LandmarkReward {
+  name: string
+  count: number
+}
+
 export interface WorldObject {
   id: string
   kind: Exclude<ItemKind, 'players'>
@@ -98,7 +111,9 @@ export interface WorldObject {
   level?: number
   x: number
   y: number
+  z?: number
   map: string
+  rewards?: LandmarkReward[]
 }
 
 export interface MapItem {
@@ -123,7 +138,9 @@ export interface MapItem {
   towerDefeats?: number
   x: number
   y: number
+  z?: number
   map: string
+  rewards?: LandmarkReward[]
 }
 
 export interface PlayerState {

@@ -11,20 +11,21 @@ import (
 )
 
 type Config struct {
-	Addr              string
-	RESTURL           string
-	AdminPassword     string
-	DemoMode          bool
-	PollInterval      time.Duration
-	UpstreamTimeout   time.Duration
-	WorldPollInterval time.Duration
-	WorldTimeout      time.Duration
-	WorldDataEnabled  bool
-	SaveDataEnabled   bool
-	SaveRoot          string
-	SaveWorldID       string
-	SavePollInterval  time.Duration
-	SaveTimeout       time.Duration
+	Addr                string
+	RESTURL             string
+	AdminPassword       string
+	DemoMode            bool
+	PollInterval        time.Duration
+	UpstreamTimeout     time.Duration
+	WorldPollInterval   time.Duration
+	WorldTimeout        time.Duration
+	WorldDataEnabled    bool
+	SaveDataEnabled     bool
+	SaveRoot            string
+	SaveWorldID         string
+	SavePollInterval    time.Duration
+	SaveTimeout         time.Duration
+	PlayerClaimsEnabled bool
 }
 
 func Load() (Config, error) {
@@ -64,22 +65,26 @@ func Load() (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
-
+	playerClaimsEnabled, err := boolean("PLAYER_CLAIMS_ENABLED", false)
+	if err != nil {
+		return Config{}, err
+	}
 	cfg := Config{
-		Addr:              envOr("ADDR", ":8080"),
-		RESTURL:           strings.TrimRight(os.Getenv("PALWORLD_REST_URL"), "/"),
-		AdminPassword:     os.Getenv("PALWORLD_ADMIN_PASSWORD"),
-		DemoMode:          demoMode,
-		PollInterval:      pollInterval,
-		UpstreamTimeout:   upstreamTimeout,
-		WorldPollInterval: worldPollInterval,
-		WorldTimeout:      worldTimeout,
-		WorldDataEnabled:  worldDataEnabled,
-		SaveDataEnabled:   saveDataEnabled,
-		SaveRoot:          envOr("PALWORLD_SAVE_ROOT", "/data/palworld/saves"),
-		SaveWorldID:       strings.TrimSpace(os.Getenv("PALWORLD_SAVE_WORLD_ID")),
-		SavePollInterval:  savePollInterval,
-		SaveTimeout:       saveTimeout,
+		Addr:                envOr("ADDR", ":8080"),
+		RESTURL:             strings.TrimRight(os.Getenv("PALWORLD_REST_URL"), "/"),
+		AdminPassword:       os.Getenv("PALWORLD_ADMIN_PASSWORD"),
+		DemoMode:            demoMode,
+		PollInterval:        pollInterval,
+		UpstreamTimeout:     upstreamTimeout,
+		WorldPollInterval:   worldPollInterval,
+		WorldTimeout:        worldTimeout,
+		WorldDataEnabled:    worldDataEnabled,
+		SaveDataEnabled:     saveDataEnabled,
+		SaveRoot:            envOr("PALWORLD_SAVE_ROOT", "/data/palworld/saves"),
+		SaveWorldID:         strings.TrimSpace(os.Getenv("PALWORLD_SAVE_WORLD_ID")),
+		SavePollInterval:    savePollInterval,
+		SaveTimeout:         saveTimeout,
+		PlayerClaimsEnabled: playerClaimsEnabled,
 	}
 
 	var missing []string
@@ -120,6 +125,14 @@ func Load() (Config, error) {
 		}
 		if cfg.SaveTimeout <= 0 || cfg.SaveTimeout >= cfg.SavePollInterval {
 			return Config{}, errors.New("SAVE_TIMEOUT must be positive and shorter than SAVE_POLL_INTERVAL")
+		}
+	}
+	if cfg.PlayerClaimsEnabled {
+		if cfg.DemoMode {
+			return Config{}, errors.New("PLAYER_CLAIMS_ENABLED cannot be used with DEMO_MODE")
+		}
+		if !cfg.SaveDataEnabled {
+			return Config{}, errors.New("PLAYER_CLAIMS_ENABLED requires SAVE_DATA_ENABLED")
 		}
 	}
 	return cfg, nil

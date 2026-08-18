@@ -777,4 +777,37 @@ describe('MapViewport marker stacking', () => {
     expect(stackOf(worker)).toBeLessThan(stackOf(base))
     expect(stackOf(base)).toBeGreaterThan(stackOf(player))
   })
+
+  it('focuses a fixed shared position at the encoded zoom without rendering a marker', () => {
+    installViewportMocks()
+    const ref = createRef<MapViewportHandle>()
+    const sharedPosition = { region: layer.id, x: 0, y: 0, zoom: 8 }
+    const { container } = render(
+      <MapViewport
+        ref={ref}
+        activeLayer={layer}
+        items={[]}
+        enabledKinds={new Set<ItemKind>()}
+        enabledPlayerStatuses={new Set(['online', 'offline'])}
+        hiddenIds={new Set<string>()}
+        search=""
+        onShowItem={() => undefined}
+        inspectorOpen={false}
+      >
+        {null}
+      </MapViewport>
+    )
+
+    expect(screen.queryByRole('img', { name: /Shared position/ })).not.toBeInTheDocument()
+
+    act(() => ref.current?.focusPosition(sharedPosition))
+
+    const scene = container.querySelector<HTMLElement>('.map-scene')
+    if (!scene) throw new Error('Expected map scene')
+    const view = readTransform(scene)
+    expect(4096 * view.scale + view.x).toBeCloseTo(VIEWPORT_WIDTH / 2)
+    expect(4096 * view.scale + view.y).toBeCloseTo(VIEWPORT_HEIGHT / 2)
+    expect(ref.current?.getZoomRatio()).toBeCloseTo(8)
+    expect(screen.queryByRole('img', { name: /Shared position/ })).not.toBeInTheDocument()
+  })
 })

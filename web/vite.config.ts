@@ -4,6 +4,9 @@ import { defineConfig } from 'vitest/config'
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],
+  resolve: {
+    dedupe: ['react', 'react-dom']
+  },
   build: {
     outDir: 'dist',
     emptyOutDir: true

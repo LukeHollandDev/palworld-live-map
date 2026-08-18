@@ -184,6 +184,38 @@ func TestPollerFiltersUnusedLiveObjectsAndKeepsSemanticRevisionStable(t *testing
 	}
 }
 
+func TestPollerClonesAndComparesWorldObjectLandmarkMetadata(t *testing.T) {
+	z := 1250.0
+	source := &stubSource{objects: []WorldObject{{
+		ID: "base", Kind: "bases", Name: "Home", Z: &z,
+		Rewards: []LandmarkReward{{Name: "Dog Coin", Count: 20}},
+	}}}
+	poller := testPoller(source)
+	poller.refreshWorld(context.Background())
+
+	first, revision, changed := poller.ObjectSnapshotSince(0)
+	if !changed || first.Objects[0].Z == nil || *first.Objects[0].Z != 1250 || first.Objects[0].Rewards[0].Count != 20 {
+		t.Fatalf("first snapshot = %#v, revision %d, changed %v", first, revision, changed)
+	}
+	*first.Objects[0].Z = 0
+	first.Objects[0].Rewards[0].Name = "mutated"
+	copy := poller.ObjectSnapshot()
+	if copy.Objects[0].Z == nil || *copy.Objects[0].Z != 1250 || copy.Objects[0].Rewards[0].Name != "Dog Coin" {
+		t.Fatalf("metadata shares snapshot storage: %#v", copy.Objects[0])
+	}
+
+	poller.refreshWorld(context.Background())
+	if _, nextRevision, changed := poller.ObjectSnapshotSince(revision); changed || nextRevision != revision {
+		t.Fatalf("unchanged metadata advanced revision %d -> %d", revision, nextRevision)
+	}
+	source.objects[0].Rewards[0].Count = 25
+	poller.refreshWorld(context.Background())
+	changedSnapshot, changedRevision, changed := poller.ObjectSnapshotSince(revision)
+	if !changed || changedRevision == revision || changedSnapshot.Objects[0].Rewards[0].Count != 25 {
+		t.Fatalf("changed metadata = %#v, revision %d, changed %v", changedSnapshot, changedRevision, changed)
+	}
+}
+
 func TestPollerCategorizesOversizedWorldResponse(t *testing.T) {
 	source := &stubSource{objectErr: &ResponseSizeError{Limit: maxWorldResponseBytes}}
 	poller := testPoller(source)
@@ -259,10 +291,18 @@ func TestPollerMergesPersistentRosterWithOnlinePlayers(t *testing.T) {
 
 func TestPollerReportsPartialSaveRosterAndLogsTransitions(t *testing.T) {
 	var logs bytes.Buffer
+	privateValues := []string{
+		"aaaaaaaa-0000-0000-0000-000000000000",
+		"/private/palworld/save/Players/aaaaaaaa.sav",
+		"decoder stderr secret",
+		"ClaimSecretItem42",
+		"private-fast-travel-state-key",
+	}
+	privateDetail := strings.Join(privateValues, " ")
 	roster := &stubRoster{snapshot: RosterSnapshot{
 		SnapshotAt:   time.Now().UTC(),
 		Players:      []Player{},
-		PartialError: errors.New("private decoder detail"),
+		PartialError: errors.New(privateDetail),
 	}}
 	poller := NewPollerWithRoster(
 		&stubSource{},
@@ -283,15 +323,17 @@ func TestPollerReportsPartialSaveRosterAndLogsTransitions(t *testing.T) {
 	if count := strings.Count(logs.String(), "save-roster resolve failed"); count != 1 {
 		t.Fatalf("degraded transition logged %d times, logs = %q", count, logs.String())
 	}
-	if !strings.Contains(logs.String(), "private decoder detail") {
-		t.Fatalf("server log omitted the decoder diagnostic: %q", logs.String())
-	}
 	publicJSON, err := json.Marshal(degraded)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if strings.Contains(string(publicJSON), "private decoder detail") {
-		t.Fatalf("public snapshot leaked the decoder diagnostic: %s", publicJSON)
+	for _, private := range privateValues {
+		if strings.Contains(logs.String(), private) {
+			t.Fatalf("server log leaked private save value %q: %q", private, logs.String())
+		}
+		if strings.Contains(string(publicJSON), private) {
+			t.Fatalf("public snapshot leaked private save value %q: %s", private, publicJSON)
+		}
 	}
 
 	roster.snapshot.PartialError = nil
@@ -303,6 +345,25 @@ func TestPollerReportsPartialSaveRosterAndLogsTransitions(t *testing.T) {
 	}
 	if count := strings.Count(logs.String(), "save-roster resolve recovered"); count != 1 {
 		t.Fatalf("recovery transition logged %d times, logs = %q", count, logs.String())
+	}
+
+	roster.err = errors.New(privateDetail)
+	poller.refreshRoster(context.Background())
+	failed := poller.PlayerSnapshot()
+	if !failed.SaveStale || failed.SaveLastError != "refresh-failed" {
+		t.Fatalf("failed save state = %#v", failed)
+	}
+	failedJSON, err := json.Marshal(failed)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, private := range privateValues {
+		if strings.Contains(logs.String(), private) {
+			t.Fatalf("server log leaked private refresh value %q: %q", private, logs.String())
+		}
+		if strings.Contains(string(failedJSON), private) {
+			t.Fatalf("public failed snapshot leaked private save value %q: %s", private, failedJSON)
+		}
 	}
 }
 
@@ -344,5 +405,21 @@ func TestMergePlayersUsesUnnamedSaveDetailsWithoutPublishingAnonymousPlayers(t *
 		players[0].BossDefeats == nil || *players[0].BossDefeats != bossDefeats ||
 		players[0].TowerDefeats == nil || *players[0].TowerDefeats != towerDefeats {
 		t.Fatalf("online player was not enriched: %#v", players)
+	}
+}
+
+func TestMergePlayersPreservesGuildProvenance(t *testing.T) {
+	saved := Player{ID: "player:one", Name: "Alice", GuildKey: "guild:saved", GuildName: "Saved Guild"}
+
+	filled := mergePlayers([]Player{saved}, []Player{{ID: "player:one", Name: "Alice"}})
+	if len(filled) != 1 || filled[0].GuildKey != "guild:saved" || filled[0].GuildName != "Saved Guild" || filled[0].GuildFromLive {
+		t.Fatalf("save-filled guild provenance = %#v", filled)
+	}
+
+	authoritative := mergePlayers([]Player{saved}, []Player{{
+		ID: "player:one", Name: "Alice", GuildFromLive: true,
+	}})
+	if len(authoritative) != 1 || authoritative[0].GuildKey != "" || authoritative[0].GuildName != "" || !authoritative[0].GuildFromLive {
+		t.Fatalf("authoritative live guild provenance = %#v", authoritative)
 	}
 }

@@ -309,7 +309,9 @@ func (p *Poller) refreshRoster(ctx context.Context) {
 			p.playerRevision++
 		}
 		p.mu.Unlock()
-		p.logger.Warn("Palworld save-roster refresh failed", "error", err)
+		// Save reader errors can contain filesystem paths and raw save-authored
+		// identifiers. The public state and logs expose only a stable category.
+		p.logger.Warn("Palworld save-roster refresh failed", "category", "refresh-failed")
 		return
 	}
 	now := time.Now().UTC()
@@ -333,7 +335,7 @@ func (p *Poller) refreshRoster(ctx context.Context) {
 	p.mu.Unlock()
 	switch {
 	case lastError == saveResolveFailed && previousError != saveResolveFailed:
-		p.logger.Warn("Palworld save-roster resolve failed; using partial enrichment", "error", roster.PartialError)
+		p.logger.Warn("Palworld save-roster resolve failed; using partial enrichment", "category", saveResolveFailed)
 	case lastError == "" && previousError == saveResolveFailed:
 		p.logger.Info("Palworld save-roster resolve recovered")
 	}
@@ -412,7 +414,7 @@ func (p *Poller) publishWorld(objects []WorldObject, truncated bool, total int, 
 	defer p.mu.Unlock()
 	if p.snapshot.ObjectsAvailable && !p.snapshot.ObjectsStale && !p.snapshot.ObjectsUnsupported &&
 		p.snapshot.ObjectsTruncated == truncated && p.snapshot.ObjectsTotal == total &&
-		p.snapshot.ObjectsLastError == lastError && slices.Equal(p.snapshot.Objects, objects) {
+		p.snapshot.ObjectsLastError == lastError && slices.EqualFunc(p.snapshot.Objects, objects, worldObjectEqual) {
 		return
 	}
 	p.snapshot.ObjectsAvailable = true
@@ -500,11 +502,16 @@ func mergePlayers(saved, online []Player) []Player {
 }
 
 func mergePersistedPlayer(player, persisted Player) Player {
-	if player.GuildKey == "" {
-		player.GuildKey = persisted.GuildKey
-	}
-	if player.GuildName == "" {
-		player.GuildName = persisted.GuildName
+	// A current world relation is authoritative even when it says the player is
+	// not in a guild. Otherwise save enrichment may fill the missing pair, while
+	// retaining false provenance so privacy projections can remove it again.
+	if !player.GuildFromLive {
+		if player.GuildKey == "" {
+			player.GuildKey = persisted.GuildKey
+		}
+		if player.GuildName == "" {
+			player.GuildName = persisted.GuildName
+		}
 	}
 	if player.LastSeenAt.IsZero() {
 		player.LastSeenAt = persisted.LastSeenAt
@@ -538,6 +545,33 @@ func mergePersistedPlayer(player, persisted Player) Player {
 
 func cloneWorldObjects(objects []WorldObject) []WorldObject {
 	result := make([]WorldObject, len(objects))
-	copy(result, objects)
+	for index, object := range objects {
+		result[index] = object
+		if object.Z != nil {
+			z := *object.Z
+			result[index].Z = &z
+		}
+		result[index].Rewards = append([]LandmarkReward(nil), object.Rewards...)
+	}
 	return result
+}
+
+func worldObjectEqual(left, right WorldObject) bool {
+	return left.ID == right.ID &&
+		left.Kind == right.Kind &&
+		left.Name == right.Name &&
+		left.Detail == right.Detail &&
+		left.BaseID == right.BaseID &&
+		left.GuildKey == right.GuildKey &&
+		left.OwnerID == right.OwnerID &&
+		left.Level == right.Level &&
+		left.X == right.X &&
+		left.Y == right.Y &&
+		optionalFloat64Equal(left.Z, right.Z) &&
+		left.Map == right.Map &&
+		slices.Equal(left.Rewards, right.Rewards)
+}
+
+func optionalFloat64Equal(left, right *float64) bool {
+	return left == nil && right == nil || left != nil && right != nil && *left == *right
 }

@@ -2,9 +2,23 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { type Detail, DetailsDialog } from './components/DetailsDialog'
 import { Explorer } from './components/Explorer'
 import { MapViewport, type MapViewportHandle } from './components/MapViewport'
+import { PlayerClaimProvider, usePlayerClaimSession } from './components/PlayerClaimPanel'
+import { ProgressPanel } from './components/ProgressPanel'
 import { ProjectLinks } from './components/ProjectLinks'
 import { StatusBar } from './components/StatusBar'
 import { usePolling } from './hooks/usePolling'
+import { useSaveProgress } from './hooks/useSaveProgress'
+import {
+  activeLocalCompletionProfile,
+  isChecklistItem,
+  loadLocalCompletionState,
+  manualCompletionIDs,
+  saveLocalCompletionState,
+  setManualLandmarkCompletion,
+  setRemainingOnly,
+  summarizeCompletion,
+  summarizeCompletionBreakdown
+} from './lib/completion'
 import { buildGuildDetails, guildIdForBase } from './lib/guilds'
 import type { LeaderboardId } from './lib/leaderboards'
 import { itemSearchText } from './lib/map'
@@ -15,6 +29,13 @@ import {
   loadFilterPreferences,
   saveFilterPreferences
 } from './lib/preferences'
+import { catalogueVersionFromURL, combineCompletionIDs, saveCompletionIDs } from './lib/saveProgress'
+import {
+  buildSharedPositionUrl,
+  copySharedPositionUrl,
+  parseSharedPosition,
+  SHARE_POSITION_MIN_ZOOM
+} from './lib/sharePosition'
 import {
   EMPTY_OBJECT_STATE,
   type ItemKind,
@@ -138,14 +159,16 @@ export function App() {
   }
 
   return (
-    <LiveMap
-      config={config}
-      catalogueError={catalogueError}
-      onRetryCatalogue={() => {
-        setCatalogueError(false)
-        setCatalogueAttempt((attempt) => attempt + 1)
-      }}
-    />
+    <PlayerClaimProvider enabled={config.playerClaimsEnabled}>
+      <LiveMap
+        config={config}
+        catalogueError={catalogueError}
+        onRetryCatalogue={() => {
+          setCatalogueError(false)
+          setCatalogueAttempt((attempt) => attempt + 1)
+        }}
+      />
+    </PlayerClaimProvider>
   )
 }
 
@@ -160,11 +183,22 @@ function LiveMap({
 }) {
   const players = usePolling<PlayerState>('/api/players', config.pollIntervalMs)
   const objects = usePolling<ObjectState>('/api/objects', config.worldPollIntervalMs, config.worldDataEnabled)
+  const claimSession = usePlayerClaimSession()
+  const expectedCatalogueVersion = useMemo(() => catalogueVersionFromURL(config.catalogueUrl), [config.catalogueUrl])
+  const { state: saveProgress } = useSaveProgress(claimSession.session, {
+    expectedCatalogueVersion,
+    onUnauthorized: claimSession.invalidate
+  })
   const playerState = players.data
   const objectState = objects.data || { ...EMPTY_OBJECT_STATE, enabled: config.worldDataEnabled }
   const initialPreferences = useMemo(loadFilterPreferences, [])
+  const [localCompletion, setLocalCompletion] = useState(loadLocalCompletionState)
+  const [initialSharedPosition] = useState(() => parseSharedPosition(window.location.href, config.layers))
   const [activeLayer, setActiveLayer] = useState<MapLayer>(
-    () => config.layers.find((layer) => layer.id === initialPreferences.activeLayerId) || config.layers[0]
+    () =>
+      config.layers.find((layer) => layer.id === initialSharedPosition?.region) ||
+      config.layers.find((layer) => layer.id === initialPreferences.activeLayerId) ||
+      config.layers[0]
   )
   const [enabledKinds, setEnabledKinds] = useState(
     () => new Set<ItemKind>(initialPreferences.enabledKinds || DEFAULT_ENABLED_KINDS)
@@ -178,18 +212,32 @@ function LiveMap({
   const [expandedBases, setExpandedBases] = useState(() => new Set<string>())
   const [search, setSearch] = useState('')
   const [filtersOpen, setFiltersOpen] = useState(() => typeof window === 'undefined' || window.innerWidth >= 640)
+  const [progressOpen, setProgressOpen] = useState(false)
   const [detail, setDetail] = useState<Detail | null>(null)
   const [returnFocus, setReturnFocus] = useState<HTMLElement | null>(null)
   const mapRef = useRef<MapViewportHandle>(null)
+  const sharedPositionPendingRef = useRef(Boolean(initialSharedPosition))
   const pendingFocusRef = useRef<{ itemId: string; returnFocus: HTMLElement } | null>(null)
   const searchRef = useRef<HTMLInputElement>(null)
   const filterButtonRef = useRef<HTMLButtonElement>(null)
+  const progressButtonRef = useRef<HTMLButtonElement>(null)
   const leaderboardButtonRef = useRef<HTMLButtonElement>(null)
 
   useEffect(() => {
     saveFilterPreferences({ activeLayerId: activeLayer.id, enabledKinds, enabledPlayerStatuses, hiddenIds, seenKinds })
   }, [activeLayer.id, enabledKinds, enabledPlayerStatuses, hiddenIds, seenKinds])
 
+  useEffect(() => saveLocalCompletionState(localCompletion), [localCompletion])
+
+  useEffect(() => {
+    if (!sharedPositionPendingRef.current || initialSharedPosition?.region !== activeLayer.id) return
+    const frame = window.requestAnimationFrame(() => {
+      if (!mapRef.current || !sharedPositionPendingRef.current) return
+      sharedPositionPendingRef.current = false
+      mapRef.current.focusPosition(initialSharedPosition)
+    })
+    return () => window.cancelAnimationFrame(frame)
+  }, [activeLayer.id, initialSharedPosition])
   const items = useMemo<MapItem[]>(() => {
     const combined: MapItem[] = [
       ...(config.landmarks || []),
@@ -205,6 +253,31 @@ function LiveMap({
   }, [config.landmarks, objectState.objects, playerState?.players])
   const presentedItems = useMemo(() => items.filter((item) => item.kind !== 'companions'), [items])
   const itemById = useMemo(() => new Map(items.map((item) => [item.id, item])), [items])
+  const completionProfile = useMemo(() => activeLocalCompletionProfile(localCompletion), [localCompletion])
+  const manuallyCompletedIds = useMemo(() => manualCompletionIDs(completionProfile), [completionProfile])
+  const saveCompletedIds = useMemo(
+    () => saveCompletionIDs(saveProgress.phase === 'available' ? saveProgress.snapshot : null, items),
+    [items, saveProgress]
+  )
+  const completedIds = useMemo(
+    () => combineCompletionIDs(manuallyCompletedIds, saveCompletedIds),
+    [manuallyCompletedIds, saveCompletedIds]
+  )
+  const completionSummary = useMemo(
+    () => summarizeCompletion(items, completedIds, activeLayer.id),
+    [activeLayer.id, completedIds, items]
+  )
+  const completionBreakdown = useMemo(
+    () => summarizeCompletionBreakdown(items, completedIds, activeLayer.id),
+    [activeLayer.id, completedIds, items]
+  )
+  const completionVisibleItems = useMemo(
+    () =>
+      localCompletion.remainingOnly
+        ? items.filter((item) => !isChecklistItem(item) || !completedIds.has(item.id))
+        : items,
+    [completedIds, items, localCompletion.remainingOnly]
+  )
 
   // Reveal a category on the map the first time it has content, then remember it
   // so a kind the user later hides is never auto-enabled again.
@@ -255,12 +328,12 @@ function LiveMap({
 
   useEffect(() => {
     const reconcileMobilePanels = () => {
-      if (window.innerWidth < 640 && detail?.kind === 'leaderboard') setFiltersOpen(false)
+      if (window.innerWidth < 640 && (detail?.kind === 'leaderboard' || progressOpen)) setFiltersOpen(false)
     }
     reconcileMobilePanels()
     window.addEventListener('resize', reconcileMobilePanels)
     return () => window.removeEventListener('resize', reconcileMobilePanels)
-  }, [detail?.kind])
+  }, [detail?.kind, progressOpen])
 
   useEffect(() => {
     if (!detail) return
@@ -287,11 +360,13 @@ function LiveMap({
   }, [activeLayer.id, itemById])
 
   const showItem = (item: MapItem, focus: HTMLElement) => {
+    setProgressOpen(false)
     setReturnFocus(focus)
     setDetail({ kind: 'item', itemId: item.id })
   }
 
   const showGuild = (guildId: string, focus: HTMLElement) => {
+    setProgressOpen(false)
     pendingFocusRef.current = null
     const query = search.trim().toLowerCase()
     if (query && !buildGuildDetails(guildId, items).name.toLowerCase().includes(query)) setSearch('')
@@ -301,6 +376,7 @@ function LiveMap({
   }
 
   const showLeaderboard = (leaderboardId: LeaderboardId, focus: HTMLElement) => {
+    setProgressOpen(false)
     pendingFocusRef.current = null
     setReturnFocus(focus)
     mapRef.current?.clearSelection()
@@ -319,11 +395,25 @@ function LiveMap({
       setDetail(null)
       mapRef.current?.clearSelection()
     }
+    if (mobilePanelLayout()) setProgressOpen(false)
     setFiltersOpen(true)
+  }
+
+  const toggleProgress = () => {
+    if (progressOpen) {
+      setProgressOpen(false)
+      return
+    }
+    pendingFocusRef.current = null
+    setDetail(null)
+    mapRef.current?.clearSelection()
+    if (mobilePanelLayout()) setFiltersOpen(false)
+    setProgressOpen(true)
   }
 
   const toggleLeaderboards = (focus: HTMLButtonElement) => {
     if (detail?.kind !== 'leaderboard') {
+      setProgressOpen(false)
       if (mobilePanelLayout()) setFiltersOpen(false)
       showLeaderboard('player-level', focus)
       return
@@ -379,6 +469,17 @@ function LiveMap({
       return
     }
     mapRef.current?.focusItem(item, focus)
+  }
+
+  const shareItemPosition = async (item: MapItem) => {
+    const currentZoom = item.map === activeLayer.id ? mapRef.current?.getZoomRatio() || 1 : 1
+    const url = buildSharedPositionUrl({
+      region: item.map,
+      x: item.x,
+      y: item.y,
+      zoom: Math.max(SHARE_POSITION_MIN_ZOOM, currentZoom)
+    })
+    return { url, copied: await copySharedPositionUrl(url) }
   }
 
   const toggleKinds = (kinds: ItemKind[], visible: boolean) => {
@@ -546,7 +647,7 @@ function LiveMap({
   const explorerProps = {
     activeLayer,
     layers: config.layers,
-    items,
+    items: completionVisibleItems,
     search,
     filterButtonRef,
     searchInputRef: searchRef,
@@ -555,6 +656,10 @@ function LiveMap({
     hiddenIds,
     expandedGuilds,
     expandedBases,
+    manualChecklist: {
+      manualCompletedIds: manuallyCompletedIds,
+      saveCompletedIds
+    },
     dataNotices,
     catalogueRetry: catalogueError
       ? {
@@ -590,33 +695,71 @@ function LiveMap({
           filterButtonRef,
           filterSearch: search,
           filtersOpen,
+          progressButtonRef,
+          progressOpen,
           leaderboardButtonRef,
           leaderboardOpen: detail?.kind === 'leaderboard',
           onToggleFilters: toggleFilters,
+          onToggleProgress: toggleProgress,
           onToggleLeaderboards: toggleLeaderboards
         }}
       />
       <main className="absolute inset-0 overflow-hidden bg-[#0d161e]">
         <Explorer {...explorerProps} open={filtersOpen} />
+        <ProgressPanel
+          open={progressOpen}
+          activeLayer={activeLayer}
+          players={items}
+          progressButtonRef={progressButtonRef}
+          checklist={{
+            profileName: completionProfile.name,
+            completed: completionSummary.completed,
+            total: completionSummary.total,
+            remaining: completionSummary.remaining,
+            breakdown: completionBreakdown,
+            remainingOnly: localCompletion.remainingOnly,
+            saveProgress,
+            onRemainingOnlyChange: (remainingOnly) =>
+              setLocalCompletion((current) => setRemainingOnly(current, remainingOnly))
+          }}
+          onClose={() => setProgressOpen(false)}
+        />
         <div className="relative size-full min-h-0 min-w-0 overflow-hidden">
           <MapViewport
             ref={mapRef}
             activeLayer={activeLayer}
-            items={items}
+            items={completionVisibleItems}
+            manualCompletedIds={manuallyCompletedIds}
+            saveCompletedIds={saveCompletedIds}
             enabledKinds={enabledKinds}
             enabledPlayerStatuses={enabledPlayerStatuses}
             hiddenIds={hiddenIds}
             search={search}
             onShowItem={showItem}
-            inspectorOpen={Boolean(detail)}
+            inspectorOpen={Boolean(detail) || progressOpen}
           >
             <ProjectLinks hidden={Boolean(detail && detail.kind !== 'leaderboard')} />
             <DetailsDialog
               detail={detail}
               items={items}
               layers={config.layers}
+              playerClaimsEnabled={config.playerClaimsEnabled}
+              manualChecklist={{
+                profileName: completionProfile.name,
+                manualCompletedIds: manuallyCompletedIds,
+                saveCompletedIds,
+                onSetCompletion: (landmarkId, completed) =>
+                  setLocalCompletion((current) => setManualLandmarkCompletion(current, landmarkId, completed))
+              }}
               returnFocus={returnFocus}
               fallbackFocus={leaderboardButtonRef.current}
+              onShowPlayerClaim={() => {
+                pendingFocusRef.current = null
+                setDetail(null)
+                mapRef.current?.clearSelection()
+                if (mobilePanelLayout()) setFiltersOpen(false)
+                setProgressOpen(true)
+              }}
               onSelectItem={(item, focus) => {
                 const query = search.trim().toLowerCase()
                 if (query && !itemSearchText(item).includes(query)) setSearch('')
@@ -628,6 +771,7 @@ function LiveMap({
               onSelectLeaderboard={(leaderboardId) => {
                 setDetail({ kind: 'leaderboard', leaderboardId })
               }}
+              onSharePosition={shareItemPosition}
               onClose={() => {
                 pendingFocusRef.current = null
                 setDetail(null)

@@ -1,11 +1,15 @@
-import { IconCheck, IconChevronDown, IconChevronRight } from '@tabler/icons-react'
+import { IconCheck, IconChevronDown, IconChevronRight, IconLink } from '@tabler/icons-react'
 import { useEffect, useId, useRef, useState } from 'react'
+import { isChecklistItem } from '../lib/completion'
 import { buildGuildDetails, type GuildDetails as GuildDetailsModel } from '../lib/guilds'
 import { LEADERBOARDS, type LeaderboardId, leaderboardById } from '../lib/leaderboards'
 import { kindLabel } from '../lib/map'
-import type { ItemKind, MapItem, MapLayer } from '../types'
+import { completionSource, completionSourceLabel } from '../lib/saveProgress'
+import type { SharePositionResult } from '../lib/sharePosition'
+import type { ItemKind, LandmarkReward, MapItem, MapLayer } from '../types'
 import { MapPanelHeader, MapPanelShell } from './MapPanel'
 import { MarkerGlyph } from './MarkerGlyph'
+import { PlayerClaimPanel } from './PlayerClaimPanel'
 
 export type Detail =
   | { kind: 'item'; itemId: string }
@@ -37,12 +41,23 @@ interface DetailsDialogProps {
   detail: Detail | null
   items: MapItem[]
   layers: MapLayer[]
+  playerClaimsEnabled?: boolean
   returnFocus: HTMLElement | null
   fallbackFocus: HTMLElement | null
+  manualChecklist?: ManualChecklistDetails
+  onShowPlayerClaim?: () => void
   onClose: () => void
   onSelectItem: (item: MapItem, focus: HTMLElement) => void
   onSelectGuild: (guildId: string, focus: HTMLElement) => void
   onSelectLeaderboard: (leaderboardId: LeaderboardId) => void
+  onSharePosition?: (item: MapItem) => Promise<SharePositionResult>
+}
+
+interface ManualChecklistDetails {
+  profileName: string
+  manualCompletedIds: ReadonlySet<string>
+  saveCompletedIds: ReadonlySet<string>
+  onSetCompletion: (landmarkId: string, completed: boolean) => void
 }
 
 function canRestoreFocus(target: HTMLElement | null) {
@@ -62,12 +77,16 @@ export function DetailsDialog({
   detail,
   items,
   layers,
+  playerClaimsEnabled,
   returnFocus,
   fallbackFocus,
+  manualChecklist,
+  onShowPlayerClaim,
   onClose,
   onSelectItem,
   onSelectGuild,
-  onSelectLeaderboard
+  onSelectLeaderboard,
+  onSharePosition
 }: DetailsDialogProps) {
   const titleRef = useRef<HTMLHeadingElement>(null)
   const bodyRef = useRef<HTMLDivElement>(null)
@@ -140,11 +159,16 @@ export function DetailsDialog({
         <div className="grid gap-5 p-[18px] max-sm:p-3.5">
           {item ? (
             <ItemDetails
+              key={`${item.id}:${item.map}:${item.x}:${item.y}`}
               item={item}
               items={items}
               layers={layers}
+              playerClaimsEnabled={playerClaimsEnabled === true}
+              manualChecklist={manualChecklist}
+              onShowPlayerClaim={onShowPlayerClaim}
               onSelectItem={onSelectItem}
               onSelectGuild={onSelectGuild}
+              onSharePosition={onSharePosition}
             />
           ) : guild ? (
             <GuildDetails guild={guild} layers={layers} onSelectItem={onSelectItem} />
@@ -399,6 +423,41 @@ function FactList({ entries }: { entries: Array<[string, string | number | undef
   )
 }
 
+function JournalPreview({ preview }: { preview: string }) {
+  return (
+    <section>
+      <SectionTitle>Journal preview</SectionTitle>
+      <p className="pal-glass-inset m-0 px-3 py-3 text-[13px] leading-5 text-[#dbeaec]">{preview}</p>
+    </section>
+  )
+}
+
+function LandmarkRewards({ rewards }: { rewards: LandmarkReward[] }) {
+  if (rewards.length === 0) return null
+  return (
+    <section>
+      <SectionTitle>Rewards</SectionTitle>
+      <ul className="pal-glass-inset m-0 grid list-none divide-y divide-[#ceeaee]/15 p-0">
+        {rewards.map((reward) => {
+          const count = reward.count.toLocaleString()
+          return (
+            <li
+              key={`${reward.name}:${reward.count}`}
+              className="flex min-h-11 items-center justify-between gap-3 px-3 py-2.5 text-xs"
+            >
+              <span className="min-w-0 text-[#eff9fa]">{reward.name}</span>
+              <span className="shrink-0 rounded-sm border border-[#72d7e5]/25 bg-[#20353a] px-2 py-1 font-medium text-[#9eeaf3] tabular-nums">
+                <span aria-hidden="true">×{count}</span>
+                <span className="sr-only">Quantity {count}</span>
+              </span>
+            </li>
+          )
+        })}
+      </ul>
+    </section>
+  )
+}
+
 interface ItemRelationships {
   base?: MapItem
   owner?: MapItem
@@ -480,6 +539,11 @@ function levelLabel(item: MapItem) {
 
 function coordinates(item: MapItem) {
   return `X ${Math.round(item.x)}\u00a0\u00a0Y ${Math.round(item.y)}`
+}
+
+function altitude(z?: number) {
+  if (z === undefined || !Number.isFinite(z)) return undefined
+  return `${Math.round(z / 100).toLocaleString()} m`
 }
 
 function lastSeen(lastSeenAt?: string) {
@@ -698,19 +762,32 @@ function ItemDetails({
   item,
   items,
   layers,
+  playerClaimsEnabled,
+  manualChecklist,
+  onShowPlayerClaim,
   onSelectItem,
-  onSelectGuild
+  onSelectGuild,
+  onSharePosition
 }: {
   item: MapItem
   items: MapItem[]
   layers: MapLayer[]
+  playerClaimsEnabled: boolean
+  manualChecklist?: ManualChecklistDetails
+  onShowPlayerClaim?: () => void
   onSelectItem: (item: MapItem, focus: HTMLElement) => void
   onSelectGuild: (guildId: string, focus: HTMLElement) => void
+  onSharePosition?: (item: MapItem) => Promise<SharePositionResult>
 }) {
+  const [shareResult, setShareResult] = useState<SharePositionResult | null>(null)
+  const [sharing, setSharing] = useState(false)
+  const shareStatusId = useId()
   const relationships = buildRelationships(item, items)
   const { base, owner, guildKey, guildName, guildMembers, guildBases, guildPals, relatedPals } = relationships
 
   const entries: Array<[string, string | number | undefined]> = []
+  const journalPreview = item.kind === 'journals' ? item.detail : undefined
+  const rewards = item.rewards || []
   if (item.level) entries.push(['Level', item.level])
   if (item.kind === 'players') {
     entries.push(['Status', item.online === false ? 'Offline' : 'Online'])
@@ -724,12 +801,13 @@ function ItemDetails({
     entries.push(['Boss clears', item.bossDefeats?.toLocaleString()])
     entries.push(['Tower clears', item.towerDefeats?.toLocaleString()])
   }
-  if (item.detail && item.kind !== 'players') {
+  if (item.detail && item.kind !== 'players' && item.kind !== 'journals' && rewards.length === 0) {
     entries.push([DETAIL_LABELS[item.kind], item.detail])
   }
   if (item.kind === 'bases') entries.push(['Assigned Pals', relatedPals.length])
   entries.push(['Region', layers.find((layer) => layer.id === item.map)?.name || item.map])
   entries.push(['Coordinates', coordinates(item)])
+  entries.push(['Altitude', altitude(item.z)])
 
   const guildMembershipNotice =
     item.kind === 'bases'
@@ -750,6 +828,57 @@ function ItemDetails({
   return (
     <>
       <FactList entries={entries} />
+      {journalPreview ? <JournalPreview preview={journalPreview} /> : null}
+      <LandmarkRewards rewards={rewards} />
+      {item.kind === 'players' && playerClaimsEnabled ? (
+        <PlayerClaimPanel key={item.id} playerId={item.id} onShowGlobalControl={onShowPlayerClaim} />
+      ) : null}
+      {manualChecklist && isChecklistItem(item) ? (
+        <CompletionChecklistControl item={item} checklist={manualChecklist} />
+      ) : null}
+      {onSharePosition ? (
+        <section className="grid gap-2">
+          <button
+            type="button"
+            className="pal-glass-inset pal-interactive flex min-h-11 w-full cursor-pointer items-center justify-center gap-2 px-3 py-2 text-xs font-medium text-[#e8fbfd] focus-visible:outline-none disabled:cursor-wait disabled:opacity-70"
+            aria-describedby={sharing || shareResult ? shareStatusId : undefined}
+            disabled={sharing}
+            onClick={async () => {
+              setSharing(true)
+              setShareResult(null)
+              try {
+                setShareResult(await onSharePosition(item))
+              } finally {
+                setSharing(false)
+              }
+            }}
+          >
+            <IconLink className="size-4 text-[#69d3e1]" aria-hidden="true" focusable="false" />
+            Share position
+          </button>
+          {sharing ? (
+            <p id={shareStatusId} className="m-0 text-xs text-[#9fb0b5]" role="status" aria-live="polite">
+              Preparing position link…
+            </p>
+          ) : shareResult ? (
+            <div id={shareStatusId} className="grid gap-1.5" role="status" aria-live="polite">
+              <p className="m-0 text-xs text-[#9fcbd1]">
+                {shareResult.copied ? 'Position link copied.' : 'Automatic copy unavailable. Copy this link:'}
+              </p>
+              {!shareResult.copied ? (
+                <input
+                  className="pal-glass-inset min-h-11 w-full px-2.5 text-xs text-[#e8fbfd] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#8cecf7]"
+                  aria-label="Position link for manual copy"
+                  readOnly
+                  value={shareResult.url}
+                  onClick={(event) => event.currentTarget.select()}
+                  onFocus={(event) => event.currentTarget.select()}
+                />
+              ) : null}
+            </div>
+          ) : null}
+        </section>
+      ) : null}
       {hasGuildRelationships ? (
         <section>
           <SectionTitle>Guild</SectionTitle>
@@ -803,5 +932,54 @@ function ItemDetails({
         <p className="m-0 text-[13px] text-[#8f989d]">This base currently has no assigned Pals.</p>
       ) : null}
     </>
+  )
+}
+
+function CompletionChecklistControl({ item, checklist }: { item: MapItem; checklist: ManualChecklistDetails }) {
+  const descriptionId = useId()
+  const manuallyCompleted = checklist.manualCompletedIds.has(item.id)
+  const source = completionSource(item.id, checklist.manualCompletedIds, checklist.saveCompletedIds)
+  const sourceLabel = completionSourceLabel(source)
+  return (
+    <section data-completion-source={source || undefined}>
+      <SectionTitle>{checklist.profileName}</SectionTitle>
+      <div className="pal-glass-inset grid gap-2.5 p-3">
+        <div>
+          <p className="m-0 text-[10px] tracking-[.1em] text-[#78c6d0] uppercase">{sourceLabel || 'Not completed'}</p>
+          <p id={descriptionId} className="mt-1 mb-0 text-[11px] leading-4 text-[#9fb0b5]">
+            {source === 'save'
+              ? 'Confirmed by your connected save. A manual mark remains a separate, optional browser-only note.'
+              : source === 'combined'
+                ? 'Confirmed by your connected save and marked manually in this browser.'
+                : source === 'manual'
+                  ? 'This manual mark is stored only in this browser.'
+                  : 'Manual marks stay in this browser. Save-confirmed progress appears only while connected.'}
+          </p>
+        </div>
+        <label
+          className={`pal-interactive flex min-h-11 cursor-pointer items-center gap-2.5 border px-3 py-2 text-xs focus-within:border-[#8de9f5] ${
+            manuallyCompleted
+              ? 'pal-selected border-[#72d7e5]/55 text-[#effafb]'
+              : 'border-[#8bb7bd]/25 bg-[#26363b]/55 text-[#d6e7e9]'
+          }`}
+        >
+          <input
+            type="checkbox"
+            className="size-4 shrink-0 accent-[#63c9d8]"
+            checked={manuallyCompleted}
+            aria-label={`Mark ${item.name} complete in ${checklist.profileName}`}
+            aria-describedby={descriptionId}
+            onChange={(event) => checklist.onSetCompletion(item.id, event.currentTarget.checked)}
+          />
+          <span>
+            {manuallyCompleted
+              ? 'Manual mark saved'
+              : source === 'save'
+                ? 'Also add manual mark'
+                : 'Mark complete manually'}
+          </span>
+        </label>
+      </div>
+    </section>
   )
 }

@@ -117,6 +117,12 @@
     color: #d9c98e;
   }
 
+  .header-panel-control[data-panel-control="progress"] {
+    --header-panel-accent: #78d7ae;
+
+    color: #a5e2c8;
+  }
+
   .header-panel-control[aria-expanded="true"] {
     border-color: var(--header-panel-accent);
     background: rgb(45 59 64 / 96%);

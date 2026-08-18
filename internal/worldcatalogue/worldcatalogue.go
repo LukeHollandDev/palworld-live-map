@@ -64,6 +64,15 @@ type Catalogue struct {
 	Decoder     string                 `json:"decoder"`
 	Locations   []palworld.WorldObject `json:"locations"`
 	ContentHash string                 `json:"-"`
+	Completion  []CompletionRecord     `json:"-"`
+}
+
+// CompletionRecord is a private, validated join from a save state key to a
+// public catalogue location. StateKey must never be serialized directly.
+type CompletionRecord struct {
+	LocationID string `json:"-"`
+	Category   string `json:"-"`
+	StateKey   string `json:"-"`
 }
 
 type datasetSpec struct {
@@ -170,6 +179,8 @@ func Load(sourceFS fs.FS) (Catalogue, error) {
 	seenIDs := make(map[string]struct{}, total)
 	seenInstances := make(map[string]struct{}, total)
 	locations := make([]palworld.WorldObject, 0, total)
+	completion := make([]CompletionRecord, 0, total)
+	seenCompletionKeys := make(map[string]struct{}, total)
 
 	for _, reference := range input.Datasets {
 		spec := specs[reference.ID]
@@ -202,7 +213,8 @@ func Load(sourceFS fs.FS) (Catalogue, error) {
 		}
 
 		for index := range inputDataset.Locations {
-			location, instanceID, err := projectLocation(inputDataset.Locations[index], spec)
+			record := inputDataset.Locations[index]
+			location, instanceID, err := projectLocation(record, spec)
 			if err != nil {
 				return Catalogue{}, fmt.Errorf(
 					"world catalogue dataset %q location %d: %w", reference.ID, index, err,
@@ -221,6 +233,17 @@ func Load(sourceFS fs.FS) (Catalogue, error) {
 			}
 			seenIDs[location.ID] = struct{}{}
 			locations = append(locations, location)
+			if record.StateKey != nil {
+				stateKey := strings.ToLower(strings.TrimSpace(*record.StateKey))
+				joinKey := record.Category + "\x00" + stateKey
+				if _, duplicate := seenCompletionKeys[joinKey]; duplicate {
+					return Catalogue{}, fmt.Errorf("duplicate world catalogue completion key for %q", record.Category)
+				}
+				seenCompletionKeys[joinKey] = struct{}{}
+				completion = append(completion, CompletionRecord{
+					LocationID: location.ID, Category: record.Category, StateKey: stateKey,
+				})
+			}
 		}
 	}
 
@@ -230,6 +253,7 @@ func Load(sourceFS fs.FS) (Catalogue, error) {
 		Decoder:     input.Decoder,
 		Locations:   locations,
 		ContentHash: hex.EncodeToString(contentHasher.Sum(nil)),
+		Completion:  completion,
 	}, nil
 }
 
@@ -402,9 +426,15 @@ func projectLocation(input locationRecord, spec datasetSpec) (palworld.WorldObje
 	if input.Level != nil {
 		level = *input.Level
 	}
+	z := input.Z
+	rewards := make([]palworld.LandmarkReward, len(input.Rewards))
+	for index, item := range input.Rewards {
+		rewards[index] = palworld.LandmarkReward{Name: item.Name, Count: item.Count}
+	}
 	return palworld.WorldObject{
 		ID: "catalogue:" + input.ID, Kind: input.Category, Name: input.Name,
-		Detail: detail, Level: level, X: input.X, Y: input.Y, Map: mapID,
+		Detail: detail, Level: level, X: input.X, Y: input.Y, Z: &z, Map: mapID,
+		Rewards: rewards,
 	}, instanceID, nil
 }
 

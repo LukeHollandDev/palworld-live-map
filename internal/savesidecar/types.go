@@ -23,6 +23,53 @@ type Snapshot struct {
 	Stats      Stats
 }
 
+// ClaimPlayer is the deliberately narrow private projection used to prove
+// control of one character. It is never part of a public snapshot. Stack item
+// identifiers and Pal instance identifiers are save-authored secrets and must
+// remain server-side.
+type ClaimPlayer struct {
+	PlayerID  string        `json:"-"`
+	Common    []ClaimStack  `json:"-"`
+	DropSlot  []ClaimStack  `json:"-"`
+	Essential []ClaimStack  `json:"-"`
+	Weapons   []ClaimStack  `json:"-"`
+	Armor     []ClaimStack  `json:"-"`
+	Food      []ClaimStack  `json:"-"`
+	Party     []ClaimPal    `json:"-"`
+	Progress  ClaimProgress `json:"-"`
+}
+
+// ClaimProgress contains exact, private state keys used only after a character
+// has been proven. Available is true only when every domain was decoded and
+// validated; non-nil empty slices then mean authoritative zero completion.
+type ClaimProgress struct {
+	Available    bool     `json:"-"`
+	FastTravel   []string `json:"-"`
+	Areas        []string `json:"-"`
+	Notes        []string `json:"-"`
+	Relics       []string `json:"-"`
+	ItemPickups  []string `json:"-"`
+	NormalBosses []string `json:"-"`
+	TowerBosses  []string `json:"-"`
+}
+
+// ClaimStack identifies one occupied private inventory-container slot. Common
+// stacks also retain enough information for the ordered proof and restore.
+type ClaimStack struct {
+	Slot          uint32 `json:"-"`
+	ItemID        string `json:"-"`
+	Count         uint32 `json:"-"`
+	DynamicItemID string `json:"-"`
+}
+
+// ClaimPal identifies one occupied party slot retained by the narrow private
+// resolver. Species is used only as a knowledge-question candidate.
+type ClaimPal struct {
+	Slot       int32  `json:"-"`
+	InstanceID string `json:"-"`
+	Species    string `json:"-"`
+}
+
 // Player combines both decoder calls for one save record. Identity is private
 // until saveroster projects it into the public ID space: PlayerID and GuildID
 // are raw save GUIDs and must never reach a public snapshot unprojected.
@@ -61,9 +108,9 @@ type Stats struct {
 	UnnamedPlayers   int
 	// NamesResolved counts records the roster pass named. ResolveFailed marks
 	// the pass itself failing, which downgrades the generation to preset-only
-	// data rather than discarding it. ResolveError retains the private
-	// diagnostic for server-side logging; it must never be sent to browsers
-	// because decoder errors can contain paths or save-authored text.
+	// data rather than discarding it. ResolveError remains inside this private
+	// decoder boundary for diagnosis and tests; callers must collapse it to a
+	// stable category because it can contain paths or save-authored text.
 	NamesResolved int
 	ResolveFailed bool
 	ResolveError  error
@@ -134,4 +181,51 @@ type resolvedCharacter struct {
 type resolvedGuild struct {
 	ID   string `json:"id"`
 	Name string `json:"name"`
+}
+
+type resolvedPlayerDocument struct {
+	ResolveVersion int                  `json:"resolveVersion"`
+	Kind           string               `json:"kind"`
+	Player         *resolvedClaimPlayer `json:"player"`
+}
+
+type resolvedClaimPlayer struct {
+	PlayerUID string                 `json:"playerUId"`
+	Inventory resolvedClaimInventory `json:"inventory"`
+	Pals      []resolvedClaimPal     `json:"pals"`
+	Warnings  []string               `json:"warnings"`
+	Progress  *resolvedClaimProgress `json:"progress"`
+}
+
+type resolvedClaimProgress struct {
+	FastTravel   []string `json:"fastTravel"`
+	Areas        []string `json:"areas"`
+	Notes        []string `json:"notes"`
+	Relics       []string `json:"relics"`
+	ItemPickups  []string `json:"itemPickups"`
+	NormalBosses []string `json:"normalBosses"`
+	TowerBosses  []string `json:"towerBosses"`
+}
+
+type resolvedClaimInventory struct {
+	Common    []resolvedClaimStack `json:"common"`
+	DropSlot  []resolvedClaimStack `json:"dropSlot"`
+	Essential []resolvedClaimStack `json:"essential"`
+	Weapons   []resolvedClaimStack `json:"weapons"`
+	Armor     []resolvedClaimStack `json:"armor"`
+	Food      []resolvedClaimStack `json:"food"`
+}
+
+type resolvedClaimStack struct {
+	Slot          uint32  `json:"slot"`
+	ItemID        string  `json:"itemId"`
+	Count         uint32  `json:"count"`
+	DynamicItemID *string `json:"dynamicItemId"`
+}
+
+type resolvedClaimPal struct {
+	InstanceID string `json:"instanceId"`
+	Species    string `json:"species"`
+	Location   string `json:"location"`
+	Slot       int32  `json:"slot"`
 }

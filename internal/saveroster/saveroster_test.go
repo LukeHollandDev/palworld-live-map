@@ -9,10 +9,13 @@ import (
 	"math"
 	"os"
 	"path/filepath"
+	"reflect"
+	"slices"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/LukeHollandDev/palworld-live-map/internal/playerclaim"
 	"github.com/LukeHollandDev/palworld-live-map/internal/savesidecar"
 )
 
@@ -36,6 +39,34 @@ func (f *fakeSnapshotReader) ReadSnapshot(ctx context.Context, path string) (*sa
 	return f.snapshot, f.err
 }
 
+type claimRead struct {
+	path     string
+	playerID string
+}
+
+type fakeClaimReader struct {
+	documents map[string]savesidecar.ClaimPlayer
+	err       error
+	reads     []claimRead
+}
+
+func (*fakeClaimReader) KnowledgeQuizEnabled() bool { return true }
+
+func (f *fakeClaimReader) ReadClaimPlayer(ctx context.Context, path, playerID string) (savesidecar.ClaimPlayer, error) {
+	if err := ctx.Err(); err != nil {
+		return savesidecar.ClaimPlayer{}, err
+	}
+	f.reads = append(f.reads, claimRead{path: path, playerID: playerID})
+	if f.err != nil {
+		return savesidecar.ClaimPlayer{}, f.err
+	}
+	document, ok := f.documents[path]
+	if !ok {
+		return savesidecar.ClaimPlayer{}, fmt.Errorf("no claim document for %q", path)
+	}
+	return document, nil
+}
+
 func TestNewValidatesConfiguration(t *testing.T) {
 	valid := Options{
 		Root: t.TempDir(), Reader: &fakeSnapshotReader{},
@@ -55,6 +86,11 @@ func TestNewValidatesConfiguration(t *testing.T) {
 		{name: "missing reader", mutate: func(o *Options) { o.Reader = nil }, want: "snapshot reader"},
 		{name: "missing player projector", mutate: func(o *Options) { o.ProjectPlayerID = nil }, want: "projector"},
 		{name: "missing guild projector", mutate: func(o *Options) { o.ProjectGuildKey = nil }, want: "guild key projector"},
+		{name: "claim reader without secret", mutate: func(o *Options) { o.ClaimReader = &fakeClaimReader{} }, want: "configured together"},
+		{name: "claim secret without reader", mutate: func(o *Options) { o.ClaimSecret = testClaimSecret() }, want: "configured together"},
+		{name: "short claim secret", mutate: func(o *Options) {
+			o.ClaimReader, o.ClaimSecret = &fakeClaimReader{}, []byte("too-short")
+		}, want: "exactly 32 bytes"},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -70,6 +106,90 @@ func TestNewValidatesConfiguration(t *testing.T) {
 	valid.WorldID = strings.ToUpper(testWorldOne)
 	if _, err := New(valid); err != nil {
 		t.Fatalf("New(valid uppercase world ID) = %v", err)
+	}
+	disabled, err := New(valid)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := disabled.Prepare(context.Background(), "player:any", 0); !errors.Is(err, playerclaim.ErrUnavailable) {
+		t.Fatalf("Prepare() with claims disabled = %v, want ErrUnavailable", err)
+	}
+}
+
+func TestClaimSubjectIsStableWorldScopedAndNeverPublished(t *testing.T) {
+	const publicID = "player:public-alice"
+	rawID := strings.Repeat("a", 32)
+	prepare := func(worldID string) (playerclaim.Prepared, []byte) {
+		t.Helper()
+		root := t.TempDir()
+		baseline := makeGeneration(t, root, worldID, "2026.07.21-10.00.00")
+		makeGeneration(t, root, worldID, "2026.07.21-11.00.00")
+		snapshotReader := &fakeSnapshotReader{snapshot: &savesidecar.Snapshot{Players: []savesidecar.Player{{PlayerID: rawID, Name: "Alice"}}}}
+		claimReader := &fakeClaimReader{documents: map[string]savesidecar.ClaimPlayer{
+			baseline: inventoryClaimPlayer(rawID),
+		}}
+		source := newClaimTestSource(t, root, worldID, snapshotReader, claimReader, func(raw string) (string, bool) {
+			return publicID, raw == rawID
+		})
+		roster, err := source.Roster(context.Background())
+		if err != nil {
+			t.Fatal(err)
+		}
+		prepared, err := source.Prepare(context.Background(), publicID, 0)
+		if err != nil {
+			t.Fatal(err)
+		}
+		published, err := json.Marshal(roster)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return prepared, published
+	}
+
+	first, firstPublic := prepare(testWorldOne)
+	second, _ := prepare(testWorldOne)
+	otherWorld, _ := prepare(testWorldTwo)
+	if first.Subject == "" || first.Subject != second.Subject {
+		t.Fatalf("same world/player subjects = %q and %q, want one stable non-empty subject", first.Subject, second.Subject)
+	}
+	if first.Subject == otherWorld.Subject {
+		t.Fatalf("subjects for worlds %q and %q are equal: %q", testWorldOne, testWorldTwo, first.Subject)
+	}
+	if len(first.Subject) != 64 || first.Subject == rawID || first.Subject == publicID ||
+		strings.Contains(first.Subject, rawID) || strings.Contains(first.Subject, publicID) {
+		t.Fatalf("subject %q is not an opaque SHA-256-sized identifier", first.Subject)
+	}
+	for _, private := range []string{rawID, first.Subject} {
+		if strings.Contains(string(firstPublic), private) {
+			t.Fatalf("public roster leaked claim value %q: %s", private, firstPublic)
+		}
+	}
+}
+
+func TestClaimIsUnavailableForProjectorCollision(t *testing.T) {
+	root := t.TempDir()
+	baseline := makeGeneration(t, root, testWorldOne, "2026.07.21-10.00.00")
+	firstRaw := strings.Repeat("a", 32)
+	secondRaw := strings.Repeat("b", 32)
+	const collision = "player:collision"
+	claimReader := &fakeClaimReader{documents: map[string]savesidecar.ClaimPlayer{
+		baseline: inventoryClaimPlayer(firstRaw),
+	}}
+	source := newClaimTestSource(t, root, testWorldOne, &fakeSnapshotReader{snapshot: &savesidecar.Snapshot{
+		Players: []savesidecar.Player{{PlayerID: firstRaw}, {PlayerID: secondRaw}},
+	}}, claimReader, func(string) (string, bool) { return collision, true })
+	roster, err := source.Roster(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(roster.Players) != 0 {
+		t.Fatalf("collision roster = %#v, want both ambiguous players suppressed", roster.Players)
+	}
+	if _, err := source.Prepare(context.Background(), collision, 0); !errors.Is(err, playerclaim.ErrUnavailable) {
+		t.Fatalf("Prepare() for colliding public ID = %v, want ErrUnavailable", err)
+	}
+	if len(claimReader.reads) != 0 {
+		t.Fatalf("claim reader was consulted for ambiguous identity: %#v", claimReader.reads)
 	}
 }
 
@@ -133,10 +253,11 @@ func TestRosterUsesOnlyCompleteGenerationAndGenerationTimeFallback(t *testing.T)
 	}
 }
 
-func TestRosterPropagatesPartialDecoderFailure(t *testing.T) {
+func TestRosterSanitizesPartialDecoderFailure(t *testing.T) {
 	root := t.TempDir()
 	makeGeneration(t, root, testWorldOne, "generation")
-	resolveError := errors.New("decoder resolve failed")
+	privateDetail := "decoder stderr /private/save/" + strings.Repeat("a", 32) + " ClaimSecretItem state-key"
+	resolveError := errors.New(privateDetail)
 	reader := &fakeSnapshotReader{snapshot: &savesidecar.Snapshot{
 		Stats: savesidecar.Stats{ResolveFailed: true, ResolveError: resolveError},
 	}}
@@ -145,8 +266,11 @@ func TestRosterPropagatesPartialDecoderFailure(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !errors.Is(roster.PartialError, resolveError) {
-		t.Fatalf("PartialError = %v, want %v", roster.PartialError, resolveError)
+	if roster.PartialError == nil || roster.PartialError.Error() != "save decoder resolve failed" {
+		t.Fatalf("PartialError = %v, want stable resolve category", roster.PartialError)
+	}
+	if strings.Contains(roster.PartialError.Error(), privateDetail) {
+		t.Fatalf("PartialError leaked private decoder detail: %v", roster.PartialError)
 	}
 }
 
@@ -501,6 +625,25 @@ func TestNonTimestampGenerationsFallBackToModificationTime(t *testing.T) {
 	}
 }
 
+func TestCompleteGenerationsAcceptsLargeNativeBackupHistories(t *testing.T) {
+	root := t.TempDir()
+	generationsPath := filepath.Join(root, testWorldOne, "backup", "world")
+	if err := os.MkdirAll(generationsPath, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	for index := 0; index < 513; index++ {
+		if err := os.Mkdir(filepath.Join(generationsPath, fmt.Sprintf("old-%04d", index)), 0o700); err != nil {
+			t.Fatal(err)
+		}
+	}
+	makeGeneration(t, root, testWorldOne, "2026.08.16-12.00.00")
+	makeGeneration(t, root, testWorldOne, "2026.08.16-12.05.00")
+	generations, err := completeGenerations(context.Background(), filepath.Join(root, testWorldOne))
+	if err != nil || len(generations) != 2 {
+		t.Fatalf("completeGenerations() = %d generations, %v; want two complete generations", len(generations), err)
+	}
+}
+
 func TestRosterTimeoutCoversDecoder(t *testing.T) {
 	root := t.TempDir()
 	makeGeneration(t, root, testWorldOne, "generation")
@@ -542,6 +685,77 @@ func newTestSource(t *testing.T, root, worldID string, timeout time.Duration, re
 		t.Fatal(err)
 	}
 	return source
+}
+
+func newClaimTestSource(t *testing.T, root, worldID string, reader SnapshotReader, claimReader ClaimReader, player IDProjector) *Source {
+	t.Helper()
+	source, err := New(Options{
+		Root: root, WorldID: worldID, Reader: reader,
+		ProjectPlayerID: player, ProjectGuildKey: testGuildProjector,
+		ClaimReader: claimReader, ClaimSecret: testClaimSecret(),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return source
+}
+
+func testClaimSecret() []byte {
+	return []byte("0123456789abcdef0123456789abcdef")
+}
+
+func inventoryClaimPlayer(playerID string) savesidecar.ClaimPlayer {
+	player := savesidecar.ClaimPlayer{
+		PlayerID: playerID,
+		Common:   make([]savesidecar.ClaimStack, 16),
+		Progress: savesidecar.ClaimProgress{
+			Available: true, FastTravel: []string{}, Areas: []string{}, Notes: []string{},
+			Relics: []string{}, ItemPickups: []string{},
+			NormalBosses: []string{}, TowerBosses: []string{},
+		},
+	}
+	for index := range player.Common {
+		player.Common[index] = savesidecar.ClaimStack{
+			Slot: uint32(index), ItemID: fmt.Sprintf("ClaimSecretItem%02d", index), Count: uint32(index + 11),
+		}
+		if index%3 == 0 {
+			player.Common[index].DynamicItemID = fmt.Sprintf("ClaimSecretInstance%02d", index)
+		}
+	}
+	return player
+}
+
+func prepareInventoryClaim(t *testing.T, root, actualWorldID, configuredWorldID, rawID string) (*Source, *fakeClaimReader, playerclaim.Prepared) {
+	t.Helper()
+	const publicID = "player:alice"
+	claimReader := &fakeClaimReader{documents: make(map[string]savesidecar.ClaimPlayer)}
+	source := newClaimTestSource(t, root, configuredWorldID,
+		&fakeSnapshotReader{snapshot: &savesidecar.Snapshot{Players: []savesidecar.Player{{PlayerID: rawID}}}},
+		claimReader, func(candidate string) (string, bool) { return publicID, candidate == rawID })
+	roster, err := source.Roster(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(roster.Players) != 1 || roster.Players[0].ID != publicID {
+		t.Fatalf("Roster() players = %#v, want claim target %q from world %q", roster.Players, publicID, actualWorldID)
+	}
+	prepared, err := source.Prepare(context.Background(), publicID, 0x0123456789abcdef)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return source, claimReader, prepared
+}
+
+func makeIncompleteGeneration(t *testing.T, root, worldID, name string) string {
+	t.Helper()
+	path := filepath.Join(root, worldID, "backup", "world", name)
+	if err := os.MkdirAll(path, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(path, "Level.sav"), []byte("partial-save"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	return path
 }
 
 func makeGeneration(t *testing.T, root, worldID, name string) string {
@@ -587,6 +801,174 @@ func testPlayerProjector(raw string) (string, bool) {
 		return "", false
 	}
 	return "player:test", true
+}
+
+func TestSelectKnowledgeQuizBuildsOneCyclableQuestionWithCharacterOptions(t *testing.T) {
+	stacks := make([]savesidecar.ClaimStack, 8)
+	for index := range stacks {
+		stacks[index] = savesidecar.ClaimStack{Slot: uint32(index), ItemID: fmt.Sprintf("TestItem%d", index+1), Count: 1}
+	}
+	player := savesidecar.ClaimPlayer{
+		Common:  stacks,
+		Weapons: []savesidecar.ClaimStack{{Slot: 0, ItemID: "PrivateWeapon", Count: 1}},
+		Party:   []savesidecar.ClaimPal{{Slot: 0, InstanceID: "private-instance", Species: "PrivatePal"}},
+	}
+	snapshotAt := time.Date(2026, time.August, 16, 1, 0, 0, 0, time.UTC)
+	instructions, correct, remaining, ok := selectKnowledgeQuiz(player, 42, snapshotAt)
+	if !ok || instructions.Kind != playerclaim.InventoryQuiz || len(instructions.Questions) != 1 || len(correct) != 1 || len(remaining) == 0 {
+		t.Fatalf("selectKnowledgeQuiz() = %+v, %v, %v, %v", instructions, correct, remaining, ok)
+	}
+	for index, question := range instructions.Questions {
+		answer, exists := correct[question.ID]
+		if len(question.Options) != 8 || !question.CanCycle || !exists || answer < 0 || answer >= len(question.Options) {
+			t.Fatalf("question %d = %+v, correct %d", index, question, answer)
+		}
+		seen := make(map[string]struct{}, len(question.Options))
+		for _, option := range question.Options {
+			seen[option] = struct{}{}
+		}
+		if len(seen) != 8 {
+			t.Fatalf("question %d options are not unique: %v", index, question.Options)
+		}
+	}
+	for _, question := range instructions.Questions {
+		for _, option := range question.Options {
+			if !strings.HasPrefix(option, "Test Item") {
+				t.Fatalf("question options were not grounded in the character's common inventory: %v", question.Options)
+			}
+		}
+	}
+	encoded, err := json.Marshal(instructions)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(encoded), "correct") || strings.Contains(string(encoded), "TestItem") {
+		t.Fatalf("quiz JSON exposed answers or raw item IDs: %s", encoded)
+	}
+	if got := humanizeItemID("MegaPalSphere"); got != "Mega Pal Sphere" {
+		t.Fatalf("humanizeItemID() = %q", got)
+	}
+}
+
+func TestSelectKnowledgeQuizAllowsPartyPalQuestions(t *testing.T) {
+	player := savesidecar.ClaimPlayer{Party: []savesidecar.ClaimPal{
+		{Slot: 0, InstanceID: "private-one", Species: "Lamball"},
+		{Slot: 1, InstanceID: "private-two", Species: "Cattiva"},
+		{Slot: 2, InstanceID: "private-three", Species: "Foxparks"},
+	}}
+	instructions, correct, remaining, ok := selectKnowledgeQuiz(
+		player, 7, time.Date(2026, time.August, 16, 1, 0, 0, 0, time.UTC),
+	)
+	if !ok || len(instructions.Questions) != 1 || len(correct) != 1 || len(remaining) != 2 {
+		t.Fatalf("selectKnowledgeQuiz() = %+v, %v, %v, %v", instructions, correct, remaining, ok)
+	}
+	for index, question := range instructions.Questions {
+		if !strings.HasPrefix(question.Prompt, "Which Pal species was in party slot ") {
+			t.Fatalf("question %d prompt = %q", index, question.Prompt)
+		}
+		if !reflect.DeepEqual(sortedStrings(question.Options), []string{"Cattiva", "Foxparks", "Lamball"}) {
+			t.Fatalf("question %d options = %v; want only the character's party", index, question.Options)
+		}
+	}
+}
+
+func TestSelectKnowledgeQuizSkipsContainersWithoutThreeDistinctRealOptions(t *testing.T) {
+	player := savesidecar.ClaimPlayer{
+		Weapons: []savesidecar.ClaimStack{
+			{Slot: 0, ItemID: "LaserRifle", Count: 1},
+			{Slot: 1, ItemID: "RocketLauncher", Count: 1},
+		},
+		Armor: []savesidecar.ClaimStack{
+			{Slot: 0, ItemID: "PalMetalArmor", Count: 1},
+			{Slot: 1, ItemID: "LifePendant", Count: 1},
+			{Slot: 2, ItemID: "AttackPendant", Count: 1},
+		},
+	}
+	instructions, _, remaining, ok := selectKnowledgeQuiz(
+		player, 17, time.Date(2026, time.August, 16, 1, 0, 0, 0, time.UTC),
+	)
+	if !ok || len(instructions.Questions) != 1 || len(remaining) != 2 {
+		t.Fatalf("selectKnowledgeQuiz() = %+v, remaining %d, ok %v", instructions, len(remaining), ok)
+	}
+	for _, question := range instructions.Questions {
+		if !strings.HasPrefix(question.Prompt, "What was equipped in equipment slot ") || len(question.Options) != 3 {
+			t.Fatalf("question used an undersized or unrelated container: %+v", question)
+		}
+	}
+}
+
+func TestSelectKnowledgeQuizUsesOnlyTheFirstTwoCommonInventoryRows(t *testing.T) {
+	privateStacks := func(prefix string) []savesidecar.ClaimStack {
+		result := make([]savesidecar.ClaimStack, 8)
+		for index := range result {
+			result[index] = savesidecar.ClaimStack{Slot: uint32(index), ItemID: fmt.Sprintf("%s%d", prefix, index), Count: 1}
+		}
+		return result
+	}
+	player := savesidecar.ClaimPlayer{
+		Common: []savesidecar.ClaimStack{
+			{Slot: 0, ItemID: "Wood", Count: 1},
+			{Slot: 5, ItemID: "Stone", Count: 1},
+			{Slot: 11, ItemID: "Fiber", Count: 1},
+			{Slot: 12, ItemID: "LateRowOre", Count: 1},
+			{Slot: 20, ItemID: "LateRowCoal", Count: 1},
+		},
+		DropSlot:  privateStacks("DroppedSecret"),
+		Essential: privateStacks("KeyItemSecret"),
+	}
+	instructions, _, remaining, ok := selectKnowledgeQuiz(
+		player, 23, time.Date(2026, time.August, 16, 1, 0, 0, 0, time.UTC),
+	)
+	if !ok || len(instructions.Questions) != 1 || len(remaining) != 2 {
+		t.Fatalf("selectKnowledgeQuiz() = %+v, remaining %d, ok %v", instructions, len(remaining), ok)
+	}
+	wantOptions := []string{"Fiber", "Stone", "Wood"}
+	for _, question := range instructions.Questions {
+		if !strings.HasPrefix(question.Prompt, "What was in inventory slot ") ||
+			!reflect.DeepEqual(sortedStrings(question.Options), wantOptions) {
+			t.Fatalf("question included a later row, dropped item, or key item: %+v", question)
+		}
+	}
+}
+
+func sortedStrings(values []string) []string {
+	result := append([]string(nil), values...)
+	slices.Sort(result)
+	return result
+}
+
+func TestCycleQuestionReplacesTheCurrentQuestion(t *testing.T) {
+	stacks := make([]savesidecar.ClaimStack, 8)
+	for index := range stacks {
+		stacks[index] = savesidecar.ClaimStack{Slot: uint32(index), ItemID: fmt.Sprintf("PrivateItem%d", index+1), Count: 1}
+	}
+	player := savesidecar.ClaimPlayer{
+		Common:  stacks,
+		Weapons: []savesidecar.ClaimStack{{Slot: 0, ItemID: "PrivateWeapon", Count: 1}},
+		Armor:   []savesidecar.ClaimStack{{Slot: 0, ItemID: "PrivateArmor", Count: 1}},
+	}
+	instructions, correct, remaining, ok := selectKnowledgeQuiz(player, 99, time.Now().UTC())
+	if !ok || len(remaining) < 2 {
+		t.Fatalf("selectKnowledgeQuiz() remaining = %d, ok = %v", len(remaining), ok)
+	}
+	prepared := playerclaim.Prepared{
+		Subject: "subject", PublicPlayerID: "player", Instructions: instructions,
+		Evidence: &claimQuizEvidence{target: claimTarget{}, correct: correct, remaining: remaining},
+	}
+	q1ID := prepared.Instructions.Questions[0].ID
+	if err := (&Source{}).CycleQuestion(context.Background(), &prepared, q1ID); err != nil {
+		t.Fatalf("CycleQuestion(q1) error = %v", err)
+	}
+	if prepared.Instructions.Questions[0].ID == q1ID {
+		t.Fatalf("Q1 cycle did not replace the question: %+v", prepared.Instructions.Questions)
+	}
+	q1After := prepared.Instructions.Questions[0]
+	if err := (&Source{}).CycleQuestion(context.Background(), &prepared, q1After.ID); err != nil {
+		t.Fatalf("CycleQuestion(replacement) error = %v", err)
+	}
+	if prepared.Instructions.Questions[0].ID == q1After.ID {
+		t.Fatalf("second cycle did not replace the question: %+v", prepared.Instructions.Questions)
+	}
 }
 
 // Distinct guilds must project to distinct keys without the result carrying any
