@@ -16,7 +16,8 @@ import {
   saveLocalCompletionState,
   setManualLandmarkCompletion,
   setRemainingOnly,
-  summarizeCompletion
+  summarizeCompletion,
+  summarizeCompletionBreakdown
 } from './lib/completion'
 import { buildGuildDetails, guildIdForBase } from './lib/guilds'
 import type { LeaderboardId } from './lib/leaderboards'
@@ -264,6 +265,10 @@ function LiveMap({
   )
   const completionSummary = useMemo(
     () => summarizeCompletion(items, completedIds, activeLayer.id),
+    [activeLayer.id, completedIds, items]
+  )
+  const completionBreakdown = useMemo(
+    () => summarizeCompletionBreakdown(items, completedIds, activeLayer.id),
     [activeLayer.id, completedIds, items]
   )
   const completionVisibleItems = useMemo(
@@ -711,6 +716,7 @@ function LiveMap({
             completed: completionSummary.completed,
             total: completionSummary.total,
             remaining: completionSummary.remaining,
+            breakdown: completionBreakdown,
             remainingOnly: localCompletion.remainingOnly,
             saveProgress,
             onRetrySaveProgress: retrySaveProgress,

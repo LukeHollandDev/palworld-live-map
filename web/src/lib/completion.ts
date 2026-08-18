@@ -56,6 +56,31 @@ export interface CompletionSummary {
   remaining: number
 }
 
+export type CompletionEvidence = 'save-supported' | 'manual-only'
+
+export interface CompletionBreakdownItem extends CompletionSummary {
+  kind: (typeof CHECKLIST_KINDS)[number]
+  label: string
+  evidence: CompletionEvidence
+}
+
+const CHECKLIST_KIND_DETAILS: Record<
+  (typeof CHECKLIST_KINDS)[number],
+  { label: string; evidence: CompletionEvidence }
+> = {
+  'alpha-pals': { label: 'Alpha Pals', evidence: 'save-supported' },
+  bosses: { label: 'Tower Bosses', evidence: 'save-supported' },
+  bounties: { label: 'Bounties', evidence: 'save-supported' },
+  'oil-rigs': { label: 'Oil Rigs', evidence: 'manual-only' },
+  watchtowers: { label: 'Watchtowers', evidence: 'save-supported' },
+  waypoints: { label: 'Fast Travel', evidence: 'save-supported' },
+  'dungeon-entrances': { label: 'Dungeons', evidence: 'manual-only' },
+  effigies: { label: 'Lifmunk Effigies', evidence: 'save-supported' },
+  journals: { label: 'Journals', evidence: 'save-supported' },
+  'ancient-shrine-pickups': { label: 'Ancient Shrine Pickups', evidence: 'save-supported' },
+  'npc-locations': { label: 'NPC Locations', evidence: 'manual-only' }
+}
+
 function timestamp(now: Date) {
   return Number.isFinite(now.getTime()) ? now.toISOString() : new Date(0).toISOString()
 }
@@ -226,6 +251,36 @@ export function summarizeCompletion(
     if (completedIDs.has(item.id)) completed++
   }
   return { total, completed, remaining: total - completed }
+}
+
+export function summarizeCompletionBreakdown(
+  items: readonly MapItem[],
+  completedIDs: ReadonlySet<string>,
+  layerId?: string
+): CompletionBreakdownItem[] {
+  const seen = new Set<string>()
+  const counts = new Map<(typeof CHECKLIST_KINDS)[number], { total: number; completed: number }>()
+  for (const item of items) {
+    if ((layerId && item.map !== layerId) || !isChecklistItem(item) || seen.has(item.id)) continue
+    seen.add(item.id)
+    const kind = item.kind as (typeof CHECKLIST_KINDS)[number]
+    const count = counts.get(kind) || { total: 0, completed: 0 }
+    count.total++
+    if (completedIDs.has(item.id)) count.completed++
+    counts.set(kind, count)
+  }
+  return CHECKLIST_KINDS.flatMap((kind) => {
+    const count = counts.get(kind)
+    if (!count) return []
+    return [
+      {
+        kind,
+        ...CHECKLIST_KIND_DETAILS[kind],
+        ...count,
+        remaining: count.total - count.completed
+      }
+    ]
+  })
 }
 
 // Kept as a compatibility name for existing local-checklist callers.

@@ -1,5 +1,6 @@
 import { type RefObject, useEffect, useId, useRef } from 'react'
 import type { SaveProgressState } from '../hooks/useSaveProgress'
+import type { CompletionBreakdownItem } from '../lib/completion'
 import { formatSaveProgressAge } from '../lib/saveProgress'
 import type { MapItem, MapLayer } from '../types'
 import { MapPanelHeader, MapPanelShell } from './MapPanel'
@@ -10,6 +11,7 @@ export interface ProgressChecklistView {
   completed: number
   total: number
   remaining: number
+  breakdown: CompletionBreakdownItem[]
   remainingOnly: boolean
   saveProgress: SaveProgressState
   onRetrySaveProgress: () => void
@@ -118,6 +120,39 @@ export function ProgressPanel({
             <p className="m-0 text-[#d8bc83] tabular-nums">{checklist.remaining} missing</p>
           </div>
 
+          <div className="border-t border-[#caeaef]/15 pt-2">
+            <p className="m-0 mb-1.5 text-[10px] tracking-[.08em] text-[#789da3] uppercase">Breakdown</p>
+            <div className="grid gap-1">
+              {checklist.breakdown.map((item) => (
+                <div key={item.kind} className="flex min-h-5 items-baseline justify-between gap-3 text-[11px]">
+                  <span className="flex min-w-0 items-center gap-1.5 truncate text-[#b8c9cc]">
+                    <i
+                      className={`inline-block size-1.5 shrink-0 rounded-full ${item.evidence === 'save-supported' ? 'bg-[#65d4ad]' : 'bg-[#718b91]'}`}
+                      aria-hidden="true"
+                    />
+                    {item.label}
+                    <span className="sr-only">
+                      {item.evidence === 'save-supported' ? 'Save-supported' : 'Manual only'}
+                    </span>
+                  </span>
+                  <span className="shrink-0 text-[#dcebed] tabular-nums">
+                    {item.completed} / {item.total}
+                  </span>
+                </div>
+              ))}
+            </div>
+            <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-[9px] leading-4 text-[#718b91]">
+              <span>
+                <i className="mr-1 inline-block size-1.5 rounded-full bg-[#65d4ad]" aria-hidden="true" />
+                Save + manual
+              </span>
+              <span>
+                <i className="mr-1 inline-block size-1.5 rounded-full bg-[#718b91]" aria-hidden="true" />
+                Manual only
+              </span>
+            </div>
+          </div>
+
           <label className="flex min-h-10 cursor-pointer items-center gap-2 border-t border-[#caeaef]/15 pt-2 text-xs text-[#dcebed]">
             <input
               type="checkbox"
@@ -142,13 +177,6 @@ export function ProgressPanel({
             >
               {saveProgressDescription(progress)}
             </p>
-            <details className="mt-1 text-[10px] leading-4 text-[#718b91]">
-              <summary className="cursor-pointer text-[#789da3]">How progress is counted</summary>
-              <p className="m-0 mt-1">
-                Saves confirm bosses, bounties, fast travel, effigies, journals, and shrine pickups. Other landmarks use
-                manual marks.
-              </p>
-            </details>
             {progress.phase === 'available' ? (
               <time className="sr-only" dateTime={progress.snapshot.snapshotAt}>
                 Save snapshot {progress.snapshot.snapshotAt}

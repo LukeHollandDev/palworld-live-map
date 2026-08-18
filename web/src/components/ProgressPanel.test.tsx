@@ -18,6 +18,16 @@ function checklist(overrides: Partial<ProgressChecklistView> = {}): ProgressChec
     completed: 2,
     total: 5,
     remaining: 3,
+    breakdown: [
+      {
+        kind: 'effigies',
+        label: 'Lifmunk Effigies',
+        evidence: 'save-supported',
+        completed: 2,
+        total: 5,
+        remaining: 3
+      }
+    ],
     remainingOnly: false,
     saveProgress: { phase: 'inactive' },
     onRetrySaveProgress: vi.fn(),
@@ -58,8 +68,12 @@ describe('ProgressPanel', () => {
       '2'
     )
     expect(within(panel).getByText('Manual · this browser')).toBeVisible()
-    expect(within(panel).getByText('2 / 5')).toBeVisible()
+    expect(within(panel).getAllByText('2 / 5')).toHaveLength(2)
     expect(within(panel).getByText('3 missing')).toBeVisible()
+    expect(within(panel).getByText('Breakdown')).toBeVisible()
+    expect(within(panel).getByText('Lifmunk Effigies')).toBeVisible()
+    expect(within(panel).getByText('Save + manual')).toBeVisible()
+    expect(within(panel).getAllByText('Manual only')).toHaveLength(1)
     expect(within(panel).getByText('Save-backed identity is not enabled on this map.', { exact: false })).toBeVisible()
 
     await user.click(within(panel).getByRole('checkbox', { name: 'Show only missing on the map' }))

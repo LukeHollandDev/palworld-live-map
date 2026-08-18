@@ -12,6 +12,7 @@ import {
   setManualLandmarkCompletion,
   setRemainingOnly,
   summarizeCompletion,
+  summarizeCompletionBreakdown,
   summarizeManualCompletion
 } from './completion'
 
@@ -138,5 +139,32 @@ describe('local completion profiles', () => {
       completed: 2,
       remaining: 0
     })
+  })
+
+  it('breaks a region total down by checklist category and completion evidence', () => {
+    const items: MapItem[] = [
+      { id: 'alpha', kind: 'alpha-pals', name: 'Alpha', x: 1, y: 1, map: 'palpagos' },
+      { id: 'dungeon', kind: 'dungeon-entrances', name: 'Dungeon', x: 2, y: 2, map: 'palpagos' },
+      { id: 'other-map', kind: 'effigies', name: 'Effigy', x: 3, y: 3, map: 'world-tree' }
+    ]
+
+    expect(summarizeCompletionBreakdown(items, new Set(['alpha']), 'palpagos')).toEqual([
+      {
+        kind: 'alpha-pals',
+        label: 'Alpha Pals',
+        evidence: 'save-supported',
+        completed: 1,
+        total: 1,
+        remaining: 0
+      },
+      {
+        kind: 'dungeon-entrances',
+        label: 'Dungeons',
+        evidence: 'manual-only',
+        completed: 0,
+        total: 1,
+        remaining: 1
+      }
+    ])
   })
 })

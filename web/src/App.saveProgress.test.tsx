@@ -138,8 +138,9 @@ describe('authenticated completion overlay', () => {
       '3'
     )
     expect(await within(progressPanel).findByText(/Save synced ·/)).toBeVisible()
-    await user.click(within(progressPanel).getByText('How progress is counted'))
-    expect(within(progressPanel).getByText(/saves confirm bosses, bounties, fast travel/i)).toBeVisible()
+    expect(within(progressPanel).getByText('Breakdown')).toBeVisible()
+    expect(within(progressPanel).getByText('Fast Travel')).toBeVisible()
+    expect(within(progressPanel).getByText('Save + manual')).toBeVisible()
     expect(within(progressPanel).getByRole('heading', { name: 'Connected private save' })).toBeVisible()
 
     await user.click(within(explorer).getByRole('button', { name: 'Expand Waypoints section' }))
