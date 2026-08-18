@@ -831,7 +831,7 @@ func selectKnowledgeQuiz(player savesidecar.ClaimPlayer, selector uint64, snapsh
 	commonFirstRows := claimStacksBeforeSlot(player.Common, claimCommonQuizSlots)
 	appendStackQuizFacts(&facts, commonFirstRows, "What was in inventory slot %d?")
 	appendStackQuizFacts(&facts, player.Weapons, "What was in loadout slot %d?")
-	appendArmorQuizFacts(&facts, player.Armor)
+	appendStackQuizFacts(&facts, player.Armor, "What was equipped in equipment slot %d?")
 	appendStackQuizFacts(&facts, player.Food, "What was in food pouch slot %d?")
 	partyOptions := quizOptionsFromParty(player.Party)
 	for _, pal := range player.Party {
@@ -907,39 +907,6 @@ func appendStackQuizFacts(destination *[]claimQuizFact, stacks []savesidecar.Cla
 			prompt: fmt.Sprintf(prompt, stack.Slot+1), value: label, options: options,
 		})
 	}
-}
-
-func appendArmorQuizFacts(destination *[]claimQuizFact, stacks []savesidecar.ClaimStack) {
-	options := quizOptionsFromStacks(stacks)
-	if len(options) < claimQuizMinOptions {
-		return
-	}
-	for _, stack := range stacks {
-		prompt, ok := armorQuizPrompt(stack.Slot)
-		label := humanizeItemID(stack.ItemID)
-		if !ok || !validClaimStack(stack) || label == "" {
-			continue
-		}
-		*destination = append(*destination, claimQuizFact{prompt: prompt, value: label, options: options})
-	}
-}
-
-func armorQuizPrompt(slot uint32) (string, bool) {
-	prompts := [...]string{
-		"What helmet was equipped?",
-		"What body armor was equipped?",
-		"What was equipped in accessory slot 1?",
-		"What was equipped in accessory slot 2?",
-		"What shield was equipped?",
-		"What glider was equipped?",
-		"What was equipped in accessory slot 3?",
-		"What was equipped in accessory slot 4?",
-		"What Sphere Module was equipped?",
-	}
-	if slot >= uint32(len(prompts)) {
-		return "", false
-	}
-	return prompts[slot], true
 }
 
 func quizOptionsFromStacks(stacks []savesidecar.ClaimStack) []string {
