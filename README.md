@@ -161,48 +161,18 @@ temporarily unavailable.
 
 ### Connect a saved character privately
 
-Character connection is opt-in and requires save integration. Online and
-offline characters use the same quick check: the map asks one multiple-choice
-question from the latest completed backup. Questions can cover the first two
-six-slot rows of common inventory, equipped weapons, armor, food, and party
-Pals. The question can be replaced before answering. It presents three to eight
-choices drawn from the same real saved container as its answer; for example, a weapon-slot question offers that
-character's equipped weapons. Starting or cycling a check can therefore disclose
-a bounded set of the character's item or party-Pal names before verification.
-The answer is submitted once, and a wrong submission consumes the challenge.
-Correct option indexes, counts, dynamic instance IDs, raw item IDs, account IDs, and
-save identifiers never reach the browser or logs. Challenges, question cycling,
-and submissions remain bounded by the built-in per-client and process-wide rate limits.
+Set `PLAYER_CLAIMS_ENABLED=true` alongside save integration. Choose an online or
+offline character and answer one question based on their saved inventory,
+equipment, food, or party. You can request a different question before answering.
 
-If no inventory, loadout, equipment, food-pouch, or party group contains at
-least three distinct real choices, that character cannot currently be
-connected. Add three different items or Pal species to one supported group,
-wait until the map has read a completed backup containing the change, and try
-again.
+If the map cannot build a question, add three distinct items or Pal species to
+one supported group and wait for a completed backup before trying again.
 
-Enable the feature with `PLAYER_CLAIMS_ENABLED=true`; there is no origin,
-proxy, or secret-file configuration. HTTP and raw-IP deployments are supported.
-HTTPS is still recommended on shared or untrusted networks because it prevents
-interception of the short-lived private session and completion response.
-
-The quiz reads the safely completed second-newest native backup and normally
-appears as soon as that private player projection is decoded. Quiz challenges
-expire after ten minutes. Successful checks return a random session bearer held
-only in the open page's React memory. It is never written to localStorage,
-sessionStorage, a cookie, or the URL. Reloading the page or restarting the map
-requires answering another question.
-Connected players can see exact save-confirmed completion for field and tower
-bosses, bounties, watchtowers, waypoints, effigies, journals, and Ancient Shrine pickups through
-`/api/me/progress` only;
-raw save state keys are projected to public catalogue location IDs. Manual
-checklist marks remain in that browser and are never copied into save evidence.
-
-Character connection does not change the map's existing public player data:
-online and offline rosters, saved locations, levels, guild relationships,
-last-seen values, aggregate progression, and leaderboards remain available as
-before. Only the new exact per-landmark completion overlay
-is self-only. Restrict access to the deployment separately if its existing
-player data is sensitive.
+Connecting adds save-confirmed completion for bosses, bounties, travel points,
+effigies, journals, and Ancient Shrine pickups. Other landmarks continue to use
+the browser-local checklist. The connection lasts until the page is reloaded;
+HTTPS is recommended on untrusted networks. Existing public player data and map
+features are unchanged.
 
 ## License
 
