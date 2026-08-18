@@ -160,11 +160,13 @@ describe('authenticated completion overlay', () => {
     await user.click(within(progressPanel).getByRole('button', { name: 'This is me' }))
     await user.selectOptions(await within(progressPanel).findByLabelText('What was equipped?'), '1')
     await user.click(within(progressPanel).getByRole('button', { name: 'Connect character' }))
-    expect(await within(progressPanel).findByText(/Save synced ·/)).toBeVisible()
-    expect(within(progressPanel).getByRole('progressbar', { name: 'Palpagos Islands completion' })).toHaveAttribute(
-      'aria-valuenow',
-      '3'
+    await waitFor(() =>
+      expect(within(progressPanel).getByRole('progressbar', { name: 'Palpagos Islands completion' })).toHaveAttribute(
+        'aria-valuenow',
+        '3'
+      )
     )
+    expect(within(progressPanel).queryByText(/Save (synced|may be stale)/)).not.toBeInTheDocument()
     expect(within(progressPanel).getByText('Breakdown')).toBeVisible()
     expect(within(progressPanel).getByText('Fast Travel')).toBeVisible()
     expect(within(progressPanel).getByText('Save + manual')).toBeVisible()

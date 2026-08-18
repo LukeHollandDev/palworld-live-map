@@ -1,7 +1,6 @@
 import { type RefObject, useEffect, useId, useRef } from 'react'
 import type { SaveProgressState } from '../hooks/useSaveProgress'
 import type { CompletionBreakdownItem } from '../lib/completion'
-import { formatSaveProgressAge } from '../lib/saveProgress'
 import type { MapItem, MapLayer } from '../types'
 import { MapPanelHeader, MapPanelShell } from './MapPanel'
 import { PlayerClaimIdentityChooser, PlayerClaimSessionControl } from './PlayerClaimPanel'
@@ -33,10 +32,7 @@ function saveProgressDescription(progress: SaveProgressState) {
       ? 'Save unavailable · map version mismatch'
       : 'Save temporarily unavailable'
   if (progress.phase === 'inactive') return 'Manual · this browser'
-  const age = formatSaveProgressAge(progress.snapshot.snapshotAt)
-  if (progress.refreshing) return `Refreshing · showing ${age}`
-  if (progress.refreshFailed) return `Refresh failed · showing ${age}`
-  return progress.stale ? `Save may be stale · ${age}` : `Save synced · ${age}`
+  return null
 }
 
 export function ProgressPanel({
@@ -54,6 +50,7 @@ export function ProgressPanel({
   const wasOpenRef = useRef(open)
   const percent = checklist.total > 0 ? Math.round((checklist.completed / checklist.total) * 100) : 0
   const progress = checklist.saveProgress
+  const progressDescription = saveProgressDescription(progress)
 
   useEffect(() => {
     if (open && !wasOpenRef.current) window.requestAnimationFrame(() => closeRef.current?.focus())
@@ -167,21 +164,18 @@ export function ProgressPanel({
             Hide landmarks completed manually or confirmed by your connected save from the map and Map filters.
           </p>
 
-          <div className="border-t border-[#caeaef]/15 pt-2">
-            <p
-              role="status"
-              aria-live="polite"
-              aria-atomic="true"
-              className={`m-0 text-[11px] leading-5 ${progress.phase === 'unavailable' || (progress.phase === 'available' && (progress.stale || progress.refreshFailed)) ? 'text-[#d8bc83]' : 'text-[#8ba4a9]'}`}
-            >
-              {saveProgressDescription(progress)}
-            </p>
-            {progress.phase === 'available' ? (
-              <time className="sr-only" dateTime={progress.snapshot.snapshotAt}>
-                Save snapshot {progress.snapshot.snapshotAt}
-              </time>
-            ) : null}
-          </div>
+          {progressDescription ? (
+            <div className="border-t border-[#caeaef]/15 pt-2">
+              <p
+                role="status"
+                aria-live="polite"
+                aria-atomic="true"
+                className={`m-0 text-[11px] leading-5 ${progress.phase === 'unavailable' ? 'text-[#d8bc83]' : 'text-[#8ba4a9]'}`}
+              >
+                {progressDescription}
+              </p>
+            </div>
+          ) : null}
         </section>
 
         <PlayerClaimSessionControl players={players} />
