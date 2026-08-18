@@ -223,7 +223,7 @@ async function recordWalkthrough(baseUrl) {
   await settle(page, 2_000)
   await traceMapCoordinates(page)
 
-  await clickControl(page, page.getByRole('button', { name: 'Uncheck all', exact: true }))
+  await clickControl(page, page.getByRole('button', { name: 'Hide all map categories', exact: true }))
   await settle(page, 1_350)
   const search = page.getByRole('searchbox', { name: 'Search map locations and live objects' })
   await hoverControl(page, search)
@@ -252,6 +252,15 @@ async function recordWalkthrough(baseUrl) {
   await checkControl(page, page.getByRole('checkbox', { name: 'Show Waypoints', exact: true }))
   await settle(page, 1_700)
 
+  await clickControl(page, page.getByRole('button', { name: 'My Progress', exact: true }))
+  await page.getByRole('heading', { name: 'My Progress', exact: true }).waitFor()
+  const breakdown = page.getByText('Breakdown', { exact: true })
+  await breakdown.waitFor()
+  await hoverControl(page, breakdown, 600)
+  await settle(page, 2_200)
+  await clickControl(page, page.getByRole('button', { name: 'Close My Progress', exact: true }))
+  await settle(page, 900)
+
   await clickControl(page, page.getByRole('button', { name: 'Leaderboards', exact: true }))
   await page.getByRole('heading', { name: 'Leaderboards', exact: true }).waitFor()
   await settle(page, 1_800)
@@ -266,7 +275,7 @@ async function recordWalkthrough(baseUrl) {
   await page.locator('button[aria-pressed="true"]').filter({ hasText: 'World Tree' }).waitFor()
   await page.locator('.map-tile-layer.is-ready .map-tile[src*="world-tree"]').first().waitFor()
   await settle(page, 1_200)
-  await clickControl(page, page.getByRole('button', { name: 'Check all', exact: true }))
+  await clickControl(page, page.getByRole('button', { name: 'Show all map categories', exact: true }))
   await settle(page, 1_400)
   await clickControl(page, page.getByRole('button', { name: 'Fit', exact: true }))
   await settle(page, 1_100)
