@@ -5,6 +5,7 @@ import {
   clampView,
   coverScale,
   coverView,
+  formatGameCoordinates,
   formatUptime,
   isScenePointVisible,
   itemSearchText,
@@ -14,6 +15,7 @@ import {
   sceneViewportBounds,
   selectMapTileLevel,
   selectVisibleMapTiles,
+  toGameCoordinates,
   toScene,
   toWorld
 } from './map'
@@ -34,6 +36,12 @@ describe('map coordinates', () => {
   it('rejects points beyond the layer bounds', () => {
     expect(toScene({ x: 101, y: 0 }, layer, 1000)).toBeNull()
     expect(toScene({ x: 0, y: -201 }, layer, 1000)).toBeNull()
+  })
+
+  it('converts raw world positions to the coordinates shown by the game', () => {
+    expect(toGameCoordinates({ x: -167230, y: 96430 })).toEqual({ x: -134, y: -94 })
+    expect(toGameCoordinates({ x: -123888, y: 158000 })).toEqual({ x: 0, y: 0 })
+    expect(formatGameCoordinates({ x: -167230, y: 96430 })).toBe('X -134\u00a0\u00a0Y -94')
   })
 })
 

@@ -13,6 +13,7 @@ import {
   buildSpatialGrid,
   clampView,
   coverScale,
+  formatGameCoordinates,
   itemSearchText,
   MAX_ZOOM_RATIO,
   type MapTilePyramid,
@@ -778,8 +779,7 @@ export const MapViewport = forwardRef<MapViewportHandle, MapViewportProps>(funct
           activeLayer,
           size
         )
-        if (coordinatesRef.current)
-          coordinatesRef.current.textContent = `X ${Math.round(world.x)}\u00a0\u00a0Y ${Math.round(world.y)}`
+        if (coordinatesRef.current) coordinatesRef.current.textContent = formatGameCoordinates(world)
 
         const drag = dragRef.current
         if (!drag || drag.pointer !== event.pointerId) return

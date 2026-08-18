@@ -3,7 +3,7 @@ import { useEffect, useId, useRef, useState } from 'react'
 import { isChecklistItem } from '../lib/completion'
 import { buildGuildDetails, type GuildDetails as GuildDetailsModel } from '../lib/guilds'
 import { LEADERBOARDS, type LeaderboardId, leaderboardById } from '../lib/leaderboards'
-import { kindLabel } from '../lib/map'
+import { formatGameCoordinates, kindLabel } from '../lib/map'
 import { completionSource, completionSourceLabel } from '../lib/saveProgress'
 import type { SharePositionResult } from '../lib/sharePosition'
 import type { ItemKind, LandmarkReward, MapItem, MapLayer } from '../types'
@@ -538,7 +538,7 @@ function levelLabel(item: MapItem) {
 }
 
 function coordinates(item: MapItem) {
-  return `X ${Math.round(item.x)}\u00a0\u00a0Y ${Math.round(item.y)}`
+  return formatGameCoordinates(item)
 }
 
 function altitude(z?: number) {

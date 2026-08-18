@@ -309,7 +309,7 @@ describe('App', () => {
     const detailsTitle = screen.getByRole('heading', { name: 'Luke' })
     expect(detailsTitle).toBeInTheDocument()
     await waitFor(() => expect(detailsTitle).toHaveFocus())
-    expect(screen.getByText(/X 10\s+Y 20/)).toBeInTheDocument()
+    expect(screen.getByText(/X -344\s+Y 270/)).toBeInTheDocument()
     expect(screen.getByText('No guild membership is known for this player.')).toBeVisible()
   })
 
@@ -2207,13 +2207,19 @@ describe('App', () => {
     let moved = false
     let playerPolls = 0
     mockAPI((path) => {
-      if (path === '/api/config') return { ...(responses[path] as object), pollIntervalMs: 10 }
+      if (path === '/api/config') {
+        return {
+          ...(responses[path] as object),
+          pollIntervalMs: 10,
+          layers: [{ id: 'palpagos', name: 'Palpagos Islands', bounds: [1000, 1000, -1000, -1000] }]
+        }
+      }
       if (path !== '/api/players') return responses[path]
       playerPolls++
       const state = responses[path] as (typeof responses)['/api/players'] & { players: Array<Record<string, unknown>> }
       return {
         ...state,
-        players: state.players.map((player) => ({ ...player, x: moved ? 80 : 10, y: moved ? 70 : 20 }))
+        players: state.players.map((player) => ({ ...player, x: moved ? 500 : 10, y: moved ? 600 : 20 }))
       }
     })
 
@@ -2221,12 +2227,12 @@ describe('App', () => {
     render(<App />)
     await screen.findByRole('heading', { name: 'Test Realm' })
     await user.click(screen.getByRole('button', { name: 'View Luke · Lv 55' }))
-    expect(screen.getByText(/X 10\s+Y 20/)).toBeInTheDocument()
+    expect(screen.getByText(/X -344\s+Y 270/)).toBeInTheDocument()
 
     const pollsBeforeMove = playerPolls
     moved = true
     await waitFor(() => expect(playerPolls).toBeGreaterThan(pollsBeforeMove))
-    expect(await screen.findByText(/X 80\s+Y 70/)).toBeInTheDocument()
+    expect(await screen.findByText(/X -343\s+Y 271/)).toBeInTheDocument()
   })
 
   it('keeps a hidden player hidden after their coordinates change', async () => {

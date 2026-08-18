@@ -3,6 +3,10 @@ import type { ItemKind, MapItem, MapLayer } from '../types'
 export const MAP_PIXEL_SIZE = 8192
 export const MAX_ZOOM_RATIO = 96
 
+const GAME_COORDINATE_X_OFFSET = 158000
+const GAME_COORDINATE_Y_OFFSET = 123888
+const GAME_COORDINATE_SCALE = 459
+
 const MARKER_STACK_ORDER: Record<ItemKind, number> = {
   'wild-pals': 10,
   'dungeon-entrances': 15,
@@ -114,6 +118,20 @@ export function toWorld(point: Point, layer: MapLayer, size: number): Point {
     x: maxX - (point.y / size) * (maxX - minX),
     y: minY + (point.x / size) * (maxY - minY)
   }
+}
+
+// Palworld's map readout swaps the Unreal world axes, translates its origin,
+// and scales the underlying world-unit coordinates down to player-facing ones.
+export function toGameCoordinates(point: Point): Point {
+  return {
+    x: Math.round((point.y - GAME_COORDINATE_X_OFFSET) / GAME_COORDINATE_SCALE),
+    y: Math.round((point.x + GAME_COORDINATE_Y_OFFSET) / GAME_COORDINATE_SCALE)
+  }
+}
+
+export function formatGameCoordinates(point: Point): string {
+  const game = toGameCoordinates(point)
+  return `X ${game.x}\u00a0\u00a0Y ${game.y}`
 }
 
 export function coverScale(width: number, height: number, size: number): number {
