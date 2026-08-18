@@ -143,8 +143,8 @@
       },
       "Microsoft.Bcl.Memory": {
         "type": "Transitive",
-        "resolved": "10.0.10",
-        "contentHash": "/PxGfVdy8P15x9TUyAyWfzR92DcRVRCMs4nMnVS6bldRaDTJJPG9ECJPlF0lbkeZdqwM5eSkOQ214YwvcimAWQ=="
+        "resolved": "10.0.11",
+        "contentHash": "gOK5j94niQhCvUXA5sXn/h4khL0ZHPlKZx//SJ9pwuydpWSDIPBpduLWty5MYMEJkWs/ewYbG1LAqfPLOprDgg=="
       },
       "Microsoft.NETCore.Platforms": {
         "type": "Transitive",
@@ -296,7 +296,7 @@
         "dependencies": {
           "CUE4Parse": "[1.2.2.202608, )",
           "CUE4Parse-Conversion": "[1.2.2.202608, )",
-          "Microsoft.Bcl.Memory": "[10.0.10, )",
+          "Microsoft.Bcl.Memory": "[10.0.11, )",
           "Newtonsoft.Json": "[13.0.4, )",
           "SixLabors.ImageSharp": "[3.1.12, )",
           "SkiaSharp.NativeAssets.Linux.NoDependencies": "[2.88.9, )"
