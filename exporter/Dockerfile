@@ -16,7 +16,7 @@ RUN dotnet run --project tests/PalworldAssetExporter.Tests.csproj -c Release --n
 RUN dotnet publish src/PalworldAssetExporter.csproj -c Release --no-restore -o /out
 
 # Run the published exporter without the .NET SDK.
-FROM mcr.microsoft.com/dotnet/runtime:10.0.11-noble@sha256:acad02eb5c4fbf57d15296f9c08d56cd4036e915bdae5b4dd48a06523d452617
+FROM mcr.microsoft.com/dotnet/runtime:10.0.11-noble@sha256:a365ce6a50b09176855d085c69da3fc1204a48432e36087e9a208f6e5860e235
 
 # Bake in the pinned Palworld community mappings file so running the exporter needs
 # nothing but Docker. The build fails unless the download matches the pinned checksum.
