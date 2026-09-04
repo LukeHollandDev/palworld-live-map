@@ -5,7 +5,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
-    <Cue4ParseVersion>1.2.2.202608</Cue4ParseVersion>
+    <Cue4ParseVersion>1.2.2.202609</Cue4ParseVersion>
   </PropertyGroup>
   <ItemGroup>
     <AssemblyMetadata Include="CUE4ParseVersion" Value="$(Cue4ParseVersion)" />
