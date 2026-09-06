@@ -9,8 +9,8 @@
       },
       "Blake3": {
         "type": "Transitive",
-        "resolved": "2.2.1",
-        "contentHash": "HfNW2Iiy4hCaVDVGFEyk0mks+M5HSU3O8O517LyYkI6FFuj2jpvNlag4kGQFDSRmJi4/axgOei8k02NKq/uoDg=="
+        "resolved": "3.0.2",
+        "contentHash": "THvWhdj8ErSdrGamTqjshCU1ImANfr7ieKY6eFqeMsRenvXEKut9qGm5/MA4SUk8IYvAahf67jSh0yVj9jTPzg=="
       },
       "BouncyCastle.Cryptography": {
         "type": "Transitive",
@@ -24,10 +24,10 @@
       },
       "CUE4Parse": {
         "type": "Transitive",
-        "resolved": "1.2.2.202608",
-        "contentHash": "oJd7SFkLYKT5AsPmAW30WMGWIwq4S2GZayB5ZEU8kWtJsjCa96XWl8YZOfkFmMIIj6O2zYChwhX5otAd8ROMtQ==",
+        "resolved": "1.2.2.202609",
+        "contentHash": "TyZXxkTsuYrJU17tB9ryfdpakvV1KRNpSbnVtlhdFVnO4jJ1ZNAb6lfAt2gWHNiuWNu3k9C+YSYVo51aP5hfWg==",
         "dependencies": {
-          "Blake3": "2.2.1",
+          "Blake3": "3.0.2",
           "BouncyCastle.Cryptography": "2.6.2",
           "FixedMathSharp": "4.0.1",
           "Fmod5Sharp": "3.1.0",
@@ -51,11 +51,11 @@
       },
       "CUE4Parse-Conversion": {
         "type": "Transitive",
-        "resolved": "1.2.2.202608",
-        "contentHash": "yXyHta02ZMSdiBpPPwaiTXcKgLmu+/bJfwQMtEmKiHbOXNNvqVzCHItOfMntJyLS8sKNf2DBKhUGvJOUjcalww==",
+        "resolved": "1.2.2.202609",
+        "contentHash": "HCxAlalI2yqdh7aI6LoSbvghV7UtxuOWBpMMEdYEZ26gykVTaTc7alZyMfHUHBqj6/TVgt/ZbGWudM5Uuc9xeA==",
         "dependencies": {
           "AssetRipper.TextureDecoder": "2.6.2",
-          "CUE4Parse": "1.2.2.202608",
+          "CUE4Parse": "1.2.2.202609",
           "SharpGLTF.Core": "1.0.6",
           "SharpGLTF.Toolkit": "1.0.6",
           "SixLabors.ImageSharp": "[3.1.12]",
@@ -294,8 +294,8 @@
       "palworldassetexporter": {
         "type": "Project",
         "dependencies": {
-          "CUE4Parse": "[1.2.2.202608, )",
-          "CUE4Parse-Conversion": "[1.2.2.202608, )",
+          "CUE4Parse": "[1.2.2.202609, )",
+          "CUE4Parse-Conversion": "[1.2.2.202609, )",
           "Microsoft.Bcl.Memory": "[10.0.11, )",
           "Newtonsoft.Json": "[13.0.4, )",
           "SixLabors.ImageSharp": "[3.1.12, )",
