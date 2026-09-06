@@ -1,9 +1,8 @@
 #!/bin/sh
 set -eu
 
-reader_version=v0.2.0
-reader_revision=c6560931f407abcbe3398a3fc73840b51bb56974
-reader_build_version="${reader_version}+live-map.3"
+reader_version=v0.3.0
+reader_revision=922c229292277ad239507d4b2ae0eb75d8b0ac64
 
 project_root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 reader_stage=$(mktemp -d "${TMPDIR:-/tmp}/palworld-live-map-reader.XXXXXX")
@@ -17,14 +16,10 @@ if [ "$actual_revision" != "$reader_revision" ]; then
     "$reader_revision" "$actual_revision" >&2
   exit 1
 fi
-git -C "$reader_stage/source" apply --check \
-  "$project_root/patches/palworld-save-reader-v0.2.0-leaderboards.patch"
-git -C "$reader_stage/source" apply \
-  "$project_root/patches/palworld-save-reader-v0.2.0-leaderboards.patch"
 
 mkdir -p "$project_root/bin"
 make -C "$reader_stage/source" release-build \
   GOOS="$(go env GOOS)" \
   GOARCH="$(go env GOARCH)" \
-  VERSION="$reader_build_version" \
+  VERSION="$reader_version" \
   OUTPUT="$project_root/bin/palworld-save-reader"
