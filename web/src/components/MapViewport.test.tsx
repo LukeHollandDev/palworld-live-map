@@ -415,6 +415,38 @@ describe('MapViewport zoom controls', () => {
     expect(scene.style.transform).not.toBe(initial)
   })
 
+  it('suppresses native drag and text selection while panning the map', () => {
+    installViewportMocks()
+    const { container } = render(
+      <MapViewport
+        activeLayer={layer}
+        items={[]}
+        enabledKinds={new Set<ItemKind>()}
+        enabledPlayerStatuses={new Set(['online', 'offline'])}
+        hiddenIds={new Set<string>()}
+        search=""
+        onShowItem={() => undefined}
+        inspectorOpen={false}
+      >
+        <div role="dialog" aria-label="Details">
+          <button type="button">Dialog action</button>
+        </div>
+      </MapViewport>
+    )
+    const scene = container.querySelector<HTMLElement>('.map-scene')
+    if (!scene) throw new Error('Expected map scene')
+
+    expect(scene).toHaveClass('select-none')
+
+    // Native drag from map artwork, markers, or stray selections is cancelled so panning never
+    // spawns the browser drag ghost (issue #56).
+    expect(fireEvent.dragStart(screen.getByRole('application'))).toBe(false)
+    expect(fireEvent.dragStart(scene)).toBe(false)
+
+    // Inspector content keeps its default browser behavior.
+    expect(fireEvent.dragStart(screen.getByRole('button', { name: 'Dialog action' }))).toBe(true)
+  })
+
   it('fits the whole map on a short viewport and animates zoom in, zoom out, and fit', () => {
     const advanceFrame = installViewportMocks()
     const scene = renderViewport()

@@ -391,6 +391,8 @@
     position: absolute;
     transform-origin: 0 0;
     background: var(--map-background, #0d161e);
+    user-select: none;
+    -webkit-user-drag: none;
   }
 
   .fallback-grid {

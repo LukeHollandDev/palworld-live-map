@@ -805,6 +805,14 @@ export const MapViewport = forwardRef<MapViewportHandle, MapViewportProps>(funct
         event.currentTarget.style.cursor = 'grab'
         syncRenderViewport()
       }}
+      onDragStart={(event) => {
+        if (
+          event.target instanceof Element &&
+          event.target.closest('a[href], input, textarea, select, aside, [role="search"], [role="dialog"]')
+        )
+          return
+        event.preventDefault()
+      }}
       onKeyDown={(event) => {
         if (event.target !== event.currentTarget) return
         const rect = event.currentTarget.getBoundingClientRect()
@@ -840,7 +848,7 @@ export const MapViewport = forwardRef<MapViewportHandle, MapViewportProps>(funct
     >
       <div
         ref={sceneRef}
-        className="map-scene"
+        className="map-scene select-none"
         style={
           {
             width: size,
