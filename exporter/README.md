@@ -66,6 +66,21 @@ PALWORLD_GAME_VERSION="1.0.1.100619" make game-assets
 | `MAP_OUTPUT_DIR` | Directory for the exported images and manifest | `build/maps` |
 | `LANDMARK_OUTPUT_DIR` | Directory for the landmark manifest | `build/landmarks` |
 
+## Diagnosing game-update breakage
+
+When a Palworld update renames packages or restructures data tables, the fail-closed checks stop the export with a specific error. To inspect what the installed PAK actually contains, run the exporter image directly with `--dump-package` (read-only; skips all staging and output):
+
+```bash
+PAK="$(eval echo ~)/Library/Application Support/CrossOver/Bottles/Steam/drive_c/Program Files (x86)/Steam/steamapps/common/Palworld/Pal/Content/Paks"
+docker build --quiet -t palworld-live-map/asset-exporter:dev exporter
+docker run --rm --mount "type=bind,src=$PAK,dst=/palworld-paks,readonly" \
+  palworld-live-map/asset-exporter:dev \
+  --pak-directory /palworld-paks --mappings /mappings.usmap \
+  --dump-package Pal/Content/Pal/DataTable/Character/DT_PalMonsterParameter --dump-filter BOSS_
+```
+
+`--dump-filter` optionally narrows the output to row names containing a substring. If the package resolves to zero rows, the dump prints the raw serialized table (including `ParentTables` references) so composite-table restructuring and outdated mappings are distinguishable at a glance.
+
 ## How It Works
 
 The Docker build downloads the pinned Palworld community mappings file and fails unless it matches the pinned checksum, so the image ships with a verified copy. The wrapper script builds that image, mounts the game's PAK directory read-only, and starts the exporter, which then:

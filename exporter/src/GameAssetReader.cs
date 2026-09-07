@@ -11,6 +11,12 @@ internal static class GameAssetReader
 {
     internal static JObject LoadRows(DefaultFileProvider provider, string packagePath)
     {
+        var table = LoadDataTable(provider, packagePath);
+        return ResolveRows(provider, table, packagePath, new HashSet<string>(StringComparer.Ordinal) { packagePath });
+    }
+
+    private static JObject LoadDataTable(DefaultFileProvider provider, string packagePath)
+    {
         var tables = LoadExports(provider, packagePath)
             .Where(item => (item.Class?.Name.ToString() ?? string.Empty).Contains("DataTable", StringComparison.Ordinal))
             .ToArray();
@@ -18,9 +24,66 @@ internal static class GameAssetReader
         {
             throw new InvalidOperationException($"Expected one DataTable export in {packagePath}, found {tables.Length}.");
         }
+        return SerializeObject(tables[0]);
+    }
 
-        var table = SerializeObject(tables[0]);
-        return LandmarkShaper.RequireObject(table["Rows"], $"{packagePath}.Rows");
+    // Palworld 1.0.4 split several data tables into CompositeDataTable shells whose own
+    // Rows are empty and whose effective rows live in ParentTables. Resolve the
+    // inheritance chain so callers see the full row set: parent rows load in order and
+    // the composite's own rows override them, matching engine lookup. Fail closed on
+    // cycles and malformed references.
+    internal static JObject ResolveRows(
+        DefaultFileProvider provider,
+        JObject table,
+        string packagePath,
+        ISet<string> visited)
+    {
+        var ownRows = LandmarkShaper.RequireObject(table["Rows"], $"{packagePath}.Rows");
+        var parentReferences = table["Properties"]?["ParentTables"] as JArray;
+        if (parentReferences is null || parentReferences.Count == 0)
+        {
+            return ownRows;
+        }
+
+        var parentRowSets = new List<JObject>(parentReferences.Count);
+        foreach (var reference in parentReferences)
+        {
+            var parentObjectPath = reference?["ObjectPath"]?.ToString();
+            var separator = parentObjectPath?.LastIndexOf('.');
+            if (string.IsNullOrEmpty(parentObjectPath) || separator is null || separator.Value < 1)
+            {
+                throw new InvalidOperationException(
+                    $"{packagePath} has a malformed parent table reference: {reference}");
+            }
+            var parentPackagePath = parentObjectPath[..separator.Value];
+            if (!visited.Add(parentPackagePath))
+            {
+                throw new InvalidOperationException(
+                    $"CompositeDataTable inheritance cycle at {parentPackagePath} referenced from {packagePath}.");
+            }
+            var parentTable = LoadDataTable(provider, parentPackagePath);
+            parentRowSets.Add(ResolveRows(provider, parentTable, parentPackagePath, visited));
+        }
+        return MergeTableRows(parentRowSets, ownRows);
+    }
+
+    // Pure parent/own row merge kept separate from CUE4Parse so override order and
+    // row cloning stay testable against fixtures.
+    internal static JObject MergeTableRows(IReadOnlyList<JObject> parentRowSets, JObject ownRows)
+    {
+        var merged = new JObject();
+        foreach (var rows in parentRowSets)
+        {
+            foreach (var property in rows.Properties())
+            {
+                merged[property.Name] = property.Value.DeepClone();
+            }
+        }
+        foreach (var property in ownRows.Properties())
+        {
+            merged[property.Name] = property.Value.DeepClone();
+        }
+        return merged;
     }
 
     internal static UObject[] LoadExports(DefaultFileProvider provider, string packagePath) =>
