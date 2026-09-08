@@ -29,7 +29,9 @@ internal static partial class TestProgram
         ("source snapshots detect changes", SourceSnapshotsDetectChanges),
         ("staged outputs promote across directories", StagedOutputsPromoteAcrossDirectories),
         ("source failure preserves prior outputs", SourceFailurePreservesPriorOutputs),
-        ("duplicate promotion targets preserve prior outputs", DuplicatePromotionTargetsPreservePriorOutputs)
+        ("duplicate promotion targets preserve prior outputs", DuplicatePromotionTargetsPreservePriorOutputs),
+        ("composite table rows merge parents and override with own rows", CompositeTableRowsMergeParentsAndOverrideWithOwnRows),
+        ("composite table merge clones source rows", CompositeTableMergeClonesSourceRows)
     ];
 
     public static int Main()
@@ -489,6 +491,66 @@ internal static partial class TestProgram
                 exception);
         }
         throw new InvalidOperationException($"Expected InvalidOperationException containing <{messageFragment}>, but no exception was thrown.");
+    }
+
+    private static void CompositeTableRowsMergeParentsAndOverrideWithOwnRows()
+    {
+        var firstParent = new JObject
+        {
+            ["SharedRow"] = new JObject { ["Level"] = 11 },
+            ["ParentOnlyRow"] = new JObject { ["Level"] = 12 }
+        };
+        var secondParent = new JObject
+        {
+            ["SharedRow"] = new JObject { ["Level"] = 13 }
+        };
+        var ownRows = new JObject
+        {
+            ["SharedRow"] = new JObject { ["Level"] = 14 }
+        };
+
+        var merged = GameAssetReader.MergeTableRows([firstParent, secondParent], ownRows);
+
+        var expected = new[] { "ParentOnlyRow", "SharedRow" }.Order(StringComparer.Ordinal).ToArray();
+        if (!merged.Properties().Select(property => property.Name).Order(StringComparer.Ordinal).SequenceEqual(expected))
+        {
+            throw new InvalidOperationException($"Expected merged row names {string.Join(", ", expected)}.");
+        }
+        if (merged["ParentOnlyRow"]!["Level"]!.Value<int>() != 12)
+        {
+            throw new InvalidOperationException("Expected untouched parent rows to survive the merge.");
+        }
+        if (merged["SharedRow"]!["Level"]!.Value<int>() != 14)
+        {
+            throw new InvalidOperationException("Expected the composite's own rows to override every parent row.");
+        }
+
+        var withoutOwnRows = GameAssetReader.MergeTableRows([firstParent, secondParent], []);
+        if (withoutOwnRows["SharedRow"]!["Level"]!.Value<int>() != 13)
+        {
+            throw new InvalidOperationException("Expected later parent tables to override earlier ones.");
+        }
+    }
+
+    private static void CompositeTableMergeClonesSourceRows()
+    {
+        var parent = new JObject
+        {
+            ["RowA"] = new JObject { ["Level"] = 21 }
+        };
+        var ownRows = new JObject
+        {
+            ["RowB"] = new JObject { ["Level"] = 22 }
+        };
+
+        var merged = GameAssetReader.MergeTableRows([parent], ownRows);
+        merged["RowA"]!["Level"] = new JValue(99);
+        merged["RowB"]!["Level"] = new JValue(99);
+
+        if (parent["RowA"]!["Level"]!.Value<int>() != 21 || ownRows["RowB"]!["Level"]!.Value<int>() != 22)
+        {
+            throw new InvalidOperationException("Expected merged rows to be decoupled copies of their sources.");
+        }
     }
 
     private sealed record TowerFixture(

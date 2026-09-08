@@ -41,6 +41,13 @@ internal static class LandmarkExporter
 
         var bossRows = GameAssetReader.LoadRows(provider, BossSpawnerPackage);
         var monsterRows = GameAssetReader.LoadRows(provider, MonsterParameterPackage);
+        if (monsterRows.Count == 0)
+        {
+            throw new InvalidOperationException(
+                $"{MonsterParameterPackage} decoded zero rows after composite resolution. The installed " +
+                "Palworld version likely changed PalCharacterParameterDatabaseRow since the pinned " +
+                "mappings.usmap in exporter/Dockerfile; update the mappings pin to a current release.");
+        }
         var palNameRows = GameAssetReader.LoadRows(provider, PalNamePackage);
         var mainWorldExports = GameAssetReader.LoadExports(provider, MainWorldPackage);
         var alphaLocations = ExtractAlphas(bossRows, monsterRows, palNameRows);

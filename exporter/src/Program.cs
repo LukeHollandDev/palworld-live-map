@@ -6,6 +6,7 @@ using CUE4Parse.UE4.Assets.Exports.Texture;
 using CUE4Parse.UE4.Versions;
 using CUE4Parse_Conversion.Options;
 using CUE4Parse_Conversion.Textures;
+using Newtonsoft.Json.Linq;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.Formats.Jpeg;
 using SixLabors.ImageSharp.Processing;
@@ -15,6 +16,11 @@ const string GeneratorName = "palworld-asset-exporter";
 const string GeneratorVersion = "4";
 
 var options = ParseOptions(args);
+if (options.DumpPackage is not null)
+{
+    DumpPackageRows(options);
+    return;
+}
 using var mapOutput = StagedOutputDirectory.Create(options.OutputDirectory);
 using var landmarkOutput = StagedOutputDirectory.Create(options.LandmarkOutputDirectory);
 
@@ -30,14 +36,7 @@ var mappingsManifest = SourceSnapshots.CaptureFile(options.MappingsFile);
 Console.WriteLine("Captured initial PAK provenance; mounting verified sources...");
 
 Console.WriteLine($"Indexing {pakFiles.Length} Palworld PAK file(s)...");
-var versions = new VersionContainer(EGame.GAME_UE5_1, ETexturePlatform.DesktopMobile);
-var provider = new DefaultFileProvider(options.PakDirectory, SearchOption.TopDirectoryOnly, versions, StringComparer.OrdinalIgnoreCase)
-{
-    MappingsContainer = new FileUsmapTypeMappingsProvider(options.MappingsFile)
-};
-provider.Initialize();
-provider.Mount();
-provider.PostMount();
+var provider = MountProvider(options.PakDirectory, options.MappingsFile);
 Console.WriteLine($"Mounted {provider.Files.Count} game files.");
 var gameVersion = GameVersionExtractor.ReadMounted(provider);
 if (options.ExpectedGameVersion is not null &&
@@ -142,6 +141,53 @@ OutputPromotion.Promote(mapOutput, landmarkOutput);
 Console.WriteLine($"Promoted map output to {mapOutput.DestinationDirectory}");
 Console.WriteLine($"Promoted landmark output to {landmarkOutput.DestinationDirectory}");
 
+static void DumpPackageRows(ExportOptions options)
+{
+    using var provider = MountProvider(options.PakDirectory, options.MappingsFile);
+    Console.WriteLine($"Mounted {provider.Files.Count} game files.");
+    var gameVersion = GameVersionExtractor.ReadMounted(provider);
+    Console.WriteLine($"Detected Palworld ProjectVersion {gameVersion} from {GameVersionExtractor.SourcePath}.");
+    var rows = GameAssetReader.LoadRows(provider, options.DumpPackage!);
+    var properties = rows.Properties().OrderBy(item => item.Name, StringComparer.Ordinal).ToArray();
+    Console.WriteLine($"Package {options.DumpPackage} has {properties.Length} rows");
+    if (properties.Length == 0)
+    {
+        var exports = GameAssetReader.LoadExports(provider, options.DumpPackage!);
+        Console.WriteLine($"Package exports: {string.Join(", ", exports.Select(item => item.Class?.Name.ToString() ?? item.Name.ToString()))}");
+        var serialized = GameAssetReader.SerializeObject(exports.Single(item => (item.Class?.Name.ToString() ?? string.Empty).Contains("DataTable", StringComparison.Ordinal)));
+        var serializedText = serialized.ToString(Newtonsoft.Json.Formatting.Indented);
+        Console.WriteLine("Raw serialized DataTable (first 6000 characters):");
+        Console.WriteLine(serializedText[..Math.Min(6000, serializedText.Length)]);
+        return;
+    }
+    foreach (var property in properties)
+    {
+        if (options.DumpFilter is not null &&
+            !property.Name.Contains(options.DumpFilter, StringComparison.OrdinalIgnoreCase))
+        {
+            continue;
+        }
+        var row = property.Value as JObject;
+        var characterId = row?["CharacterID"]?.ToString();
+        Console.WriteLine(characterId is null or "None"
+            ? property.Name
+            : $"{property.Name}\t{characterId}");
+    }
+}
+
+static DefaultFileProvider MountProvider(string pakDirectory, string mappingsFile)
+{
+    var versions = new VersionContainer(EGame.GAME_UE5_1, ETexturePlatform.DesktopMobile);
+    var provider = new DefaultFileProvider(pakDirectory, SearchOption.TopDirectoryOnly, versions, StringComparer.OrdinalIgnoreCase)
+    {
+        MappingsContainer = new FileUsmapTypeMappingsProvider(mappingsFile)
+    };
+    provider.Initialize();
+    provider.Mount();
+    provider.PostMount();
+    return provider;
+}
+
 static ExportOptions ParseOptions(string[] arguments)
 {
     string? pakDirectory = null;
@@ -149,6 +195,8 @@ static ExportOptions ParseOptions(string[] arguments)
     string? outputDirectory = null;
     string? landmarkOutputDirectory = null;
     string? gameVersion = null;
+    string? dumpPackage = null;
+    string? dumpFilter = null;
 
     for (var index = 0; index < arguments.Length; index++)
     {
@@ -165,12 +213,28 @@ static ExportOptions ParseOptions(string[] arguments)
             case "--output": outputDirectory = value; break;
             case "--landmark-output": landmarkOutputDirectory = value; break;
             case "--game-version": gameVersion = value; break;
+            case "--dump-package": dumpPackage = value; break;
+            case "--dump-filter": dumpFilter = value; break;
             default: throw new ArgumentException($"Unknown option: {key}");
         }
     }
 
-    if (string.IsNullOrWhiteSpace(pakDirectory) || string.IsNullOrWhiteSpace(mappingsFile) ||
-        string.IsNullOrWhiteSpace(outputDirectory) || string.IsNullOrWhiteSpace(landmarkOutputDirectory))
+    if (string.IsNullOrWhiteSpace(pakDirectory) || string.IsNullOrWhiteSpace(mappingsFile))
+    {
+        throw new ArgumentException(
+            "Usage: PalworldAssetExporter --pak-directory PATH --mappings FILE [--output PATH " +
+            "--landmark-output PATH [--game-version EXPECTED_VERSION]] [--dump-package PACKAGE " +
+            "[--dump-filter SUBSTRING]]");
+    }
+    if (dumpPackage is not null)
+    {
+        if (string.IsNullOrWhiteSpace(outputDirectory) || string.IsNullOrWhiteSpace(landmarkOutputDirectory))
+        {
+            return new ExportOptions(pakDirectory, mappingsFile, string.Empty, string.Empty, gameVersion?.Trim(), dumpPackage, dumpFilter);
+        }
+        throw new ArgumentException("--dump-package runs a read-only diagnostic and cannot be combined with --output or --landmark-output.");
+    }
+    if (string.IsNullOrWhiteSpace(outputDirectory) || string.IsNullOrWhiteSpace(landmarkOutputDirectory))
     {
         throw new ArgumentException(
             "Usage: PalworldAssetExporter --pak-directory PATH --mappings FILE --output PATH " +
@@ -229,7 +293,9 @@ record ExportOptions(
     string MappingsFile,
     string OutputDirectory,
     string LandmarkOutputDirectory,
-    string? ExpectedGameVersion);
+    string? ExpectedGameVersion,
+    string? DumpPackage = null,
+    string? DumpFilter = null);
 record LayerSource(string Id, string Name, string FileName, string ObjectPath, double[] Bounds);
 record LayerManifest(
     string Id,
