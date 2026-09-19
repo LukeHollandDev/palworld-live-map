@@ -619,7 +619,7 @@ describe('App', () => {
     expect(screen.queryByRole('button', { name: 'Companion Default' })).not.toBeInTheDocument()
   })
 
-  it('warns when the exported landmark catalogue does not match the live server version', async () => {
+  it('shows a subtle hint when the exported landmark catalogue does not match the live server version', async () => {
     mockAPI((path) => {
       if (path === '/api/players') {
         return {
@@ -633,10 +633,9 @@ describe('App', () => {
 
     await screen.findByRole('heading', { name: 'Test Realm' })
     const explorer = await screen.findByRole('complementary', { name: 'Map filters' })
-    expect(within(explorer).getByText(/World catalogue version mismatch:/)).toHaveTextContent(
-      'locations were exported for Palworld 1.0.1.100619, but this server reports v1.0.1.100620'
-    )
-    expect(within(explorer).getByText(/World catalogue version mismatch:/)).toHaveTextContent('make game-assets')
+    expect(
+      within(explorer).getByText('Map locations may be from a different game version than this server.')
+    ).toBeVisible()
   })
 
   it('accepts an exact numeric server release with a leading v', async () => {
@@ -653,7 +652,7 @@ describe('App', () => {
 
     await screen.findByRole('heading', { name: 'Test Realm' })
     const explorer = await screen.findByRole('complementary', { name: 'Map filters' })
-    expect(within(explorer).queryByText(/World catalogue version mismatch:/)).not.toBeInTheDocument()
+    expect(within(explorer).queryByText(/Map locations may be/)).not.toBeInTheDocument()
   })
 
   it('does not show a catalogue compatibility warning for the fictional demo version', async () => {
@@ -670,7 +669,7 @@ describe('App', () => {
 
     await screen.findByRole('heading', { name: 'Palpagos Live Demo' })
     const explorer = await screen.findByRole('complementary', { name: 'Map filters' })
-    expect(within(explorer).queryByText(/World catalogue/)).not.toBeInTheDocument()
+    expect(within(explorer).queryByText(/Map locations may be/)).not.toBeInTheDocument()
   })
 
   it('does not normalize differently formatted version components', async () => {
@@ -687,10 +686,12 @@ describe('App', () => {
 
     await screen.findByRole('heading', { name: 'Test Realm' })
     const explorer = await screen.findByRole('complementary', { name: 'Map filters' })
-    expect(within(explorer).getByText(/World catalogue version mismatch:/)).toBeVisible()
+    expect(
+      within(explorer).getByText('Map locations may be from a different game version than this server.')
+    ).toBeVisible()
   })
 
-  it('warns when catalogue compatibility cannot be verified', async () => {
+  it('shows a subtle hint when catalogue compatibility cannot be verified', async () => {
     mockAPI((path) => {
       if (path === '/api/players') {
         return {
@@ -704,9 +705,9 @@ describe('App', () => {
 
     await screen.findByRole('heading', { name: 'Test Realm' })
     const explorer = await screen.findByRole('complementary', { name: 'Map filters' })
-    expect(within(explorer).getByText(/catalogue compatibility could not be verified/)).toHaveTextContent(
-      'server reports an unrecognised version (release-1.0.1.100619+build)'
-    )
+    expect(
+      within(explorer).getByText('Map locations may be out of date; the server version could not be verified.')
+    ).toBeVisible()
   })
 
   it('clears search for relationship navigation and restores a durable close target', async () => {

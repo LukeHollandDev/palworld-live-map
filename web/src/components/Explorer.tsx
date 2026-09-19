@@ -23,6 +23,7 @@ interface ExplorerProps {
   expandedBases: Set<string>
   manualChecklist: CompletionChecklistView
   dataNotices: string[]
+  catalogueNotice?: string | null
   catalogueRetry?: {
     message: string
     onRetry: () => void
@@ -886,6 +887,9 @@ export function Explorer(props: ExplorerProps) {
                 {notice}
               </p>
             ))}
+            {props.catalogueNotice ? (
+              <p className="m-3 mt-1 px-2.5 text-[10px] leading-4 text-[#789da3]">{props.catalogueNotice}</p>
+            ) : null}
             {props.catalogueRetry ? (
               <div
                 role="status"

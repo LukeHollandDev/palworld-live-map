@@ -133,6 +133,8 @@ Docker Desktop can usually reach the tunnel at `http://host.docker.internal:8212
 
 Run `make game-assets` to regenerate map artwork and encounter data from a local Palworld installation. See the [asset exporter guide](exporter/README.md) for requirements and details.
 
+When a game update outpaces the exporter's pinned community mappings, run the export with your own mappings file instead of committing it: `PALWORLD_MAPPINGS=/path/to/Mappings.usmap make game-assets`. The file is mounted read-only and its hash is recorded in the generated manifest. See [Supplying your own mappings](exporter/README.md#supplying-your-own-mappings).
+
 ## Verify Changes
 
 | Command               | Purpose                                                               |

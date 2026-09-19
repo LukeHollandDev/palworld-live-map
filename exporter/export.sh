@@ -12,6 +12,9 @@ output_directory=${MAP_OUTPUT_DIR:-$repository_dir/build/maps}
 landmark_output_directory=${LANDMARK_OUTPUT_DIR:-$repository_dir/build/landmarks}
 game_version=${PALWORLD_GAME_VERSION-}
 
+mappings_path=/mappings.usmap
+custom_mappings=${PALWORLD_MAPPINGS-}
+
 image_name=palworld-live-map/asset-exporter:dev
 
 fail() {
@@ -25,25 +28,37 @@ if [ ! -d "$pak_directory" ]; then
   fail "Palworld PAK directory not found at $pak_directory. Set PALWORLD_ROOT to the directory containing Pal/ and Engine/."
 fi
 
+if [ -n "$custom_mappings" ]; then
+  [ -f "$custom_mappings" ] || fail "PALWORLD_MAPPINGS does not point to a file: $custom_mappings"
+  mappings_path=/local-mappings.usmap
+fi
+
 mkdir -p "$output_directory" "$landmark_output_directory"
 
 printf 'Building the Palworld Asset Exporter...\n'
 docker build --quiet -t "$image_name" "$script_dir" >/dev/null
 
+if [ -n "$custom_mappings" ]; then
+  printf 'Using the mappings file supplied via PALWORLD_MAPPINGS (%s); it is mounted read-only and never copied into the image.\n' "$custom_mappings"
+fi
+
 printf 'Exporting map artwork and static world catalogue...\n'
-set -- \
+set -- docker run --rm \
+  --mount "type=bind,src=$pak_directory,dst=/palworld-paks,readonly" \
+  --mount "type=bind,src=$output_directory,dst=/output" \
+  --mount "type=bind,src=$landmark_output_directory,dst=/landmark-output"
+if [ -n "$custom_mappings" ]; then
+  set -- "$@" --mount "type=bind,src=$custom_mappings,dst=/local-mappings.usmap,readonly"
+fi
+set -- "$@" "$image_name" \
   --pak-directory /palworld-paks \
-  --mappings /mappings.usmap \
+  --mappings "$mappings_path" \
   --output /output \
   --landmark-output /landmark-output
 if [ -n "$game_version" ]; then
   set -- "$@" --game-version "$game_version"
 fi
-docker run --rm \
-  --mount "type=bind,src=$pak_directory,dst=/palworld-paks,readonly" \
-  --mount "type=bind,src=$output_directory,dst=/output" \
-  --mount "type=bind,src=$landmark_output_directory,dst=/landmark-output" \
-  "$image_name" "$@"
+"$@"
 
 printf 'Generated maps and provenance manifest in %s\n' "$output_directory"
 printf 'Generated static world catalogue in %s\n' "$landmark_output_directory"

@@ -57,6 +57,25 @@ The game version is always read from `Pal/Config/DefaultGame.ini` inside the mou
 PALWORLD_GAME_VERSION="1.0.1.100619" make game-assets
 ```
 
+### Supplying your own mappings
+
+The exporter image ships with a checksum-pinned community mappings file that is
+sufficient for the game version it targets. If a Palworld update changes a data
+table before new mappings are published upstream, you can run the export with a
+mappings file you obtained yourself instead:
+
+```bash
+PALWORLD_MAPPINGS="/path/to/Mappings.usmap" make game-assets
+```
+
+The file is bind-mounted read-only into the container for that run only. It is
+never copied into the image or committed to the repository, so keep it somewhere
+git-ignored (for example `build/`). Its SHA-256 is recorded in the generated
+manifest exactly like the pinned mapping, and the export still fails closed if
+the mapping cannot decode a required table. Distribution terms for third-party
+mappings vary: obtain the file yourself from its author and do not redistribute
+it with this project.
+
 ## Configuration
 
 | Variable | Purpose | Default |
@@ -65,6 +84,7 @@ PALWORLD_GAME_VERSION="1.0.1.100619" make game-assets
 | `PALWORLD_GAME_VERSION` | Optional exact-version assertion checked against the PAK-derived `ProjectVersion` | Unset |
 | `MAP_OUTPUT_DIR` | Directory for the exported images and manifest | `build/maps` |
 | `LANDMARK_OUTPUT_DIR` | Directory for the landmark manifest | `build/landmarks` |
+| `PALWORLD_MAPPINGS` | Path to a mappings `.usmap` file to use for this run instead of the image's pinned copy. Mounted read-only; never copied into the image | Unset (use the pinned mapping) |
 
 ## Diagnosing game-update breakage
 
