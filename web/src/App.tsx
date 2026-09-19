@@ -625,17 +625,12 @@ function LiveMap({
   const catalogueCompatibility = playerState
     ? landmarkCatalogueCompatibility(config.landmarkCatalogue.gameVersion, playerState.server.version)
     : 'compatible'
-  if (catalogueCompatibility === 'mismatch') {
-    const catalogueNotice = `World catalogue version mismatch: locations were exported for Palworld ${config.landmarkCatalogue.gameVersion}, but this server reports ${playerState?.server.version}. Static locations may be outdated; regenerate them with make game-assets.`
-    objectNotice = objectNotice ? `${objectNotice} ${catalogueNotice}` : catalogueNotice
-  } else if (catalogueCompatibility === 'unverifiable') {
-    const reportedVersion = playerState?.server.version?.trim()
-    const reason = reportedVersion
-      ? `the server reports an unrecognised version (${reportedVersion})`
-      : 'the server did not report a version'
-    const catalogueNotice = `World catalogue compatibility could not be verified because ${reason}. Static locations may be outdated; regenerate them with make game-assets after confirming the installed game version.`
-    objectNotice = objectNotice ? `${objectNotice} ${catalogueNotice}` : catalogueNotice
-  }
+  const catalogueNotice =
+    catalogueCompatibility === 'mismatch'
+      ? 'Map locations may be from a different game version than this server.'
+      : catalogueCompatibility === 'unverifiable'
+        ? 'Map locations may be out of date; the server version could not be verified.'
+        : null
 
   const dataNotices = [
     playerState?.saveEnabled && playerState.saveLastError === 'resolve-failed'
@@ -661,6 +656,7 @@ function LiveMap({
       saveCompletedIds
     },
     dataNotices,
+    catalogueNotice,
     catalogueRetry: catalogueError
       ? {
           message: 'Additional static map locations are temporarily unavailable.',
