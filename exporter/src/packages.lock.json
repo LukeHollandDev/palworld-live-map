@@ -4,9 +4,9 @@
     "net10.0": {
       "CUE4Parse": {
         "type": "Direct",
-        "requested": "[1.2.2.202609, )",
-        "resolved": "1.2.2.202609",
-        "contentHash": "TyZXxkTsuYrJU17tB9ryfdpakvV1KRNpSbnVtlhdFVnO4jJ1ZNAb6lfAt2gWHNiuWNu3k9C+YSYVo51aP5hfWg==",
+        "requested": "[1.2.2.202610, )",
+        "resolved": "1.2.2.202610",
+        "contentHash": "aOBFhhGOzmlk6WRccmFqN1oi90BBE8b4kvlJySDHb05J5AcUQ9nxnUQRKD2npBBjod9mDBULVPnsAVCIx3N4ZA==",
         "dependencies": {
           "Blake3": "3.0.2",
           "BouncyCastle.Cryptography": "2.6.2",
@@ -32,12 +32,12 @@
       },
       "CUE4Parse-Conversion": {
         "type": "Direct",
-        "requested": "[1.2.2.202609, )",
-        "resolved": "1.2.2.202609",
-        "contentHash": "HCxAlalI2yqdh7aI6LoSbvghV7UtxuOWBpMMEdYEZ26gykVTaTc7alZyMfHUHBqj6/TVgt/ZbGWudM5Uuc9xeA==",
+        "requested": "[1.2.2.202610, )",
+        "resolved": "1.2.2.202610",
+        "contentHash": "0K6xePgid09MQ/QQyxeCBQTuAx3zDZcqvd7AGoY8w10YqlQ7E8XgMFA/SQUgd22kSUdID5s73CV/D3S4lxOJzw==",
         "dependencies": {
           "AssetRipper.TextureDecoder": "2.6.2",
-          "CUE4Parse": "1.2.2.202609",
+          "CUE4Parse": "1.2.2.202610",
           "SharpGLTF.Core": "1.0.6",
           "SharpGLTF.Toolkit": "1.0.6",
           "SixLabors.ImageSharp": "[3.1.12]",
