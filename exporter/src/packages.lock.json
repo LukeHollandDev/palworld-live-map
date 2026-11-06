@@ -4,10 +4,11 @@
     "net10.0": {
       "CUE4Parse": {
         "type": "Direct",
-        "requested": "[1.2.2.202609, )",
-        "resolved": "1.2.2.202609",
-        "contentHash": "TyZXxkTsuYrJU17tB9ryfdpakvV1KRNpSbnVtlhdFVnO4jJ1ZNAb6lfAt2gWHNiuWNu3k9C+YSYVo51aP5hfWg==",
+        "requested": "[1.2.2.202611, )",
+        "resolved": "1.2.2.202611",
+        "contentHash": "vQXCDutgh5bEeNCuBHsE+sCqlbLOCd8JdwZab7Zkxs20u5Q78KPMZRDOA4NOo8bzPHpIkvWx6vGFi8BQjNOL+Q==",
         "dependencies": {
+          "Berrysoft.XXTea": "4.0.9",
           "Blake3": "3.0.2",
           "BouncyCastle.Cryptography": "2.6.2",
           "FixedMathSharp": "4.0.1",
@@ -32,12 +33,12 @@
       },
       "CUE4Parse-Conversion": {
         "type": "Direct",
-        "requested": "[1.2.2.202609, )",
-        "resolved": "1.2.2.202609",
-        "contentHash": "HCxAlalI2yqdh7aI6LoSbvghV7UtxuOWBpMMEdYEZ26gykVTaTc7alZyMfHUHBqj6/TVgt/ZbGWudM5Uuc9xeA==",
+        "requested": "[1.2.2.202611, )",
+        "resolved": "1.2.2.202611",
+        "contentHash": "DGGBGyQbqtsVtCi2ywxbADEHny57plYcMHeiD7M+ziFIVUnETDmf1uKxSC5rOf5RYZARy3eQHBvoULwVuZGkmA==",
         "dependencies": {
           "AssetRipper.TextureDecoder": "2.6.2",
-          "CUE4Parse": "1.2.2.202609",
+          "CUE4Parse": "1.2.2.202611",
           "SharpGLTF.Core": "1.0.6",
           "SharpGLTF.Toolkit": "1.0.6",
           "SixLabors.ImageSharp": "[3.1.12]",
@@ -75,6 +76,11 @@
         "type": "Transitive",
         "resolved": "2.6.2",
         "contentHash": "amxJyySJVacy0vv+uPAmj6KoHlNuwZmZVd4TuBMCESQB2wwvH37gLzzo9/0zU6dPXbxXbSQDG1U7slOx50DtZw=="
+      },
+      "Berrysoft.XXTea": {
+        "type": "Transitive",
+        "resolved": "4.0.9",
+        "contentHash": "egPzlakxtRpYl4rd7S5XYSfOMbSjmlurUFEgPU5+q4B+9f0qhlfr0Scn9zs8LqqXPeRq1j41z7A+qCrRZDyJsw=="
       },
       "Blake3": {
         "type": "Transitive",
